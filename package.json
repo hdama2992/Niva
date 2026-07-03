@@ -1,0 +1,19 @@
+{
+  "name": "niva",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "turbo run build",
+    "db:down": "docker compose -f docker/postgres/compose.yml down",
+    "db:up": "docker compose -f docker/postgres/compose.yml up -d",
+    "dev": "turbo run dev --parallel",
+    "format": "prettier --write .",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.5"
+  }
+}

@@ -1,0 +1,29 @@
+node_modules/
+.turbo/
+
+# Build output
+build/
+dist/
+.next/
+coverage/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE files
+.idea/
+.vscode/settings.json
+
+# OS files
+.DS_Store
+
+# Local runtime data
+docker/postgres/data/
