@@ -35,6 +35,15 @@ Copy the backend environment template before starting the API:
 cp apps/backend/.env.example apps/backend/.env
 ```
 
+Create or apply local database migrations with:
+
+```bash
+pnpm db:migrate
+```
+
+`pnpm dev` starts the admin dashboard on port 3000 and the API on port 3001.
+Run the Flutter app separately from `apps/mobile` with `flutter run`.
+
 ## Workspace Layout
 
 ```text

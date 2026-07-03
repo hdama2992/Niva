@@ -6,6 +6,8 @@
   "scripts": {
     "build": "turbo run build",
     "db:down": "docker compose -f docker/postgres/compose.yml down",
+    "db:migrate": "pnpm --filter @niva/backend prisma:migrate",
+    "db:studio": "pnpm --filter @niva/backend prisma:studio",
     "db:up": "docker compose -f docker/postgres/compose.yml up -d",
     "dev": "turbo run dev --parallel",
     "format": "prettier --write .",
