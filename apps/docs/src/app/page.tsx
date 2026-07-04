@@ -41,6 +41,12 @@ const docs = [
     body: 'Firebase owns OTP delivery and identity proof. It does not own Niva business rules.',
   },
   {
+    id: 'phone-metadata',
+    title: 'Phone Country Metadata',
+    section: 'Mobile',
+    body: 'The current country picker is hardcoded for the initial UI. Production should use a real phone metadata library or shared metadata source.',
+  },
+  {
     id: 'postgres',
     title: 'PostgreSQL',
     section: 'Database',

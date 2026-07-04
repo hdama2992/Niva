@@ -63,6 +63,13 @@ the repository.
 The private key must retain escaped `\\n` sequences in `.env`; the backend
 converts them to real line breaks before Firebase Admin uses it.
 
+## Current mobile UI limitation
+
+The React Native Expo login screen currently uses a small hardcoded country
+list only to unblock the initial UI. Before production, replace that list with
+a proper phone-number metadata source or library so country calling codes,
+local number lengths, and formatting rules stay accurate.
+
 ## Endpoints
 
 ### Create or synchronize a session
