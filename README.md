@@ -9,7 +9,7 @@ backend API, admin dashboard, and shared packages.
 
 ## Tech Stack
 
-- Flutter
+- React Native Expo
 - NestJS
 - Next.js
 - PostgreSQL
@@ -41,15 +41,29 @@ Create or apply local database migrations with:
 pnpm db:migrate
 ```
 
-`pnpm dev` starts the admin dashboard on port 3000 and the API on port 3001.
-Run the Flutter app separately from `apps/mobile` with `flutter run`.
+`pnpm dev` starts the API, admin dashboard, docs site, and Expo dev server.
+For focused mobile work, run:
+
+```bash
+pnpm mobile:start
+```
+
+For focused documentation work, run:
+
+```bash
+pnpm docs:dev
+```
+
+The admin dashboard runs on port 3000, the API on port 3001, and the docs site
+on port 3002.
 
 ## Workspace Layout
 
 ```text
-apps/mobile      Flutter mobile application
+apps/mobile      React Native Expo mobile application
 apps/backend     NestJS API
 apps/admin       Next.js administration dashboard
+apps/docs        Niva Academy documentation website
 packages/ui      Shared web UI components
 packages/shared  Shared utilities
 packages/config  Shared tooling configuration
