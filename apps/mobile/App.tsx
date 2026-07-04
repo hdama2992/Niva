@@ -7,12 +7,14 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { OtpScreen } from './src/screens/OtpScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
+import { UsernameScreen } from './src/screens/UsernameScreen';
 
 type Route =
   | { name: 'splash' }
   | { name: 'login' }
   | { name: 'otp'; phone: string }
-  | { name: 'home'; phone: string };
+  | { name: 'username'; phone: string }
+  | { name: 'home'; phone: string; username: string };
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
@@ -38,11 +40,18 @@ export default function App() {
           <OtpScreen
             phone={route.phone}
             onBack={() => setRoute({ name: 'login' })}
-            onVerified={() => setRoute({ name: 'home', phone: route.phone })}
+            onVerified={() => setRoute({ name: 'username', phone: route.phone })}
+          />
+        );
+      case 'username':
+        return (
+          <UsernameScreen
+            phone={route.phone}
+            onComplete={(username) => setRoute({ name: 'home', phone: route.phone, username })}
           />
         );
       case 'home':
-        return <HomeScreen phone={route.phone} />;
+        return <HomeScreen phone={route.phone} username={route.username} />;
     }
   })();
 

@@ -5,9 +5,10 @@ import { colors, radius, spacing, typography } from '../constants/theme';
 
 type HomeScreenProps = {
   phone: string;
+  username: string;
 };
 
-export function HomeScreen({ phone }: HomeScreenProps) {
+export function HomeScreen({ phone, username }: HomeScreenProps) {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
@@ -18,7 +19,8 @@ export function HomeScreen({ phone }: HomeScreenProps) {
 
       <View style={styles.identityPanel}>
         <Text style={styles.panelLabel}>Signed in as</Text>
-        <Text style={styles.phone}>{phone}</Text>
+        <Text style={styles.username}>{username}</Text>
+        <Text style={styles.phone}>Verified phone: {phone}</Text>
       </View>
 
       <View style={styles.flow}>
@@ -100,6 +102,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   phone: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: spacing.xs,
+  },
+  username: {
     color: colors.ink,
     fontSize: typography.subheading,
     fontWeight: '800',

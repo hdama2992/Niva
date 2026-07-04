@@ -70,6 +70,14 @@ list only to unblock the initial UI. Before production, replace that list with
 a proper phone-number metadata source or library so country calling codes,
 local number lengths, and formatting rules stay accurate.
 
+The mobile flow also includes a temporary username step after OTP verification
+so the Home screen can show a product identity such as `Signed in as Maya`
+instead of only showing the verified phone number. In production, that username
+should be persisted on the backend user profile after Firebase authentication.
+
+Google, Apple, and other social providers can be added later through Firebase
+Authentication providers. They are not wired in the current Expo client yet.
+
 ## Endpoints
 
 ### Create or synchronize a session

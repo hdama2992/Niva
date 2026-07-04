@@ -47,6 +47,18 @@ const docs = [
     body: 'The current country picker is hardcoded for the initial UI. Production should use a real phone metadata library or shared metadata source.',
   },
   {
+    id: 'username-onboarding',
+    title: 'Username Onboarding',
+    section: 'Authentication',
+    body: 'After phone verification, the current app asks for a username so the signed-in state can show a product identity instead of only a phone number.',
+  },
+  {
+    id: 'social-auth',
+    title: 'Social Sign-In',
+    section: 'Authentication',
+    body: 'Google, Apple, and other providers can be added later through Firebase Auth providers. They are not wired into the current Expo client yet.',
+  },
+  {
     id: 'postgres',
     title: 'PostgreSQL',
     section: 'Database',
