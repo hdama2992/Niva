@@ -5,7 +5,7 @@
 A verified Firebase phone identity becomes a local Niva user in PostgreSQL.
 
 ```text
-Flutter → Firebase Phone Auth → Firebase ID token → NestJS → Prisma → PostgreSQL
+React Native Expo → Firebase Phone Auth → Firebase ID token → NestJS → Prisma → PostgreSQL
 ```
 
 ## Implemented backend pieces
@@ -18,7 +18,7 @@ Flutter → Firebase Phone Auth → Firebase ID token → NestJS → Prisma → 
 - `GET /` returns `Niva Backend Running`.
 
 The API intentionally has no `send-otp` route. Firebase Phone Authentication
-sends and verifies the OTP from the Flutter client. The backend only verifies
+sends and verifies the OTP from the React Native Expo client. The backend only verifies
 Firebase's signed ID token, which prevents callers from inventing a phone
 number.
 
@@ -34,8 +34,7 @@ pnpm dev
 In another terminal:
 
 ```bash
-cd apps/mobile
-flutter run
+pnpm mobile:start
 ```
 
 ## Firebase setup still required
@@ -48,9 +47,10 @@ the repository.
 2. Register Android and iOS apps with bundle/package ID `com.niva.niva`.
 3. Add Android SHA-1/SHA-256 fingerprints and complete iOS APNs setup as
    Firebase requests.
-4. Run FlutterFire configuration to generate `firebase_options.dart`. Commit
-   that client configuration file unless your organization has a different
-   policy; never commit the Firebase Admin service-account key.
+4. Configure the Expo client with the Firebase project values required by the
+   chosen React Native Firebase integration. Commit only non-secret client
+   configuration unless your organization has a different policy; never commit
+   the Firebase Admin service-account key.
 5. Generate a Firebase Admin service account and add these values only to
    `apps/backend/.env`:
 
