@@ -7,11 +7,419 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SelfieVerificationStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  NEEDS_REVIEW
+  REJECTED
+}
+
+enum SelfieCheckProvider {
+  MANUAL
+  VENDOR
+  NONE
+}
+
+enum ImageQuality {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TrustTier {
+  NEW
+  BASIC_VERIFIED
+  TRUSTED
+  HOST_ELIGIBLE
+  HOST
+}
+
+enum TrustVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  RESTRICTED
+}
+
+enum TrustEventType {
+  PHONE_VERIFIED
+  GOOGLE_LINKED
+  USERNAME_SET
+  PROFILE_COMPLETED
+  SELF_DECLARATION_ACCEPTED
+  SELFIE_SUBMITTED
+  SELFIE_APPROVED
+  SELFIE_REJECTED
+  EVENT_ATTENDED
+  NO_SHOW
+  REPORT_CONFIRMED
+}
+
+enum VerificationReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_REVIEW
+}
+
+enum ActivityDifficulty {
+  EASY
+  BEGINNER
+  SOCIAL
+  FOCUSED
+}
+
+enum ActivityStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum MembershipStatus {
+  REQUESTED
+  APPROVED
+  CANCELLED
+  ATTENDED
+  NO_SHOW
+}
+
+enum ReportReason {
+  SPAM
+  FAKE_PROFILE
+  HARASSMENT
+  INAPPROPRIATE_BEHAVIOUR
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  VERIFICATION_APPROVED
+  JOIN_REQUEST_ACCEPTED
+  EVENT_REMINDER
+  HOST_UPDATED_LOCATION
+  CIRCLE_STARTING
+  REPORT_UPDATE
+}
+
+enum ChatThreadType {
+  EVENT
+  CIRCLE
+}
+
 model User {
-  id          String   @id @default(cuid())
-  firebaseUid String   @unique
-  phone       String   @unique
-  name        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                        String               @id @default(cuid())
+  firebaseUid               String               @unique
+  phone                     String?              @unique
+  email                     String?              @unique
+  username                  String?              @unique
+  displayName               String?
+  authProviders             String[]             @default([])
+  phoneVerified             Boolean              @default(false)
+  googleVerified            Boolean              @default(false)
+  selfDeclarationAccepted   Boolean              @default(false)
+  selfDeclarationAcceptedAt DateTime?
+  selfDeclarationVersion    String?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  profile                   UserProfile?
+  selfieVerification        SelfieVerification?
+  trust                     TrustProfile?
+  trustEvents               TrustEvent[]
+  usernameReservation       UsernameReservation?
+  verificationReview        VerificationReview?
+  hostedEvents              Event[]              @relation("EventHost")
+  hostedCircles             Circle[]             @relation("CircleHost")
+  eventMemberships          EventMember[]
+  circleMemberships         CircleMember[]
+  reportsMade               UserReport[]         @relation("ReportsMade")
+  reportsReceived           UserReport[]         @relation("ReportsReceived")
+  blocksMade                UserBlock[]          @relation("BlocksMade")
+  blocksReceived            UserBlock[]          @relation("BlocksReceived")
+  notifications             Notification[]
+  settings                  UserSettings?
+  emergencyContact          EmergencyContact?
+  feedback                  EventFeedback[]
+  chatMessages              ChatMessage[]
+  connectionsStarted        Connection[]         @relation("ConnectionUserA")
+  connectionsReceived       Connection[]         @relation("ConnectionUserB")
+}
+
+model UsernameReservation {
+  username  String   @id
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName         String
+  username            String
+  bio                 String?
+  city                String
+  interests           String[] @default([])
+  profilePhotoUrl     String?
+  profileCompleteness Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model SelfieVerification {
+  userId              String                   @id
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status              SelfieVerificationStatus @default(NOT_STARTED)
+  selfieUrl           String?
+  selfieSubmittedAt   DateTime?
+  selfieCheckProvider SelfieCheckProvider      @default(MANUAL)
+  faceDetected        Boolean?
+  imageQuality        ImageQuality?
+  suspectedFake       Boolean?
+  suspectedScreenshot Boolean?
+  confidence          Float?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+}
+
+model TrustProfile {
+  userId             String                  @id
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score              Int                     @default(0)
+  tier               TrustTier               @default(NEW)
+  verificationStatus TrustVerificationStatus @default(UNVERIFIED)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+}
+
+model TrustEvent {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TrustEventType
+  points    Int
+  metadata  Json?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+}
+
+model VerificationReview {
+  id         String                   @id @default(cuid())
+  userId     String                   @unique
+  user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selfieUrl  String
+  status     VerificationReviewStatus @default(PENDING)
+  reviewerId String?
+  reason     String?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  reviewedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+model Event {
+  id                   String             @id @default(cuid())
+  title                String
+  description          String
+  city                 String
+  locationName         String
+  startsAt             DateTime
+  endsAt               DateTime?
+  capacity             Int
+  difficulty           ActivityDifficulty @default(SOCIAL)
+  interests            String[]           @default([])
+  status               ActivityStatus     @default(PUBLISHED)
+  requiresVerification Boolean            @default(true)
+  hostId               String?
+  host                 User?              @relation("EventHost", fields: [hostId], references: [id], onDelete: SetNull)
+  members              EventMember[]
+  reports              UserReport[]
+  feedback             EventFeedback[]
+  chatThread           ChatThread?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([city, startsAt])
+  @@index([status, startsAt])
+}
+
+model Circle {
+  id                   String             @id @default(cuid())
+  title                String
+  description          String
+  city                 String
+  locationName         String
+  startsAt             DateTime
+  schedule             String
+  durationWeeks        Int                @default(6)
+  capacity             Int
+  difficulty           ActivityDifficulty @default(SOCIAL)
+  interests            String[]           @default([])
+  status               ActivityStatus     @default(PUBLISHED)
+  requiresVerification Boolean            @default(true)
+  hostId               String?
+  host                 User?              @relation("CircleHost", fields: [hostId], references: [id], onDelete: SetNull)
+  members              CircleMember[]
+  reports              UserReport[]
+  chatThread           ChatThread?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([city, startsAt])
+  @@index([status, startsAt])
+}
+
+model EventMember {
+  id        String           @id @default(cuid())
+  eventId   String
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    MembershipStatus @default(REQUESTED)
+  joinedAt  DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([userId, status])
+}
+
+model CircleMember {
+  id        String           @id @default(cuid())
+  circleId  String
+  circle    Circle           @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    MembershipStatus @default(REQUESTED)
+  joinedAt  DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([circleId, userId])
+  @@index([userId, status])
+}
+
+model UserReport {
+  id             String       @id @default(cuid())
+  reporterId     String
+  reporter       User         @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUserId String?
+  reportedUser   User?        @relation("ReportsReceived", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  eventId        String?
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  circleId       String?
+  circle         Circle?      @relation(fields: [circleId], references: [id], onDelete: SetNull)
+  reason         ReportReason
+  details        String?
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([reportedUserId, status])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model UserSettings {
+  userId                           String   @id
+  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationsEnabled             Boolean  @default(true)
+  showProfileInRecommendations     Boolean  @default(true)
+  allowCircleContinuitySuggestions Boolean  @default(true)
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+}
+
+model EmergencyContact {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  relationship String
+  phone        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatThread {
+  id        String         @id @default(cuid())
+  type      ChatThreadType
+  eventId   String?        @unique
+  event     Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  circleId  String?        @unique
+  circle    Circle?        @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model EventFeedback {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  body      String?
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  userAId   String
+  userA     User     @relation("ConnectionUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId   String
+  userB     User     @relation("ConnectionUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  source    String
+  createdAt DateTime @default(now())
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
 }

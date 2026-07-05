@@ -74,4 +74,18 @@ docs              Project documentation
 
 ## Status
 
-🚧 MVP in development
+MVP in development.
+
+Completed sprint foundations:
+
+- Sprint 1: phone-auth session shape with Firebase and PostgreSQL.
+- Sprint 2: username, profile, self-declaration, selfie review, admin review,
+  and private trust events.
+- Sprint 3: mobile home and discovery prototype with events, circles,
+  workshops, recommendations, permission blocking, and profile tabs.
+- Sprint 4: closed-beta community scaffolding for host tools, scoped chats,
+  feedback, reports, blocks, notifications, settings, and circle continuity.
+
+Feature tracking:
+
+- [MVP feature status](docs/mvp-feature-status.md)

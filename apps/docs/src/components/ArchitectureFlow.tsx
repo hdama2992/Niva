@@ -7,7 +7,8 @@ const steps = [
     id: 'mobile',
     title: 'React Native App',
     role: 'The product experience users hold.',
-    detail: 'Collects verified intent from the user and sends HTTPS requests to the backend.',
+    detail:
+      'Collects verified intent from the user and sends HTTPS requests to the backend.',
   },
   {
     id: 'firebase',
@@ -19,13 +20,29 @@ const steps = [
     id: 'backend',
     title: 'NestJS Backend',
     role: 'The business rules layer.',
-    detail: 'Checks Firebase tokens, decides what users can do, and protects the database.',
+    detail:
+      'Checks Firebase tokens, decides what users can do, and protects the database.',
   },
   {
     id: 'database',
     title: 'PostgreSQL',
     role: 'The product memory.',
-    detail: 'Stores Niva users, communities, attendance, trust, and future matching data.',
+    detail:
+      'Stores users, profiles, reviews, trust events, communities, attendance, and future matching data.',
+  },
+  {
+    id: 'trust',
+    title: 'Trust Layer',
+    role: 'The private safety signal.',
+    detail:
+      'Turns verification, attendance, feedback, no-shows, and reports into internal milestones.',
+  },
+  {
+    id: 'admin',
+    title: 'Admin Review',
+    role: 'The manual safety lane.',
+    detail:
+      'Approves or rejects pending selfie reviews before members can join events and circles.',
   },
 ];
 
@@ -37,7 +54,9 @@ export function ArchitectureFlow() {
       <div className="flow-track" aria-label="Niva architecture layers">
         {steps.map((step, index) => (
           <button
-            className={step.id === activeStep.id ? 'flow-node active' : 'flow-node'}
+            className={
+              step.id === activeStep.id ? 'flow-node active' : 'flow-node'
+            }
             key={step.id}
             onClick={() => setActiveStep(step)}
             type="button"

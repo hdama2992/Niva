@@ -29,6 +29,36 @@ const docs = [
     body: 'Firebase verifies the phone number. NestJS verifies the Firebase ID token. Prisma stores or updates the Niva user.',
   },
   {
+    id: 'sprint-2',
+    title: 'Sprint 2: Trust And Onboarding',
+    section: 'Learning',
+    body: 'Username, profile, self-declaration, selfie review, admin approval, and private trust events move a member toward basic verification.',
+  },
+  {
+    id: 'sprint-3',
+    title: 'Sprint 3: Home And Discovery',
+    section: 'Learning',
+    body: 'Home becomes the action surface for nearby events, recurring circles, workshops, recommendations, and join permissions.',
+  },
+  {
+    id: 'sprint-4',
+    title: 'Sprint 4: Community And Retention',
+    section: 'Learning',
+    body: 'Host tools, workshops, icebreakers, feedback, analytics, and circle continuity turn discovery into a repeat community loop.',
+  },
+  {
+    id: 'mvp-analysis',
+    title: 'MVP Analysis',
+    section: 'Product',
+    body: 'Niva should validate recurring activity cohorts with trust-first onboarding before expanding into broader social or host-led mechanics.',
+  },
+  {
+    id: 'feature-status',
+    title: 'MVP Feature Status',
+    section: 'Product',
+    body: 'Tracks implemented features, pending work, and the required checklist before a Bangalore closed beta launch.',
+  },
+  {
     id: 'http',
     title: 'HTTP Requests',
     section: 'Backend',
@@ -51,6 +81,24 @@ const docs = [
     title: 'Username Onboarding',
     section: 'Authentication',
     body: 'After phone verification, the current app asks for a username so the signed-in state can show a product identity instead of only a phone number.',
+  },
+  {
+    id: 'selfie-review',
+    title: 'Selfie Review',
+    section: 'Trust',
+    body: 'The selfie check starts from a join attempt. It is for real-person, image-quality, and abuse-prevention review, not gender inference.',
+  },
+  {
+    id: 'safety-foundation',
+    title: 'Safety Foundation',
+    section: 'Trust',
+    body: 'Reports, blocks, scoped chats, guidelines, notifications, and settings give the closed beta enough safety structure to operate.',
+  },
+  {
+    id: 'trust-events',
+    title: 'Trust Events',
+    section: 'Trust',
+    body: 'Private trust events record verification and participation signals. Members see milestones instead of raw trust scores.',
   },
   {
     id: 'social-auth',
@@ -78,13 +126,17 @@ const architectureChart = `flowchart TD
   api --> backend[NestJS Backend]
   backend --> firebase[Firebase Auth]
   backend --> postgres[(PostgreSQL)]
+  backend --> trust[Trust Events]
+  backend --> review[Admin Review]
   firebase --> sms[SMS Provider]
 `;
 
 export default function DocsHome() {
   const [query, setQuery] = useState('');
   const [darkMode, setDarkMode] = useState(
-    () => typeof window !== 'undefined' && window.localStorage.getItem('niva-docs-theme') === 'dark',
+    () =>
+      typeof window !== 'undefined' &&
+      window.localStorage.getItem('niva-docs-theme') === 'dark',
   );
 
   useEffect(() => {
@@ -99,7 +151,9 @@ export default function DocsHome() {
     }
 
     return docs.filter((doc) =>
-      `${doc.title} ${doc.section} ${doc.body}`.toLowerCase().includes(normalizedQuery),
+      `${doc.title} ${doc.section} ${doc.body}`
+        .toLowerCase()
+        .includes(normalizedQuery),
     );
   }, [query]);
 
@@ -132,7 +186,11 @@ export default function DocsHome() {
           ))}
         </nav>
 
-        <button className="theme-toggle" onClick={() => setDarkMode((value) => !value)} type="button">
+        <button
+          className="theme-toggle"
+          onClick={() => setDarkMode((value) => !value)}
+          type="button"
+        >
           {darkMode ? 'Light mode' : 'Dark mode'}
         </button>
       </aside>
@@ -142,8 +200,9 @@ export default function DocsHome() {
           <p className="eyebrow">Niva Academy</p>
           <h1>Learn the product by building the product.</h1>
           <p className="hero-copy">
-            Every sprint explains what we built, why it exists, and how it fits into Niva.
-            The stack is TypeScript-first: React Native Expo, NestJS, Next.js, and PostgreSQL.
+            Every sprint explains what we built, why it exists, and how it fits
+            into Niva. The stack is TypeScript-first: React Native Expo, NestJS,
+            Next.js, PostgreSQL, and Firebase.
           </p>
           <div className="stack-strip" aria-label="Niva stack">
             <span>React Native Expo</span>
@@ -151,6 +210,7 @@ export default function DocsHome() {
             <span>Next.js</span>
             <span>PostgreSQL</span>
             <span>Firebase</span>
+            <span>Trust Events</span>
           </div>
         </section>
 
@@ -193,8 +253,8 @@ export default function DocsHome() {
             <h2>React Native Expo replaces Flutter</h2>
           </div>
           <p>
-            The mobile app now uses TypeScript, so the mobile client, backend, admin,
-            docs, and shared packages can speak the same language.
+            The mobile app now uses TypeScript, so the mobile client, backend,
+            admin, docs, and shared packages can speak the same language.
           </p>
         </section>
 
@@ -204,8 +264,9 @@ export default function DocsHome() {
             <h2>NestJS owns product decisions</h2>
           </div>
           <p>
-            Firebase can prove who the user is. NestJS decides what that user can do
-            inside Niva and protects PostgreSQL from direct client access.
+            Firebase can prove who the user is. NestJS decides what that user
+            can do inside Niva and protects PostgreSQL from direct client
+            access.
           </p>
         </section>
 
@@ -215,8 +276,9 @@ export default function DocsHome() {
             <h2>PostgreSQL is the durable source of truth</h2>
           </div>
           <p>
-            User profiles, activities, attendance, host promotion, trust signals, and
-            matching data belong in a relational database behind the API.
+            User profiles, activities, attendance, host promotion, trust
+            signals, and matching data belong in a relational database behind
+            the API.
           </p>
         </section>
 

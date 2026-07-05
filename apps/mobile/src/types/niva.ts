@@ -1,0 +1,32 @@
+export type VerificationStatus =
+  'not_started' | 'pending' | 'approved' | 'needs_review' | 'rejected';
+
+export type TrustTier =
+  'new' | 'basic_verified' | 'trusted' | 'host_eligible' | 'host';
+
+export type NivaUser = {
+  phone: string;
+  username: string;
+  displayName: string;
+  city: string;
+  ageRange?: string;
+  bio?: string;
+  languages: string[];
+  occupation?: string;
+  interests: string[];
+  selfieUrl?: string;
+  selfDeclarationAccepted: boolean;
+  verificationStatus: VerificationStatus;
+  trustScore: number;
+  trustTier: TrustTier;
+};
+
+export type ProfileDraft = {
+  displayName: string;
+  city: string;
+  ageRange?: string;
+  bio?: string;
+  languages: string[];
+  occupation?: string;
+  interests: string[];
+};

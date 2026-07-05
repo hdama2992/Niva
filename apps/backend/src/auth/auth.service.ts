@@ -1,6 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { FirebaseAdminService } from '../firebase/firebase-admin.service';
-import { PublicUser, UsersService } from '../users/users.service';
+import {
+  firebaseTokenToSessionInput,
+  PublicUser,
+  UsersService,
+} from '../users/users.service';
 
 @Injectable()
 export class AuthService {
@@ -19,8 +23,7 @@ export class AuthService {
     }
 
     return this.usersService.upsertFromFirebase(
-      firebaseUser.uid,
-      firebaseUser.phone_number,
+      firebaseTokenToSessionInput(firebaseUser),
     );
   }
 }

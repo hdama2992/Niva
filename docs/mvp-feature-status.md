@@ -1,0 +1,233 @@
+# Niva MVP Feature Status
+
+## Scope
+
+This document tracks what is implemented in this repository, what is still
+pending, and what is required before a closed beta launch.
+
+Target launch shape:
+
+```text
+Launch type: Closed beta
+City: Bangalore
+Users: 50-200 women
+Events: manually curated
+Hosts: manually approved
+Verification: self-declaration plus join-time selfie review
+Community: event chats and circle chats only
+```
+
+## Implemented
+
+### Sprint 1: App Base
+
+- Expo mobile app shell.
+- NestJS backend.
+- Next.js admin dashboard.
+- Next.js documentation app.
+- PostgreSQL and Prisma setup.
+- Firebase Admin verification service.
+- Phone-auth session endpoint shape.
+- Basic mobile login, OTP, username, and home navigation prototype.
+- Shared theme tokens and reusable mobile form/button components.
+
+### Sprint 2: Foundation
+
+- Username rules: lowercase letters, numbers, underscore, 3-20 characters.
+- Backend username reservation model.
+- Profile setup fields:
+  - display name
+  - username
+  - bio
+  - city
+  - age range
+  - languages
+  - occupation
+  - interests
+  - profile photo URL field in backend
+- Self-declaration screen with explicit women-centered eligibility checkbox.
+- Selfie verification model.
+- Selfie verification is now triggered from the first join attempt, not forced
+  before Home.
+- Verification review queue model.
+- Admin review endpoints protected by `NIVA_ADMIN_KEY`.
+- Admin dashboard copy explaining review queue, admin key, and backend relation.
+- Trust profile model.
+- Trust event model.
+- Trust score and tier recalculation on verification actions.
+- Safety data scaffolding:
+  - reports
+  - blocks
+  - settings
+  - emergency contact
+  - notifications
+- Backend community routes for:
+  - events
+  - circles
+  - joining and leaving
+  - my activities
+  - notifications
+  - reports
+  - blocks
+  - settings
+  - emergency contact
+  - host-gated event creation
+  - event feedback
+
+### Sprint 3: User Experience
+
+- Home dashboard.
+- Explore screen.
+- Event cards.
+- Circle cards.
+- Workshop cards.
+- Search.
+- Interest filters.
+- Recommended activities from interests.
+- Event/circle detail modal.
+- Join confirmation modal.
+- Permission-blocked modal.
+- Join-time selfie verification path.
+- Verification pending screen.
+- My Events section.
+- Notifications panel.
+- Settings panel.
+- Profile screen with trust tier, verification status, interests, and profile
+  metadata.
+- Event/circle chats only in UI; no random DMs.
+- Empty states.
+- Icebreakers in activity details.
+- Block host action shown in activity details.
+- Host tools entry with create-event draft UI for trusted members and hosts.
+- Post-event feedback UI from My Events.
+
+### Sprint 4: Community And Retention
+
+- Sprint 4 documentation added.
+- Host-gated event creation backend route.
+- Event feedback backend route.
+- Bangalore seed data script for beta events and circles.
+- Mobile API client functions for community endpoints.
+- Connection model for future circle continuity.
+- Chat-thread and chat-message models scoped to events/circles.
+- Notification model for reminders and community updates.
+- Trust tier fields that can later unlock host tools.
+- Product/MVP analysis document.
+
+## Pending
+
+### Product And UX
+
+- Dedicated Event Details screen instead of only a modal.
+- Dedicated Circle Details screen instead of only a modal.
+- Dedicated Notifications screen instead of only a panel.
+- Dedicated Settings screen with editable rows.
+- Dedicated My Events screen with upcoming, past, and cancelled sections.
+- Proper Create Event host flow UI.
+- Proper report flow UI with reasons. Held by product decision for now:
+  - spam
+  - fake profile
+  - harassment
+  - inappropriate behaviour
+  - other
+- Proper block/unblock management UI.
+- Community guidelines screen or page before first join. Held by product
+  decision for now.
+- More polished empty states and loading states.
+- Real responsive QA across phone sizes.
+
+### Mobile Integration
+
+- Real Firebase Phone Auth in the Expo app.
+- Google sign-in in the Expo app.
+- Session persistence.
+- Logout wired to auth state.
+- Real image picker/camera for selfie and profile photo.
+- Real file upload to S3, R2, Firebase Storage, or equivalent.
+- Push notification registration with FCM/Expo notifications.
+- Real event/circle chat implementation.
+- Real join/leave API calls.
+- Real report/block API calls.
+- Real notification read state.
+
+### Backend And Data
+
+- Real authorization policy tests.
+- Admin report moderation endpoints.
+- Admin event/circle management endpoints.
+- Admin host approval endpoints.
+- Host create/manage circle endpoint.
+- Attendance marking endpoint.
+- No-show handling.
+- Post-event feedback trust updates.
+- Notification dispatch worker or Cloud Function.
+- Trust recalculation job.
+- Connection/circle-continuity logic.
+- Stronger input validation for phone, profile photo URL, and event timing.
+- Database migration applied and tested against local PostgreSQL.
+
+### Admin
+
+- Admin dashboard currently shows a static review-console UI.
+- Wire dashboard to backend review queue.
+- Add report moderation queue.
+- Add event/circle management.
+- Add member lookup.
+- Add host approval controls.
+- Add audit history for verification and moderation decisions.
+
+### Legal, Privacy, And Safety
+
+- Privacy policy.
+- Terms/community guidelines.
+- Consent copy for selfie and profile data.
+- Data retention policy for selfies.
+- Deletion request flow.
+- Admin access controls beyond a shared beta key.
+- Audit logging for admin actions.
+- Abuse escalation process.
+- Safety playbook for reports.
+
+## Required Before Closed Beta
+
+These are the minimum items needed before inviting real users.
+
+1. Real Firebase auth on mobile.
+2. Real backend API integration from mobile.
+3. Local PostgreSQL migration applied.
+4. Seeded Bangalore event/circle inventory.
+5. Real join request persistence.
+6. Join-time selfie upload and admin approval wired end to end.
+7. Admin dashboard connected to verification reviews.
+8. Block flow wired end to end. Report flow is intentionally held for now.
+9. Event/circle chat for joined members only.
+10. Notifications for verification, join status, event reminders, and host
+    updates.
+11. Attendance and feedback collection.
+12. Basic admin moderation for reports.
+13. Privacy policy and selfie consent copy. Dedicated community-guidelines page
+    is intentionally held for now.
+14. Closed beta operating process:
+    - who reviews selfies
+    - who approves hosts
+    - who handles reports
+    - how fast moderation responds
+
+## Not Required Before Closed Beta
+
+- Global public feed.
+- Random direct messages.
+- AI gender detection.
+- Full government ID verification for every user.
+- Payments.
+- In-app ticketing.
+- Public host marketplace.
+- Complex AI matching.
+- Ads or creator/influencer tools.
+
+## Current Product Judgment
+
+Sprint 1-4 now gives Niva a strong closed-beta MVP shape. It is not yet a fully
+integrated production app because several UI surfaces are still prototypes and
+the mobile app is not wired to real Firebase/backend flows. The next highest
+value work is integration, not more features.

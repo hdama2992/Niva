@@ -2,8 +2,19 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export type NivaUser = {
   id: string;
-  phone: string;
-  name: string | null;
+  phone: string | null;
+  email: string | null;
+  username: string | null;
+  displayName: string | null;
+  authProviders: string[];
+  phoneVerified: boolean;
+  googleVerified: boolean;
+  selfDeclarationAccepted: boolean;
+  selfDeclarationAcceptedAt: string | null;
+  selfDeclarationVersion: string | null;
+  profile: unknown | null;
+  selfieVerification: unknown | null;
+  trust: unknown | null;
   createdAt: string;
   updatedAt: string;
 };

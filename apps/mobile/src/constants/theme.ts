@@ -1,13 +1,20 @@
 export const colors = {
-  background: '#FFF8F8',
+  accent: '#F2B84B',
+  accentSoft: '#FFF4D8',
+  background: '#FFF9F4',
+  info: '#315F8F',
+  infoSoft: '#E8F0FA',
   surface: '#FFFFFF',
-  surfaceStrong: '#FDECF1',
-  primary: '#E76F8C',
-  primaryDark: '#B74364',
-  ink: '#24171C',
-  muted: '#74646A',
-  border: '#E8D7DD',
-  success: '#2E7D64',
+  surfaceStrong: '#F5EEF8',
+  primary: '#D95778',
+  primaryDark: '#A33B5A',
+  secondary: '#197C7B',
+  secondarySoft: '#E3F3F1',
+  ink: '#211A1D',
+  muted: '#6F6368',
+  border: '#E7DAD2',
+  success: '#287A61',
+  successSoft: '#E4F3EC',
   warning: '#8A5A00',
 };
 
@@ -22,8 +29,8 @@ export const spacing = {
 
 export const radius = {
   sm: 8,
-  md: 12,
-  lg: 16,
+  md: 8,
+  lg: 12,
   pill: 999,
 };
 

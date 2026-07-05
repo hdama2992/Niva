@@ -33,7 +33,18 @@ describe('AuthService', () => {
     const user = {
       id: 'user_1',
       phone: '+919876543210',
-      name: null,
+      email: null,
+      username: null,
+      displayName: null,
+      authProviders: ['phone'],
+      phoneVerified: true,
+      googleVerified: false,
+      selfDeclarationAccepted: false,
+      selfDeclarationAcceptedAt: null,
+      selfDeclarationVersion: null,
+      profile: null,
+      selfieVerification: null,
+      trust: null,
       createdAt: new Date('2026-07-03T00:00:00.000Z'),
       updatedAt: new Date('2026-07-03T00:00:00.000Z'),
     };
@@ -41,16 +52,24 @@ describe('AuthService', () => {
     verifyIdToken.mockResolvedValue({
       uid: 'firebase_1',
       phone_number: '+919876543210',
+      firebase: {
+        identities: { phone: ['+919876543210'] },
+        sign_in_provider: 'phone',
+      },
     });
     upsertFromFirebase.mockResolvedValue(user);
 
     await expect(
       authService.createSession('firebase-id-token'),
     ).resolves.toEqual(user);
-    expect(upsertFromFirebase).toHaveBeenCalledWith(
-      'firebase_1',
-      '+919876543210',
-    );
+    expect(upsertFromFirebase).toHaveBeenCalledWith({
+      firebaseUid: 'firebase_1',
+      phone: '+919876543210',
+      email: undefined,
+      authProviders: ['phone'],
+      phoneVerified: true,
+      googleVerified: false,
+    });
   });
 
   it('rejects a token that does not represent a phone-authenticated user', async () => {
