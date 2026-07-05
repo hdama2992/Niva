@@ -100,6 +100,11 @@ Community: event chats and circle chats only
 - Block host action shown in activity details.
 - Host tools entry with create-event draft UI for trusted members and hosts.
 - Post-event feedback UI from My Events.
+- Mobile onboarding writes username, profile, self-declaration, and selfie
+  review submission to the backend.
+- Home loads events, circles, memberships, and notifications from the backend.
+- Join requests and event feedback now persist through backend APIs.
+- Local beta auth bridge for Expo preview through `NIVA_BETA_AUTH_ENABLED`.
 
 ### Sprint 4: Community And Retention
 
@@ -107,6 +112,7 @@ Community: event chats and circle chats only
 - Host-gated event creation backend route.
 - Event feedback backend route.
 - Bangalore seed data script for beta events and circles.
+- Local PostgreSQL migration applied for the MVP schema.
 - Mobile API client functions for community endpoints.
 - Connection model for future circle continuity.
 - Chat-thread and chat-message models scoped to events/circles.
@@ -146,8 +152,9 @@ Community: event chats and circle chats only
 - Real file upload to S3, R2, Firebase Storage, or equivalent.
 - Push notification registration with FCM/Expo notifications.
 - Real event/circle chat implementation.
-- Real join/leave API calls.
-- Real report/block API calls.
+- Leave API calls wired into dedicated UI.
+- Real report API calls. Report UI is intentionally held for now.
+- Full block/unblock API calls from a dedicated management UI.
 - Real notification read state.
 
 ### Backend And Data
@@ -164,7 +171,6 @@ Community: event chats and circle chats only
 - Trust recalculation job.
 - Connection/circle-continuity logic.
 - Stronger input validation for phone, profile photo URL, and event timing.
-- Database migration applied and tested against local PostgreSQL.
 
 ### Admin
 
@@ -193,11 +199,12 @@ Community: event chats and circle chats only
 These are the minimum items needed before inviting real users.
 
 1. Real Firebase auth on mobile.
-2. Real backend API integration from mobile.
-3. Local PostgreSQL migration applied.
+2. Production Firebase-backed mobile session persistence.
+3. Real backend API integration from mobile. Local beta path is now wired.
 4. Seeded Bangalore event/circle inventory.
 5. Real join request persistence.
-6. Join-time selfie upload and admin approval wired end to end.
+6. Join-time selfie upload and admin approval wired end to end. Local beta path
+   is now wired; production file storage is still needed.
 7. Admin dashboard connected to verification reviews.
 8. Block flow wired end to end. Report flow is intentionally held for now.
 9. Event/circle chat for joined members only.
@@ -227,7 +234,9 @@ These are the minimum items needed before inviting real users.
 
 ## Current Product Judgment
 
-Sprint 1-4 now gives Niva a strong closed-beta MVP shape. It is not yet a fully
-integrated production app because several UI surfaces are still prototypes and
-the mobile app is not wired to real Firebase/backend flows. The next highest
-value work is integration, not more features.
+Sprint 1-4 now gives Niva a strong closed-beta MVP shape with real local
+PostgreSQL-backed onboarding, discovery, join requests, notifications, and
+feedback. It is not yet a production app because Firebase phone auth, file
+storage, push notifications, chat, and admin dashboard wiring still need to be
+finished. The next highest value work is production integration, not more
+features.

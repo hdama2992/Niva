@@ -283,6 +283,7 @@ export class UsersService {
     const displayName = dto.displayName.trim();
     const city = dto.city.trim();
     const interests = this.normalizeList(dto.interests);
+    const languages = this.normalizeList(dto.languages ?? []);
 
     if (!displayName || !city || interests.length < 3) {
       throw new BadRequestException(
@@ -310,6 +311,9 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
+          ageRange: dto.ageRange?.trim() || undefined,
+          languages,
+          occupation: dto.occupation?.trim() || undefined,
           interests,
           bio: dto.bio?.trim() || undefined,
           profilePhotoUrl: dto.profilePhotoUrl,
@@ -319,6 +323,9 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
+          ageRange: dto.ageRange?.trim() || null,
+          languages,
+          occupation: dto.occupation?.trim() || null,
           interests,
           bio: dto.bio?.trim() || null,
           profilePhotoUrl: dto.profilePhotoUrl,

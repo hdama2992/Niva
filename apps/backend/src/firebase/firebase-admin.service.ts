@@ -33,6 +33,25 @@ export class FirebaseAdminService {
   }
 
   async verifyIdToken(idToken: string): Promise<DecodedIdToken> {
+    const betaPhone = this.getBetaPhone(idToken);
+
+    if (betaPhone) {
+      return {
+        aud: 'niva-beta',
+        auth_time: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 60 * 60,
+        firebase: {
+          identities: { phone: [betaPhone] },
+          sign_in_provider: 'phone',
+        },
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'niva-beta',
+        phone_number: betaPhone,
+        sub: `beta:${betaPhone}`,
+        uid: `beta:${betaPhone}`,
+      };
+    }
+
     if (!this.app) {
       throw new ServiceUnavailableException(
         'Firebase Admin is not configured. Add Firebase service-account values to apps/backend/.env.',
@@ -46,5 +65,18 @@ export class FirebaseAdminService {
         'The Firebase ID token is invalid or expired.',
       );
     }
+  }
+
+  private getBetaPhone(idToken: string): string | undefined {
+    const betaAuthEnabled =
+      this.configService.get<string>('NIVA_BETA_AUTH_ENABLED') === 'true';
+
+    if (!betaAuthEnabled || !idToken.startsWith('niva-beta:')) {
+      return undefined;
+    }
+
+    const phone = idToken.replace('niva-beta:', '').trim();
+
+    return /^\+\d{8,15}$/.test(phone) ? phone : undefined;
   }
 }

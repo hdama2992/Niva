@@ -5,6 +5,7 @@ export type TrustTier =
   'new' | 'basic_verified' | 'trusted' | 'host_eligible' | 'host';
 
 export type NivaUser = {
+  id: string;
   phone: string;
   username: string;
   displayName: string;

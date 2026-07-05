@@ -22,6 +22,7 @@ import {
   cloneElement,
   isValidElement,
   ReactNode,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -44,9 +45,23 @@ import {
   workshops,
 } from '../data/discovery';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import {
+  blockUser,
+  CommunityActivity,
+  createEvent as createCommunityEvent,
+  joinCircle,
+  joinEvent,
+  listCircles,
+  listEvents,
+  listMyActivities,
+  listNotifications,
+  NotificationItem,
+  submitEventFeedback,
+} from '../services/community';
 import { NivaUser } from '../types/niva';
 
 type HomeScreenProps = {
+  idToken: string;
   user: NivaUser;
   onLogout: () => void;
   onStartVerification: (joiningTitle?: string) => void;
@@ -65,6 +80,7 @@ const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
 const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Career', 'Safety'];
 
 export function HomeScreen({
+  idToken,
   user,
   onLogout,
   onStartVerification,
@@ -78,6 +94,10 @@ export function HomeScreen({
   const [hostToolsVisible, setHostToolsVisible] = useState(false);
   const [hostedItems, setHostedItems] = useState<DiscoveryItem[]>([]);
   const [blockedHosts, setBlockedHosts] = useState<string[]>([]);
+  const [apiEvents, setApiEvents] = useState<DiscoveryItem[]>([]);
+  const [apiCircles, setApiCircles] = useState<DiscoveryItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [apiError, setApiError] = useState<string>();
   const [joinedItemIds, setJoinedItemIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -86,9 +106,14 @@ export function HomeScreen({
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const verified = user.verificationStatus === 'approved';
+  const visibleEvents = apiEvents.length ? apiEvents : weeklyEvents;
+  const visibleCircles = apiCircles.length ? apiCircles : circles;
   const allItems = useMemo(
-    () => [...hostedItems, ...allDiscoveryItems],
-    [hostedItems],
+    () =>
+      apiEvents.length || apiCircles.length
+        ? [...hostedItems, ...apiEvents, ...apiCircles, ...workshops]
+        : [...hostedItems, ...allDiscoveryItems],
+    [apiCircles, apiEvents, hostedItems],
   );
   const recommended = useMemo(() => {
     const userInterests = new Set(user.interests);
@@ -117,6 +142,51 @@ export function HomeScreen({
     [allItems, joinedItemIds],
   );
 
+  useEffect(() => {
+    void loadCommunityData();
+  }, [idToken, user.city]);
+
+  const loadCommunityData = async () => {
+    try {
+      setApiError(undefined);
+      const [
+        eventsPayload,
+        circlesPayload,
+        activitiesPayload,
+        notificationsPayload,
+      ] = await Promise.all([
+        listEvents(idToken, user.city),
+        listCircles(idToken, user.city),
+        listMyActivities(idToken),
+        listNotifications(idToken),
+      ]);
+
+      const events = eventsPayload.events.map((event) =>
+        activityToDiscoveryItem(event, 'event'),
+      );
+      const circles = circlesPayload.circles.map((circle) =>
+        activityToDiscoveryItem(circle, 'circle'),
+      );
+      const joinedIds = new Set<string>();
+
+      activitiesPayload.events.forEach(({ event }) => joinedIds.add(event.id));
+      activitiesPayload.circles.forEach(({ circle }) =>
+        joinedIds.add(circle.id),
+      );
+
+      setApiEvents(events);
+      setApiCircles(circles);
+      setJoinedItemIds(joinedIds);
+      setNotifications(notificationsPayload.notifications);
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load live Niva data.',
+      );
+    }
+  };
+
   const requestJoin = (item: DiscoveryItem) => {
     if (!verified) {
       if (user.verificationStatus === 'not_started') {
@@ -131,41 +201,72 @@ export function HomeScreen({
     setJoinCandidate(item);
   };
 
-  const confirmJoin = () => {
+  const confirmJoin = async () => {
     if (!joinCandidate) {
       return;
     }
 
-    setJoinedItemIds((current) => new Set(current).add(joinCandidate.id));
-    setJoinRequest(joinCandidate.title);
-    setJoinCandidate(undefined);
+    try {
+      if (joinCandidate.category === 'circle') {
+        await joinCircle(idToken, joinCandidate.remoteId ?? joinCandidate.id);
+      } else if (joinCandidate.category === 'event') {
+        await joinEvent(idToken, joinCandidate.remoteId ?? joinCandidate.id);
+      }
+
+      setJoinedItemIds((current) => new Set(current).add(joinCandidate.id));
+      setJoinRequest(joinCandidate.title);
+      setJoinCandidate(undefined);
+      await loadCommunityData();
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to send join request.',
+      );
+    }
   };
 
-  const createHostedEvent = (title: string) => {
-    const hostedEvent: DiscoveryItem = {
-      id: `hosted-${Date.now()}`,
-      category: 'event',
-      title: title.trim() || 'New hosted event',
-      location: user.city,
-      time: 'Draft',
-      seats: 6,
-      difficulty: 'Social',
-      interests: user.interests.slice(0, 2),
-      host: `Hosted by ${user.displayName}`,
-      summary: 'Host-created beta event draft.',
-    };
+  const createHostedEvent = async (title: string) => {
+    try {
+      const payload = await createCommunityEvent(idToken, {
+        capacity: 6,
+        city: user.city,
+        description: 'Host-created beta event draft.',
+        difficulty: 'SOCIAL',
+        interests: user.interests.slice(0, 2),
+        locationName: user.city,
+        startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        title: title.trim() || 'New hosted event',
+      });
 
-    setHostedItems((current) => [hostedEvent, ...current]);
-    setHostToolsVisible(false);
+      setHostedItems((current) => [
+        activityToDiscoveryItem(payload.event, 'event'),
+        ...current,
+      ]);
+      setHostToolsVisible(false);
+      await loadCommunityData();
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to create event.',
+      );
+    }
   };
 
-  const blockHost = (item: DiscoveryItem) => {
+  const blockHost = async (item: DiscoveryItem) => {
     const host = item.host.replace('Hosted by ', '').replace('Led by ', '');
 
-    setBlockedHosts((current) =>
-      current.includes(host) ? current : [...current, host],
-    );
-    setSelectedItem(undefined);
+    try {
+      if (item.hostId) {
+        await blockUser(idToken, item.hostId);
+      }
+
+      setBlockedHosts((current) =>
+        current.includes(host) ? current : [...current, host],
+      );
+      setSelectedItem(undefined);
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to block this host.',
+      );
+    }
   };
 
   const renderContent = () => {
@@ -178,16 +279,21 @@ export function HomeScreen({
               user={user}
             />
             <TrustCard user={user} verified={verified} />
+            {apiError ? (
+              <View style={styles.apiBanner}>
+                <Text style={styles.apiBannerText}>{apiError}</Text>
+              </View>
+            ) : null}
             <Section title="This week near you">
               <HorizontalCards
-                items={[...hostedItems, ...weeklyEvents]}
+                items={[...hostedItems, ...visibleEvents]}
                 onJoin={requestJoin}
                 onOpen={setSelectedItem}
               />
             </Section>
             <Section title="Circles starting soon">
               <HorizontalCards
-                items={circles}
+                items={visibleCircles}
                 onJoin={requestJoin}
                 onOpen={setSelectedItem}
               />
@@ -314,7 +420,7 @@ export function HomeScreen({
               subtitle="Recurring groups with the same members over several weeks."
             />
             <VerticalCards
-              items={circles}
+              items={visibleCircles}
               onJoin={requestJoin}
               onOpen={setSelectedItem}
             />
@@ -553,7 +659,9 @@ export function HomeScreen({
       />
 
       <FeedbackModal
+        idToken={idToken}
         item={feedbackCandidate}
+        onSubmitted={loadCommunityData}
         onClose={() => setFeedbackCandidate(undefined)}
       />
 
@@ -575,27 +683,28 @@ export function HomeScreen({
         title="Notifications"
         visible={notificationsVisible}
       >
-        <PanelRow
-          icon={
-            <CheckCircle2 color={colors.success} size={22} strokeWidth={2.3} />
-          }
-          title="Verification approved"
-          text="You can join events and circles after approval."
-        />
-        <PanelRow
-          icon={
-            <CalendarDays color={colors.primary} size={22} strokeWidth={2.3} />
-          }
-          title="Event starts tomorrow"
-          text="Badminton at Indiranagar Sports Arena, 8:00 AM."
-        />
-        <PanelRow
-          icon={
-            <UsersRound color={colors.secondary} size={22} strokeWidth={2.3} />
-          }
-          title="Circle begins Monday"
-          text="Book Club Week 1 starts with introductions."
-        />
+        {notifications.length ? (
+          notifications.map((notification) => (
+            <PanelRow
+              icon={<Bell color={colors.primary} size={22} strokeWidth={2.3} />}
+              key={notification.id}
+              title={notification.title}
+              text={notification.body}
+            />
+          ))
+        ) : (
+          <PanelRow
+            icon={
+              <CheckCircle2
+                color={colors.success}
+                size={22}
+                strokeWidth={2.3}
+              />
+            }
+            title="No notifications yet"
+            text="Join requests, reminders, and review updates will appear here."
+          />
+        )}
       </SimplePanelModal>
 
       <SimplePanelModal
@@ -874,7 +983,7 @@ function ActivityDetailModal({
 }: {
   blocked: boolean;
   item?: DiscoveryItem;
-  onBlock: (item: DiscoveryItem) => void;
+  onBlock: (item: DiscoveryItem) => Promise<void>;
   onClose: () => void;
   onJoin: (item: DiscoveryItem) => void;
 }) {
@@ -993,14 +1102,19 @@ function JoinConfirmModal({
 }
 
 function FeedbackModal({
+  idToken,
   item,
   onClose,
+  onSubmitted,
 }: {
+  idToken: string;
   item?: DiscoveryItem;
   onClose: () => void;
+  onSubmitted: () => Promise<void>;
 }) {
   const [rating, setRating] = useState(5);
   const [body, setBody] = useState('');
+  const [error, setError] = useState<string>();
 
   if (!item) {
     return null;
@@ -1047,15 +1161,37 @@ function FeedbackModal({
           </View>
           <TextInput
             multiline
-            onChangeText={setBody}
+            onChangeText={(value) => {
+              setBody(value);
+              setError(undefined);
+            }}
             placeholder="What worked? What should improve?"
             placeholderTextColor={colors.muted}
             style={styles.feedbackInput}
             value={body}
           />
+          {error ? <Text style={styles.formError}>{error}</Text> : null}
           <Pressable
             accessibilityRole="button"
-            onPress={onClose}
+            onPress={async () => {
+              try {
+                if (item.category === 'event') {
+                  await submitEventFeedback(idToken, item.remoteId ?? item.id, {
+                    body,
+                    rating,
+                  });
+                  await onSubmitted();
+                }
+
+                onClose();
+              } catch (submitError) {
+                setError(
+                  submitError instanceof Error
+                    ? submitError.message
+                    : 'Unable to submit feedback.',
+                );
+              }
+            }}
             style={styles.modalButton}
           >
             <Text style={styles.modalButtonText}>Submit feedback</Text>
@@ -1073,7 +1209,7 @@ function HostToolsModal({
   visible,
 }: {
   onClose: () => void;
-  onCreate: (title: string) => void;
+  onCreate: (title: string) => Promise<void>;
   user: NivaUser;
   visible: boolean;
 }) {
@@ -1253,7 +1389,76 @@ function formatTrustTier(tier: NivaUser['trustTier']) {
   }
 }
 
+function activityToDiscoveryItem(
+  activity: CommunityActivity,
+  category: 'circle' | 'event',
+): DiscoveryItem {
+  const startsAt = new Date(activity.startsAt);
+  const availableSeats = Math.max(
+    activity.capacity - (activity._count?.members ?? 0),
+    0,
+  );
+  const hostName =
+    activity.host?.displayName ?? activity.host?.username ?? 'Niva';
+
+  return {
+    id: activity.id,
+    remoteId: activity.id,
+    hostId: activity.host?.id,
+    category,
+    title: activity.title,
+    location: activity.locationName,
+    time:
+      category === 'circle' && activity.schedule
+        ? activity.schedule
+        : startsAt.toLocaleString(undefined, {
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            month: 'short',
+          }),
+    seats: availableSeats,
+    duration: activity.durationWeeks
+      ? `${activity.durationWeeks} weeks`
+      : undefined,
+    difficulty: formatActivityDifficulty(activity.difficulty),
+    interests: activity.interests,
+    host:
+      category === 'circle' ? `Led by ${hostName}` : `Hosted by ${hostName}`,
+    summary: activity.description,
+  };
+}
+
+function formatActivityDifficulty(
+  difficulty: string,
+): DiscoveryItem['difficulty'] {
+  switch (difficulty) {
+    case 'BEGINNER':
+      return 'Beginner';
+    case 'EASY':
+      return 'Easy';
+    case 'FOCUSED':
+      return 'Focused';
+    default:
+      return 'Social';
+  }
+}
+
 const styles = StyleSheet.create({
+  apiBanner: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  apiBannerText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
   blockedModal: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -1466,6 +1671,13 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: colors.surface,
+  },
+  formError: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginTop: spacing.md,
   },
   feedbackInput: {
     backgroundColor: colors.background,

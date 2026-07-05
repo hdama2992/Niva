@@ -168,6 +168,9 @@ model UserProfile {
   username            String
   bio                 String?
   city                String
+  ageRange            String?
+  languages           String[] @default([])
+  occupation          String?
   interests           String[] @default([])
   profilePhotoUrl     String?
   profileCompleteness Int      @default(0)

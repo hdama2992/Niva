@@ -1,6 +1,8 @@
 export type DiscoveryItem = {
   id: string;
   category: 'event' | 'circle' | 'workshop' | 'tip';
+  remoteId?: string;
+  hostId?: string;
   title: string;
   location: string;
   time: string;

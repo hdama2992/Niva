@@ -23,6 +23,21 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
+  ageRange?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  languages?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  occupation?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(280)
   bio?: string;
 

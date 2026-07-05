@@ -24,14 +24,20 @@ async function request<T>(
 }
 
 export type CommunityActivity = {
-  id: string;
-  title: string;
-  description: string;
+  _count?: { members: number };
+  category?: 'event' | 'circle';
   city: string;
-  locationName: string;
-  startsAt: string;
   capacity: number;
+  description: string;
+  difficulty: string;
+  durationWeeks?: number;
+  host?: { displayName: string | null; id: string; username: string | null };
+  id: string;
   interests: string[];
+  locationName: string;
+  schedule?: string;
+  startsAt: string;
+  title: string;
 };
 
 export type NotificationItem = {
@@ -82,8 +88,30 @@ export function leaveCircle(idToken: string, circleId: string) {
   });
 }
 
+export function createEvent(
+  idToken: string,
+  event: {
+    capacity: number;
+    city: string;
+    description: string;
+    difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
+    interests: string[];
+    locationName: string;
+    startsAt: string;
+    title: string;
+  },
+) {
+  return request<{ event: CommunityActivity }>('/community/events', idToken, {
+    body: event,
+    method: 'POST',
+  });
+}
+
 export function listMyActivities(idToken: string) {
-  return request('/community/me/activities', idToken);
+  return request<{
+    circles: Array<{ circle: CommunityActivity }>;
+    events: Array<{ event: CommunityActivity }>;
+  }>('/community/me/activities', idToken);
 }
 
 export function listNotifications(idToken: string) {
