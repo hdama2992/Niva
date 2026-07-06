@@ -1,128 +1,238 @@
-const pendingReviews = [
-  {
-    id: 'vr-101',
-    name: 'Himaja Rao',
-    username: 'himaja',
-    city: 'Bangalore',
-    submitted: '12 min ago',
-    status: 'Pending',
-  },
-  {
-    id: 'vr-102',
-    name: 'Meera Iyer',
-    username: 'meera_reads',
-    city: 'Bangalore',
-    submitted: '34 min ago',
-    status: 'Needs review',
-  },
-];
+'use client';
 
-const trustEvents = [
-  'PHONE_VERIFIED',
-  'USERNAME_SET',
-  'PROFILE_COMPLETED',
-  'SELF_DECLARATION_ACCEPTED',
-  'SELFIE_SUBMITTED',
-];
+import { FormEvent, useMemo, useState } from 'react';
+
+type ReviewStatus = 'APPROVED' | 'NEEDS_REVIEW' | 'PENDING' | 'REJECTED';
+
+type VerificationReview = {
+  createdAt: string;
+  id: string;
+  reason: string | null;
+  selfieStoragePath: string | null;
+  status: ReviewStatus;
+  user: {
+    displayName: string | null;
+    profile: { city: string | null } | null;
+    username: string | null;
+  };
+  userId: string;
+};
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function Home() {
+  const [adminKey, setAdminKey] = useState('');
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(false);
+  const [reviews, setReviews] = useState<VerificationReview[]>([]);
+  const [reviewingUserId, setReviewingUserId] = useState<string>();
+  const [viewingUserId, setViewingUserId] = useState<string>();
+
+  const counts = useMemo(
+    () => ({
+      approved: reviews.filter((review) => review.status === 'APPROVED').length,
+      pending: reviews.filter((review) => review.status === 'PENDING').length,
+      needsReview: reviews.filter((review) => review.status === 'NEEDS_REVIEW').length,
+    }),
+    [reviews],
+  );
+
+  const loadReviews = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const key = adminKey.trim();
+
+    if (!key) {
+      setError('Enter the admin key to load the verification queue.');
+      return;
+    }
+
+    setLoading(true);
+    setError(undefined);
+    try {
+      const response = await fetch(`${apiUrl}/admin/verification-reviews`, {
+        headers: { 'x-niva-admin-key': key },
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const payload = (await response.json()) as { reviews: VerificationReview[] };
+      setReviews(payload.reviews);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load the verification queue.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateReview = async (
+    review: VerificationReview,
+    status: Exclude<ReviewStatus, 'PENDING'>,
+    reason?: string,
+  ) => {
+    setReviewingUserId(review.userId);
+    setError(undefined);
+    try {
+      const response = await fetch(
+        `${apiUrl}/admin/verification-reviews/${review.userId}`,
+        {
+          body: JSON.stringify({
+            reviewerId: 'niva-admin',
+            reason: reason?.trim() || undefined,
+            status,
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-niva-admin-key': adminKey.trim(),
+          },
+          method: 'PATCH',
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      setReviews((current) =>
+        current.map((item) =>
+          item.userId === review.userId
+            ? { ...item, reason: reason?.trim() || null, status }
+            : item,
+        ),
+      );
+    } catch (reviewError) {
+      setError(
+        reviewError instanceof Error
+          ? reviewError.message
+          : 'Unable to update this verification review.',
+      );
+    } finally {
+      setReviewingUserId(undefined);
+    }
+  };
+
+  const viewSelfie = async (review: VerificationReview) => {
+    if (!review.selfieStoragePath) {
+      setError('This older review does not have a private selfie storage path.');
+      return;
+    }
+
+    setViewingUserId(review.userId);
+    setError(undefined);
+    try {
+      const response = await fetch(
+        `${apiUrl}/admin/verification-reviews/${review.userId}/selfie`,
+        { headers: { 'x-niva-admin-key': adminKey.trim() } },
+      );
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const payload = (await response.json()) as { url: string };
+      window.open(payload.url, '_blank', 'noopener,noreferrer');
+    } catch (viewerError) {
+      setError(
+        viewerError instanceof Error
+          ? viewerError.message
+          : 'Unable to open this verification selfie.',
+      );
+    } finally {
+      setViewingUserId(undefined);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-stone-50 px-6 py-8 text-stone-950">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-4 border-b border-stone-200 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-sm font-semibold text-rose-700">
-              Niva Admin
-            </p>
-            <h1 className="text-4xl font-bold tracking-tight">
-              Selfie review queue
-            </h1>
+            <p className="mb-2 text-sm font-semibold text-rose-700">Niva Admin</p>
+            <h1 className="text-4xl font-bold tracking-tight">Selfie review queue</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-              Manual-lite verification for Sprint 2. Approvals move members into
-              basic verified status and unlock event, circle, and chat access.
+              Approve or hold join-time selfie submissions. The backend applies the
+              verification status and trust-tier updates after each decision.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <Metric label="Pending" value="12" />
-            <Metric label="Approved" value="48" />
-            <Metric label="Flagged" value="3" />
+            <Metric label="Pending" value={counts.pending} />
+            <Metric label="Needs review" value={counts.needsReview} />
+            <Metric label="Approved" value={counts.approved} />
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">Pending reviews</h2>
-              <span className="rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-800">
-                Admin key required
-              </span>
-            </div>
-            <div className="grid gap-3">
-              {pendingReviews.map((review) => (
-                <article
-                  className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-                  key={review.id}
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-rose-700">
-                        {review.status}
-                      </p>
-                      <h3 className="mt-1 text-lg font-bold">{review.name}</h3>
-                      <p className="text-sm text-stone-600">
-                        @{review.username} · {review.city} · {review.submitted}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white">
-                        Approve
-                      </button>
-                      <button className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-bold text-stone-800">
-                        Review
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+        <form
+          className="flex flex-col gap-3 rounded-lg border border-stone-200 bg-white p-5 shadow-sm md:flex-row md:items-end"
+          onSubmit={(event) => void loadReviews(event)}
+        >
+          <label className="flex flex-1 flex-col gap-2 text-sm font-semibold text-stone-800">
+            Admin key
+            <input
+              autoComplete="current-password"
+              className="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-base font-normal outline-none ring-rose-300 focus:ring-2"
+              onChange={(event) => setAdminKey(event.target.value)}
+              placeholder="NIVA_ADMIN_KEY"
+              type="password"
+              value={adminKey}
+            />
+          </label>
+          <button
+            className="min-h-11 rounded-md bg-teal-700 px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={loading}
+            type="submit"
+          >
+            {loading ? 'Loading...' : 'Load queue'}
+          </button>
+        </form>
 
-          <aside className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-bold">Trust event path</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              These events are private signals. Members see milestones, not the
-              raw score.
+        {error ? (
+          <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-900">
+            {error}
+          </p>
+        ) : null}
+
+        {reviews.length ? (
+          <section className="grid gap-3">
+            {reviews.map((review) => (
+              <ReviewCard
+                busy={reviewingUserId === review.userId}
+                key={review.id}
+                onUpdate={updateReview}
+                onViewSelfie={viewSelfie}
+                review={review}
+                viewing={viewingUserId === review.userId}
+              />
+            ))}
+          </section>
+        ) : (
+          <section className="border-y border-stone-200 py-12 text-center">
+            <h2 className="text-lg font-bold">Load the review queue</h2>
+            <p className="mt-2 text-sm text-stone-600">
+              Enter the backend&apos;s `NIVA_ADMIN_KEY` above. No admin credential is
+              stored in this dashboard.
             </p>
-            <div className="mt-5 grid gap-3">
-              {trustEvents.map((event, index) => (
-                <div className="flex items-center gap-3" key={event}>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-900">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm font-semibold text-stone-800">
-                    {event}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </aside>
-        </section>
+          </section>
+        )}
 
-        <section className="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm md:grid-cols-2">
+        <section className="grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2">
           <div>
             <h2 className="text-xl font-bold">What the admin key means</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              `NIVA_ADMIN_KEY` is the beta admin password for protected backend
-              review routes. The dashboard sends it as `x-niva-admin-key`; the
-              backend rejects review actions without it.
+              `NIVA_ADMIN_KEY` is a beta-only shared credential sent as
+              `x-niva-admin-key`. The backend rejects queue reads and review actions
+              without it.
             </p>
           </div>
           <div>
             <h2 className="text-xl font-bold">Dashboard and backend</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              The dashboard is only the operator screen. The backend owns the
-              approval, rejection, verification status, trust score, and trust
-              tier updates.
+              This dashboard is the operator interface. The backend remains the source
+              of truth for review decisions, verification status, trust score, and tier.
             </p>
           </div>
         </section>
@@ -131,7 +241,87 @@ export default function Home() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function ReviewCard({
+  busy,
+  onUpdate,
+  onViewSelfie,
+  review,
+  viewing,
+}: {
+  busy: boolean;
+  onUpdate: (
+    review: VerificationReview,
+    status: Exclude<ReviewStatus, 'PENDING'>,
+    reason?: string,
+  ) => Promise<void>;
+  onViewSelfie: (review: VerificationReview) => Promise<void>;
+  review: VerificationReview;
+  viewing: boolean;
+}) {
+  const [reason, setReason] = useState(review.reason ?? '');
+  const submittedAt = new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(review.createdAt));
+
+  return (
+    <article className="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-center">
+      <div>
+        <p className="text-sm font-semibold text-rose-700">{review.status}</p>
+        <h2 className="mt-1 text-lg font-bold">
+          {review.user.displayName ?? 'Niva member'}
+        </h2>
+        <p className="mt-1 text-sm text-stone-600">
+          @{review.user.username ?? 'pending'} · {review.user.profile?.city ?? 'City not set'} · {submittedAt}
+        </p>
+        <button
+          className="mt-3 text-sm font-semibold text-teal-800 underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!review.selfieStoragePath || viewing}
+          onClick={() => void onViewSelfie(review)}
+          type="button"
+        >
+          {viewing ? 'Opening selfie...' : 'Open submitted selfie'}
+        </button>
+      </div>
+      <div className="grid gap-2 lg:w-80">
+        <input
+          className="min-h-10 rounded-md border border-stone-300 px-3 text-sm outline-none ring-rose-300 focus:ring-2"
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Review note (optional)"
+          value={reason}
+        />
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            className="min-h-10 rounded-md bg-teal-700 px-2 text-sm font-bold text-white disabled:opacity-60"
+            disabled={busy || review.status === 'APPROVED'}
+            onClick={() => void onUpdate(review, 'APPROVED', reason)}
+            type="button"
+          >
+            Approve
+          </button>
+          <button
+            className="min-h-10 rounded-md border border-amber-400 bg-amber-50 px-2 text-sm font-bold text-amber-950 disabled:opacity-60"
+            disabled={busy || review.status === 'NEEDS_REVIEW'}
+            onClick={() => void onUpdate(review, 'NEEDS_REVIEW', reason)}
+            type="button"
+          >
+            Hold
+          </button>
+          <button
+            className="min-h-10 rounded-md border border-rose-300 bg-rose-50 px-2 text-sm font-bold text-rose-900 disabled:opacity-60"
+            disabled={busy || review.status === 'REJECTED'}
+            onClick={() => void onUpdate(review, 'REJECTED', reason)}
+            type="button"
+          >
+            Reject
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-2xl font-bold">{value}</p>

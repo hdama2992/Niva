@@ -14,8 +14,10 @@ import {
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { MobileAuthMode } from '../services/mobile-auth';
 
 type LoginScreenProps = {
+  authMode: MobileAuthMode;
   onContinue: (phone: string) => void;
 };
 
@@ -35,7 +37,7 @@ const countries: Country[] = [
   { code: 'SG', dialCode: '+65', localDigits: 8, name: 'Singapore', placeholder: '8123 4567' },
 ];
 
-export function LoginScreen({ onContinue }: LoginScreenProps) {
+export function LoginScreen({ authMode, onContinue }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
@@ -67,7 +69,11 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
 
         <View style={styles.copy}>
           <Text style={styles.title}>Find your people.</Text>
-          <Text style={styles.subtitle}>Enter your phone number.</Text>
+          <Text style={styles.subtitle}>
+            {authMode === 'firebase'
+              ? 'Enter your phone number to receive a verification code.'
+              : 'Enter your phone number for the local beta preview.'}
+          </Text>
         </View>
 
         <View style={styles.phoneGroup}>

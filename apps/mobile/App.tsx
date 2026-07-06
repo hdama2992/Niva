@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, SafeAreaView, StyleSheet, View } from 'react-native';
 
 import { colors } from './src/constants/theme';
@@ -16,10 +17,24 @@ import {
   acceptSelfDeclaration,
   ApiUser,
   createBetaSession,
+  createSession,
   setUsername,
   submitSelfie,
   updateProfile,
 } from './src/services/session';
+import { firebaseConfig } from './src/services/firebase';
+import {
+  getMobileAuthMode,
+  logoutMobileUser,
+  restoreFirebaseIdToken,
+  sendPhoneCode,
+  verifyPhoneCode,
+} from './src/services/mobile-auth';
+import {
+  uploadProfilePhoto,
+  uploadVerificationSelfie,
+  type SelectedImage,
+} from './src/services/media';
 import { NivaUser, ProfileDraft } from './src/types/niva';
 
 type Route =
@@ -41,19 +56,65 @@ type Route =
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
+  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
+  const authMode = getMobileAuthMode();
 
   useEffect(() => {
-    if (route.name !== 'splash') {
-      return;
-    }
+    let isActive = true;
 
-    const timer = setTimeout(() => setRoute({ name: 'login' }), 900);
+    const restoreSession = async () => {
+      try {
+        const idToken = await restoreFirebaseIdToken();
 
-    return () => clearTimeout(timer);
-  }, [route.name]);
+        if (idToken) {
+          const user = await createSession(idToken);
 
-  const handleOtpVerified = (phone: string) =>
+          if (isActive) {
+            setRoute(routeForApiUser(idToken, user));
+          }
+
+          return;
+        }
+      } catch (error) {
+        console.warn('Unable to restore the Niva session.', error);
+      }
+
+      const timer = setTimeout(() => {
+        if (isActive) {
+          setRoute({ name: 'login' });
+        }
+      }, 900);
+
+      return () => clearTimeout(timer);
+    };
+
+    let clearTimer: (() => void) | undefined;
+    void restoreSession().then((cleanup) => {
+      clearTimer = cleanup;
+    });
+
+    return () => {
+      isActive = false;
+      clearTimer?.();
+    };
+  }, []);
+
+  const handleOtpRequested = (phone: string) =>
     withApiErrors(async () => {
+      await sendPhoneCode(phone, recaptchaVerifier.current);
+      setRoute({ name: 'otp', phone });
+    });
+
+  const handleOtpVerified = (phone: string, code: string) =>
+    withApiErrors(async () => {
+      const firebaseIdToken = await verifyPhoneCode(code);
+
+      if (firebaseIdToken) {
+        const user = await createSession(firebaseIdToken);
+        setRoute(routeForApiUser(firebaseIdToken, user));
+        return;
+      }
+
       const session = await createBetaSession(phone);
       setRoute(routeForApiUser(session.idToken, session.user));
     });
@@ -71,7 +132,12 @@ export default function App() {
     profile: ProfileDraft,
   ) =>
     withApiErrors(async () => {
-      await updateProfile(idToken, profile);
+      const { profilePhoto, ...profileData } = profile;
+      const profilePhotoUrl = profilePhoto
+        ? await uploadProfilePhoto(profilePhoto)
+        : undefined;
+
+      await updateProfile(idToken, { ...profileData, profilePhotoUrl });
       setRoute({
         idToken,
         name: 'declaration',
@@ -90,10 +156,11 @@ export default function App() {
   const handleSelfie = (
     idToken: string,
     currentUser: NivaUser,
-    selfieUrl: string,
+    image: SelectedImage,
   ) =>
     withApiErrors(async () => {
-      const { user } = await submitSelfie(idToken, selfieUrl);
+      const selfieStoragePath = await uploadVerificationSelfie(image);
+      const { user } = await submitSelfie(idToken, selfieStoragePath);
       setRoute({
         idToken,
         name: 'pending',
@@ -111,7 +178,8 @@ export default function App() {
       case 'login':
         return (
           <LoginScreen
-            onContinue={(phone) => setRoute({ name: 'otp', phone })}
+            authMode={authMode}
+            onContinue={handleOtpRequested}
           />
         );
       case 'otp':
@@ -119,7 +187,8 @@ export default function App() {
           <OtpScreen
             phone={route.phone}
             onBack={() => setRoute({ name: 'login' })}
-            onVerified={() => handleOtpVerified(route.phone)}
+            authMode={authMode}
+            onVerified={(code) => handleOtpVerified(route.phone, code)}
           />
         );
       case 'username':
@@ -150,8 +219,8 @@ export default function App() {
           <SelfieUploadScreen
             displayName={route.user.displayName}
             joiningTitle={route.joiningTitle}
-            onSubmit={(selfieUrl) =>
-              handleSelfie(route.idToken, route.user, selfieUrl)
+            onSubmit={(image) =>
+              handleSelfie(route.idToken, route.user, image)
             }
           />
         );
@@ -171,7 +240,12 @@ export default function App() {
       case 'home':
         return (
           <HomeScreen
-            onLogout={() => setRoute({ name: 'login' })}
+            onLogout={() =>
+              withApiErrors(async () => {
+                await logoutMobileUser();
+                setRoute({ name: 'login' });
+              })
+            }
             onStartVerification={(joiningTitle) =>
               setRoute({
                 idToken: route.idToken,
@@ -191,6 +265,12 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <View style={styles.app}>{screen}</View>
+      {authMode === 'firebase' ? (
+        <FirebaseRecaptchaVerifierModal
+          ref={recaptchaVerifier}
+          firebaseConfig={firebaseConfig}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -256,6 +336,7 @@ function mapApiUser(user: ApiUser): NivaUser {
     bio: profile?.bio ?? undefined,
     languages: profile?.languages?.length ? profile.languages : ['English'],
     occupation: profile?.occupation ?? undefined,
+    profilePhotoUrl: profile?.profilePhotoUrl ?? undefined,
     interests: profile?.interests?.length
       ? profile.interests
       : ['Books', 'Coffee', 'Wellness'],

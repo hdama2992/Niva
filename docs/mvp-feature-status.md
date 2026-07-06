@@ -105,6 +105,10 @@ Community: event chats and circle chats only
 - Home loads events, circles, memberships, and notifications from the backend.
 - Join requests and event feedback now persist through backend APIs.
 - Local beta auth bridge for Expo preview through `NIVA_BETA_AUTH_ENABLED`.
+- Firebase-ready Phone Auth with reCAPTCHA and Firebase ID-token exchange.
+- Firebase refresh-token persistence in Expo SecureStore.
+- Firebase Storage upload path for profile photos and join-time verification
+  selfies, with camera and photo-library selection UI.
 
 ### Sprint 4: Community And Retention
 
@@ -119,6 +123,7 @@ Community: event chats and circle chats only
 - Notification model for reminders and community updates.
 - Trust tier fields that can later unlock host tools.
 - Product/MVP analysis document.
+- Live admin verification queue with approve, hold, and reject actions.
 
 ## Pending
 
@@ -144,12 +149,13 @@ Community: event chats and circle chats only
 
 ### Mobile Integration
 
-- Real Firebase Phone Auth in the Expo app.
+- Enter real Firebase project configuration and run the Phone Auth release flow
+  on physical iOS/Android devices.
 - Google sign-in in the Expo app.
-- Session persistence.
+- Verify session restoration with real Firebase credentials on physical devices.
 - Logout wired to auth state.
-- Real image picker/camera for selfie and profile photo.
-- Real file upload to S3, R2, Firebase Storage, or equivalent.
+- Apply and verify production Firebase Storage security rules with real
+  credentials and physical-device uploads.
 - Push notification registration with FCM/Expo notifications.
 - Real event/circle chat implementation.
 - Leave API calls wired into dedicated UI.
@@ -174,8 +180,7 @@ Community: event chats and circle chats only
 
 ### Admin
 
-- Admin dashboard currently shows a static review-console UI.
-- Wire dashboard to backend review queue.
+- Replace the beta shared key with individual admin authentication.
 - Add report moderation queue.
 - Add event/circle management.
 - Add member lookup.
@@ -198,14 +203,13 @@ Community: event chats and circle chats only
 
 These are the minimum items needed before inviting real users.
 
-1. Real Firebase auth on mobile.
-2. Production Firebase-backed mobile session persistence.
+1. Configure real Firebase Phone Auth on mobile and test it on physical devices.
+2. Verify production Firebase-backed mobile session restoration.
 3. Real backend API integration from mobile. Local beta path is now wired.
 4. Seeded Bangalore event/circle inventory.
 5. Real join request persistence.
-6. Join-time selfie upload and admin approval wired end to end. Local beta path
-   is now wired; production file storage is still needed.
-7. Admin dashboard connected to verification reviews.
+6. Apply Storage rules and complete join-time selfie upload/review testing.
+7. Replace beta-key admin access with named administrator authentication.
 8. Block flow wired end to end. Report flow is intentionally held for now.
 9. Event/circle chat for joined members only.
 10. Notifications for verification, join status, event reminders, and host

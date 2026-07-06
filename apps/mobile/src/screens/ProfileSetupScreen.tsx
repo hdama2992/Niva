@@ -1,6 +1,7 @@
-import { ArrowRight, MapPin, Sparkles } from 'lucide-react-native';
+import { ArrowRight, Camera, MapPin, Sparkles } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,7 +14,8 @@ import {
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../constants/theme';
-import { ProfileDraft } from '../types/niva';
+import { pickProfilePhoto } from '../services/media';
+import { ProfileDraft, SelectedProfilePhoto } from '../types/niva';
 
 type ProfileSetupScreenProps = {
   username: string;
@@ -44,6 +46,7 @@ export function ProfileSetupScreen({
   const [languages, setLanguages] = useState('English, Hindi');
   const [occupation, setOccupation] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
   const [error, setError] = useState<string>();
 
   const selectedEnoughInterests = interests.length >= 3;
@@ -80,8 +83,22 @@ export function ProfileSetupScreen({
         .map((language) => language.trim())
         .filter(Boolean),
       occupation: occupation.trim() || undefined,
+      profilePhoto,
       interests,
     });
+  };
+
+  const chooseProfilePhoto = async () => {
+    try {
+      const photo = await pickProfilePhoto();
+      setProfilePhoto(photo);
+    } catch (photoError) {
+      setError(
+        photoError instanceof Error
+          ? photoError.message
+          : 'Unable to select a profile photo.',
+      );
+    }
   };
 
   return (
@@ -103,6 +120,26 @@ export function ProfileSetupScreen({
             Niva uses interests and city to recommend small recurring groups.
           </Text>
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void chooseProfilePhoto()}
+          style={styles.profilePhotoPicker}
+        >
+          {profilePhoto ? (
+            <Image source={{ uri: profilePhoto.uri }} style={styles.profilePhoto} />
+          ) : (
+            <View style={styles.profilePhotoPlaceholder}>
+              <Camera color={colors.secondary} size={24} strokeWidth={2.3} />
+            </View>
+          )}
+          <View style={styles.profilePhotoCopy}>
+            <Text style={styles.profilePhotoTitle}>Profile photo</Text>
+            <Text style={styles.profilePhotoMeta}>
+              Optional. Use a clear photo so event members can recognise you.
+            </Text>
+          </View>
+        </Pressable>
 
         <View style={styles.form}>
           <TextField
@@ -275,6 +312,44 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  profilePhoto: {
+    borderRadius: radius.pill,
+    height: 56,
+    width: 56,
+  },
+  profilePhotoCopy: {
+    flex: 1,
+  },
+  profilePhotoMeta: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  profilePhotoPicker: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  profilePhotoPlaceholder: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.pill,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
+  },
+  profilePhotoTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
   sectionHeader: {
     alignItems: 'center',

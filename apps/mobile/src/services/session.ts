@@ -18,6 +18,7 @@ export type ApiUserProfile = {
 };
 
 export type ApiSelfieVerification = {
+  selfieStoragePath?: string | null;
   selfieUrl?: string | null;
   status: string;
 };
@@ -129,9 +130,9 @@ export function acceptSelfDeclaration(idToken: string) {
   });
 }
 
-export function submitSelfie(idToken: string, selfieUrl: string) {
+export function submitSelfie(idToken: string, selfieStoragePath: string) {
   return request<{ user: ApiUser }>('/users/me/selfie', idToken, {
-    body: { selfieUrl },
+    body: { selfieStoragePath },
     method: 'POST',
   });
 }

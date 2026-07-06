@@ -371,6 +371,7 @@ export class UsersService {
     dto: SubmitSelfieDto,
   ): Promise<PublicUser> {
     await this.ensureUserExists(userId);
+    const legacyReference = `firebase-storage://${dto.selfieStoragePath}`;
 
     await this.prisma.$transaction([
       this.prisma.selfieVerification.upsert({
@@ -378,13 +379,15 @@ export class UsersService {
         create: {
           userId,
           status: SelfieVerificationStatus.PENDING,
-          selfieUrl: dto.selfieUrl,
+          selfieUrl: legacyReference,
+          selfieStoragePath: dto.selfieStoragePath,
           selfieSubmittedAt: new Date(),
           selfieCheckProvider: 'MANUAL',
         },
         update: {
           status: SelfieVerificationStatus.PENDING,
-          selfieUrl: dto.selfieUrl,
+          selfieUrl: legacyReference,
+          selfieStoragePath: dto.selfieStoragePath,
           selfieSubmittedAt: new Date(),
           selfieCheckProvider: 'MANUAL',
           faceDetected: null,
@@ -398,11 +401,13 @@ export class UsersService {
         where: { userId },
         create: {
           userId,
-          selfieUrl: dto.selfieUrl,
+          selfieUrl: legacyReference,
+          selfieStoragePath: dto.selfieStoragePath,
           status: VerificationReviewStatus.PENDING,
         },
         update: {
-          selfieUrl: dto.selfieUrl,
+          selfieUrl: legacyReference,
+          selfieStoragePath: dto.selfieStoragePath,
           status: VerificationReviewStatus.PENDING,
           reviewerId: null,
           reason: null,
@@ -426,6 +431,25 @@ export class UsersService {
         },
       },
     });
+  }
+
+  async getVerificationSelfieStoragePath(userId: string) {
+    const review = await this.prisma.verificationReview.findUnique({
+      where: { userId },
+      select: { selfieStoragePath: true },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Verification review not found.');
+    }
+
+    if (!review.selfieStoragePath) {
+      throw new BadRequestException(
+        'This legacy review does not have a private storage path.',
+      );
+    }
+
+    return review.selfieStoragePath;
   }
 
   async reviewSelfie(

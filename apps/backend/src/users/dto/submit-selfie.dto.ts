@@ -1,6 +1,7 @@
-import { IsUrl } from 'class-validator';
+import { IsString, Matches } from 'class-validator';
 
 export class SubmitSelfieDto {
-  @IsUrl({ require_tld: false })
-  selfieUrl!: string;
+  @IsString()
+  @Matches(/^verification-selfies\/[^/]+\/[A-Za-z0-9._-]+$/)
+  selfieStoragePath!: string;
 }

@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { App, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { DecodedIdToken, getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 
 @Injectable()
 export class FirebaseAdminService {
@@ -65,6 +66,35 @@ export class FirebaseAdminService {
         'The Firebase ID token is invalid or expired.',
       );
     }
+  }
+
+  async createPrivateSelfieViewerUrl(storagePath: string): Promise<string> {
+    if (!this.app) {
+      throw new ServiceUnavailableException(
+        'Firebase Admin is not configured for verification image access.',
+      );
+    }
+
+    const bucketName = this.configService.get<string>('FIREBASE_STORAGE_BUCKET');
+    if (!bucketName) {
+      throw new ServiceUnavailableException(
+        'Set FIREBASE_STORAGE_BUCKET before viewing verification images.',
+      );
+    }
+
+    if (!/^verification-selfies\/[^/]+\/[A-Za-z0-9._-]+$/.test(storagePath)) {
+      throw new UnauthorizedException('Invalid verification image path.');
+    }
+
+    const [url] = await getStorage(this.app)
+      .bucket(bucketName)
+      .file(storagePath)
+      .getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 5 * 60 * 1000,
+      });
+
+    return url;
   }
 
   private getBetaPhone(idToken: string): string | undefined {

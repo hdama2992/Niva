@@ -1,24 +1,59 @@
-import { Camera, CheckCircle2, UploadCloud } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, UploadCloud } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { chooseSelfie, SelectedImage, takeSelfie } from '../services/media';
 
 type SelfieUploadScreenProps = {
   displayName: string;
   joiningTitle?: string;
-  onSubmit: (selfieUrl: string) => void;
+  onSubmit: (image: SelectedImage) => Promise<void> | void;
 };
-
-const demoSelfieUrl = 'https://niva.local/selfies/current-user.jpg';
 
 export function SelfieUploadScreen({
   displayName,
   joiningTitle,
   onSubmit,
 }: SelfieUploadScreenProps) {
-  const [selfieSelected, setSelfieSelected] = useState(false);
+  const [selfie, setSelfie] = useState<SelectedImage>();
+  const [error, setError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
+
+  const selectSelfie = async (source: 'camera' | 'library') => {
+    try {
+      const selected =
+        source === 'camera' ? await takeSelfie() : await chooseSelfie();
+      setSelfie(selected);
+      setError(undefined);
+    } catch (selectionError) {
+      setError(
+        selectionError instanceof Error
+          ? selectionError.message
+          : 'Unable to select a selfie.',
+      );
+    }
+  };
+
+  const submit = async () => {
+    if (!selfie) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onSubmit(selfie);
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : 'Unable to submit your selfie.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -39,26 +74,33 @@ export function SelfieUploadScreen({
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => setSelfieSelected(true)}
-        style={[styles.uploadBox, selfieSelected && styles.uploadBoxSelected]}
+        onPress={() => void selectSelfie('camera')}
+        style={[styles.uploadBox, selfie && styles.uploadBoxSelected]}
       >
-        {selfieSelected ? (
-          <CheckCircle2 color={colors.success} size={42} strokeWidth={2.2} />
+        {selfie ? (
+          <Image source={{ uri: selfie.uri }} style={styles.selfiePreview} />
         ) : (
-          <UploadCloud color={colors.secondary} size={42} strokeWidth={2.2} />
+          <Camera color={colors.secondary} size={42} strokeWidth={2.2} />
         )}
         <View style={styles.uploadCopy}>
           <Text style={styles.uploadTitle}>
-            {selfieSelected
-              ? 'Selfie selected'
-              : `Choose selfie, ${displayName}`}
+            {selfie ? 'Selfie selected' : `Take a selfie, ${displayName}`}
           </Text>
           <Text style={styles.uploadText}>
-            {selfieSelected
-              ? 'Ready for manual review.'
+            {selfie
+              ? 'Ready for encrypted upload and manual review.'
               : 'Use a clear, recent photo with your face visible.'}
           </Text>
         </View>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void selectSelfie('library')}
+        style={styles.libraryButton}
+      >
+        <ImageIcon color={colors.secondary} size={18} strokeWidth={2.3} />
+        <Text style={styles.libraryButtonText}>Choose from library</Text>
       </Pressable>
 
       <View style={styles.checks}>
@@ -68,13 +110,18 @@ export function SelfieUploadScreen({
       </View>
 
       <View style={styles.footer}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         <PrimaryButton
-          disabled={!selfieSelected}
+          disabled={!selfie || submitting}
           icon={
-            <UploadCloud color={colors.surface} size={20} strokeWidth={2.4} />
+            submitting ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <UploadCloud color={colors.surface} size={20} strokeWidth={2.4} />
+            )
           }
-          label="Submit for review"
-          onPress={() => onSubmit(demoSelfieUrl)}
+          label={submitting ? 'Uploading securely...' : 'Submit for review'}
+          onPress={() => void submit()}
         />
       </View>
     </View>
@@ -108,6 +155,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: spacing.xs,
   },
+  error: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 19,
+    marginBottom: spacing.md,
+  },
   footer: {
     marginTop: spacing.xl,
   },
@@ -119,6 +173,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.lg,
     width: 70,
+  },
+  libraryButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    minHeight: 40,
+  },
+  libraryButtonText: {
+    color: colors.secondary,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  selfiePreview: {
+    borderRadius: radius.md,
+    height: 58,
+    width: 58,
   },
   subtitle: {
     color: colors.muted,

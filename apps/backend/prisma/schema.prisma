@@ -183,6 +183,7 @@ model SelfieVerification {
   user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   status              SelfieVerificationStatus @default(NOT_STARTED)
   selfieUrl           String?
+  selfieStoragePath   String?
   selfieSubmittedAt   DateTime?
   selfieCheckProvider SelfieCheckProvider      @default(MANUAL)
   faceDetected        Boolean?
@@ -221,6 +222,7 @@ model VerificationReview {
   userId     String                   @unique
   user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   selfieUrl  String
+  selfieStoragePath String?
   status     VerificationReviewStatus @default(PENDING)
   reviewerId String?
   reason     String?

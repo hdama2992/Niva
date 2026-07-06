@@ -5,14 +5,21 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { MobileAuthMode } from '../services/mobile-auth';
 
 type OtpScreenProps = {
+  authMode: MobileAuthMode;
   phone: string;
   onBack: () => void;
-  onVerified: () => void;
+  onVerified: (code: string) => void;
 };
 
-export function OtpScreen({ phone, onBack, onVerified }: OtpScreenProps) {
+export function OtpScreen({
+  authMode,
+  phone,
+  onBack,
+  onVerified,
+}: OtpScreenProps) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string>();
 
@@ -23,7 +30,7 @@ export function OtpScreen({ phone, onBack, onVerified }: OtpScreenProps) {
     }
 
     setError(undefined);
-    onVerified();
+    onVerified(code);
   };
 
   return (
@@ -37,7 +44,11 @@ export function OtpScreen({ phone, onBack, onVerified }: OtpScreenProps) {
           <KeyRound color={colors.primary} size={32} strokeWidth={2.3} />
         </View>
         <Text style={styles.title}>Verify your number</Text>
-        <Text style={styles.subtitle}>Enter the six-digit code sent to {phone}.</Text>
+        <Text style={styles.subtitle}>
+          {authMode === 'firebase'
+            ? `Enter the six-digit code sent to ${phone}.`
+            : `Use any six digits for the local beta preview of ${phone}.`}
+        </Text>
       </View>
 
       <TextField

@@ -14,6 +14,7 @@ export type NivaUser = {
   bio?: string;
   languages: string[];
   occupation?: string;
+  profilePhotoUrl?: string;
   interests: string[];
   selfieUrl?: string;
   selfDeclarationAccepted: boolean;
@@ -29,5 +30,11 @@ export type ProfileDraft = {
   bio?: string;
   languages: string[];
   occupation?: string;
+  profilePhoto?: SelectedProfilePhoto;
   interests: string[];
+};
+
+export type SelectedProfilePhoto = {
+  mimeType?: string | null;
+  uri: string;
 };
