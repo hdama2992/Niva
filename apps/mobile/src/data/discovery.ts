@@ -3,11 +3,18 @@ export type DiscoveryItem = {
   category: 'event' | 'circle' | 'workshop' | 'tip';
   remoteId?: string;
   hostId?: string;
+  activityStatus?: 'CANCELLED' | 'COMPLETED' | 'DRAFT' | 'PUBLISHED';
+  cancellationReason?: string | null;
+  capacity?: number;
+  membershipStatus?:
+    'REQUESTED' | 'APPROVED' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW';
+  startsAt?: string;
   title: string;
   location: string;
   time: string;
   seats?: number;
   duration?: string;
+  schedule?: string;
   difficulty?: 'Easy' | 'Beginner' | 'Social' | 'Focused';
   interests: string[];
   host: string;

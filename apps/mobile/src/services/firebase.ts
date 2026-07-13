@@ -1,5 +1,7 @@
 import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 import { FirebaseStorage, getStorage } from 'firebase/storage';
 
 const requiredConfigKeys = [
@@ -33,8 +35,18 @@ function getFirebaseApp() {
     );
   }
 
+  // expo-firebase-recaptcha's web component still uses Firebase's compatibility
+  // API, so initialize its default app before React mounts the verifier.
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+
   app ??= getApps().length ? getApp() : initializeApp(firebaseConfig);
   return app;
+}
+
+export function initializeFirebase() {
+  return getFirebaseApp();
 }
 
 export function getFirebaseAuth() {

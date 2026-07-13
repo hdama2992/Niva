@@ -84,37 +84,56 @@ Community: event chats and circle chats only
 - Search.
 - Interest filters.
 - Recommended activities from interests.
-- Event/circle detail modal.
+- Dedicated event and circle detail screens with verified join and leave states.
 - Join confirmation modal.
 - Permission-blocked modal.
 - Join-time selfie verification path.
 - Verification pending screen.
 - My Events section.
-- Notifications panel.
-- Settings panel.
+- Dedicated notifications screen with persisted read state.
+- Dedicated settings screen with persisted notification, recommendation, and
+  circle-continuity settings.
 - Profile screen with trust tier, verification status, interests, and profile
   metadata.
-- Event/circle chats only in UI; no random DMs.
+- Event/circle chat access boundary only; no random DMs.
 - Empty states.
-- Icebreakers in activity details.
 - Block host action shown in activity details.
-- Host tools entry with create-event draft UI for trusted members and hosts.
-- Post-event feedback UI from My Events.
+- Blocked-member management with a persisted unblock action.
+- Host event creation form for trusted members and hosts.
 - Mobile onboarding writes username, profile, self-declaration, and selfie
   review submission to the backend.
 - Home loads events, circles, memberships, and notifications from the backend.
 - Join requests and event feedback now persist through backend APIs.
+- My Plans groups persisted memberships into upcoming, past, and cancelled
+  states.
+- Activity capacity is enforced by the backend for new join requests.
+- Discovery excludes activities hosted by members the current user has blocked.
+- The mobile UI does not present placeholder activities as joinable.
 - Local beta auth bridge for Expo preview through `NIVA_BETA_AUTH_ENABLED`.
 - Firebase-ready Phone Auth with reCAPTCHA and Firebase ID-token exchange.
 - Firebase refresh-token persistence in Expo SecureStore.
+- Android Firebase Phone Number Verification bridge with one-tap SIM consent,
+  SMS fallback, and a backend Firebase custom-token exchange path.
 - Firebase Storage upload path for profile photos and join-time verification
   selfies, with camera and photo-library selection UI.
+- Firebase Storage rule configuration for member-owned image uploads, private
+  verification-selfie reads, and backend selfie-path ownership validation.
 
 ### Sprint 4: Community And Retention
 
-- Sprint 4 documentation added.
-- Host-gated event creation backend route.
-- Event feedback backend route.
+- Explicit community-guideline acceptance before the first authorized join.
+- Admin-reviewed host approval and host-gated event creation.
+- Host member management: approve/decline requests and record attendance/no-show.
+- Persistent event/circle cohort chat for approved members only; no random DMs.
+- Report model and guarded API retained, with member/admin report UI held.
+- Admin audit history for verification, host approvals, access grants,
+  and notification dispatch.
+- Device push-token and delivery-queue model with an Expo dispatch endpoint.
+- Host circle creation and circle-member approval/decline.
+- Post-event feedback UI for completed events with persisted rating and note.
+- Host event/circle edit controls with persisted notifications to affected members.
+- Host cancellation with a mandatory reason, member-visible cancelled state, and
+  admin cancellation controls with an audit record.
 - Bangalore seed data script for beta events and circles.
 - Local PostgreSQL migration applied for the MVP schema.
 - Mobile API client functions for community endpoints.
@@ -123,27 +142,15 @@ Community: event chats and circle chats only
 - Notification model for reminders and community updates.
 - Trust tier fields that can later unlock host tools.
 - Product/MVP analysis document.
-- Live admin verification queue with approve, hold, and reject actions.
+- Live admin verification and host-approval queues.
 
 ## Pending
 
 ### Product And UX
 
-- Dedicated Event Details screen instead of only a modal.
-- Dedicated Circle Details screen instead of only a modal.
-- Dedicated Notifications screen instead of only a panel.
-- Dedicated Settings screen with editable rows.
-- Dedicated My Events screen with upcoming, past, and cancelled sections.
-- Proper Create Event host flow UI.
-- Proper report flow UI with reasons. Held by product decision for now:
-  - spam
-  - fake profile
-  - harassment
-  - inappropriate behaviour
-  - other
-- Proper block/unblock management UI.
-- Community guidelines screen or page before first join. Held by product
-  decision for now.
+- Platform-native date/time picker and location-map integration for host
+  creation/editing. The current UI has controlled day and 30-minute time
+  controls rather than manual date entry.
 - More polished empty states and loading states.
 - Real responsive QA across phone sizes.
 
@@ -151,41 +158,32 @@ Community: event chats and circle chats only
 
 - Enter real Firebase project configuration and run the Phone Auth release flow
   on physical iOS/Android devices.
+- Complete Firebase PNV billing, OAuth brand verification, carrier testing, and
+  Android development-build testing before enabling the one-tap PNV path.
 - Google sign-in in the Expo app.
 - Verify session restoration with real Firebase credentials on physical devices.
 - Logout wired to auth state.
 - Apply and verify production Firebase Storage security rules with real
   credentials and physical-device uploads.
-- Push notification registration with FCM/Expo notifications.
-- Real event/circle chat implementation.
-- Leave API calls wired into dedicated UI.
-- Real report API calls. Report UI is intentionally held for now.
-- Full block/unblock API calls from a dedicated management UI.
-- Real notification read state.
+- Expo native push-token registration and FCM/APNs provider configuration. The
+  backend queue and manual dispatch API are implemented.
 
 ### Backend And Data
 
-- Real authorization policy tests.
-- Admin report moderation endpoints.
-- Admin event/circle management endpoints.
-- Admin host approval endpoints.
-- Host create/manage circle endpoint.
-- Attendance marking endpoint.
-- No-show handling.
-- Post-event feedback trust updates.
-- Notification dispatch worker or Cloud Function.
+- Role-specific authorization policy tests.
+- Admin event/circle location-management endpoints.
+- Post-event feedback trust updates and host-facing feedback insights.
+- Scheduled notification dispatch worker or Cloud Function. A manual admin
+  dispatch endpoint exists.
 - Trust recalculation job.
 - Connection/circle-continuity logic.
 - Stronger input validation for phone, profile photo URL, and event timing.
 
 ### Admin
 
-- Replace the beta shared key with individual admin authentication.
-- Add report moderation queue.
-- Add event/circle management.
-- Add member lookup.
-- Add host approval controls.
-- Add audit history for verification and moderation decisions.
+- Switch the dashboard from its beta key field to named Firebase admin login.
+- Restrict each admin action by role instead of allowing all active roles.
+- Add member lookup tools and richer activity search/filtering.
 
 ### Legal, Privacy, And Safety
 
@@ -197,7 +195,7 @@ Community: event chats and circle chats only
 - Admin access controls beyond a shared beta key.
 - Audit logging for admin actions.
 - Abuse escalation process.
-- Safety playbook for reports.
+- Moderation safety playbook, then re-enable report submission and review UI.
 
 ## Required Before Closed Beta
 
@@ -208,20 +206,18 @@ These are the minimum items needed before inviting real users.
 3. Real backend API integration from mobile. Local beta path is now wired.
 4. Seeded Bangalore event/circle inventory.
 5. Real join request persistence.
-6. Apply Storage rules and complete join-time selfie upload/review testing.
-7. Replace beta-key admin access with named administrator authentication.
-8. Block flow wired end to end. Report flow is intentionally held for now.
-9. Event/circle chat for joined members only.
-10. Notifications for verification, join status, event reminders, and host
-    updates.
-11. Attendance and feedback collection.
-12. Basic admin moderation for reports.
-13. Privacy policy and selfie consent copy. Dedicated community-guidelines page
-    is intentionally held for now.
-14. Closed beta operating process:
+6. Deploy the checked-in Storage rules and complete join-time selfie
+   upload/review testing with real Firebase credentials.
+7. Configure named Firebase admin login in the dashboard and retire the
+   bootstrap-key fallback.
+8. Add Expo/FCM/APNs device notification registration and automatic dispatch.
+9. Deploy Firebase Storage rules and complete physical-device selfie testing.
+10. Privacy policy, selfie consent, retention/deletion, and operator safety
+    procedures.
+11. Closed beta operating process:
     - who reviews selfies
     - who approves hosts
-    - who handles reports
+    - whether reports are enabled and who handles them
     - how fast moderation responds
 
 ## Not Required Before Closed Beta
@@ -238,9 +234,10 @@ These are the minimum items needed before inviting real users.
 
 ## Current Product Judgment
 
-Sprint 1-4 now gives Niva a strong closed-beta MVP shape with real local
-PostgreSQL-backed onboarding, discovery, join requests, notifications, and
-feedback. It is not yet a production app because Firebase phone auth, file
-storage, push notifications, chat, and admin dashboard wiring still need to be
-finished. The next highest value work is production integration, not more
-features.
+Sprint 1-4 now gives Niva a closed-beta MVP with real local PostgreSQL-backed
+onboarding, discovery, verification-gated joins, host decisions, circle
+management, cohort chat, attendance, post-event feedback, and in-app
+notifications. The reporting model is held from the active UI. Physical-device
+Firebase/Storage testing, native push registration, named dashboard sign-in,
+and privacy/operations are the next launch blockers. See
+`docs/community-completion.md` for end-to-end behavior.

@@ -1,5 +1,4 @@
 import {
-  Ban,
   Bell,
   CalendarDays,
   CalendarCheck,
@@ -36,27 +35,50 @@ import {
   View,
 } from 'react-native';
 
-import {
-  allDiscoveryItems,
-  circles,
-  DiscoveryItem,
-  safetyTips,
-  weeklyEvents,
-  workshops,
-} from '../data/discovery';
+import { DiscoveryItem, safetyTips } from '../data/discovery';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { ActivityDetailScreen } from './ActivityDetailScreen';
+import { ChatScreen } from './ChatScreen';
+import { CommunityGuidelinesScreen } from './CommunityGuidelinesScreen';
+import { CreateCircleInput, CreateCircleScreen } from './CreateCircleScreen';
+import { CreateEventInput, CreateEventScreen } from './CreateEventScreen';
+import { ActivityEditInput, EditActivityScreen } from './EditActivityScreen';
+import { EventFeedbackScreen } from './EventFeedbackScreen';
+import { ManageCircleScreen } from './ManageCircleScreen';
+import { MyActivitiesScreen } from './MyActivitiesScreen';
+import { ManageEventScreen } from './ManageEventScreen';
+import { NotificationsScreen } from './NotificationsScreen';
+import { SettingsScreen } from './SettingsScreen';
+import { acceptCommunityGuidelines } from '../services/session';
 import {
   blockUser,
+  BlockedUser,
+  cancelCircle,
+  cancelEvent,
   CommunityActivity,
+  CommunitySettings,
+  createCircle as createCommunityCircle,
   createEvent as createCommunityEvent,
+  getHostApproval,
+  getSettings,
+  HostApproval,
   joinCircle,
   joinEvent,
+  leaveCircle,
+  leaveEvent,
+  listBlocks,
   listCircles,
   listEvents,
   listMyActivities,
   listNotifications,
+  markNotificationRead,
   NotificationItem,
+  requestHostApproval,
   submitEventFeedback,
+  unblockUser,
+  updateCircle,
+  updateEvent,
+  updateSettings,
 } from '../services/community';
 import { NivaUser } from '../types/niva';
 
@@ -68,6 +90,12 @@ type HomeScreenProps = {
 };
 
 type Tab = 'home' | 'explore' | 'circles' | 'messages' | 'profile';
+type SecondaryScreen =
+  | 'create-circle'
+  | 'create-event'
+  | 'my-activities'
+  | 'notifications'
+  | 'settings';
 
 const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: 'home', label: 'Home', icon: <Home size={21} /> },
@@ -78,6 +106,11 @@ const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
 ];
 
 const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Career', 'Safety'];
+const defaultSettings: CommunitySettings = {
+  allowCircleContinuitySuggestions: true,
+  notificationsEnabled: true,
+  showProfileInRecommendations: true,
+};
 
 export function HomeScreen({
   idToken,
@@ -89,31 +122,34 @@ export function HomeScreen({
   const [blockedModalVisible, setBlockedModalVisible] = useState(false);
   const [joinRequest, setJoinRequest] = useState<string>();
   const [joinCandidate, setJoinCandidate] = useState<DiscoveryItem>();
+  const [guidelinesJoin, setGuidelinesJoin] = useState<DiscoveryItem>();
+  const [chatItem, setChatItem] = useState<DiscoveryItem>();
+  const [managedEvent, setManagedEvent] = useState<DiscoveryItem>();
+  const [managedCircle, setManagedCircle] = useState<DiscoveryItem>();
+  const [feedbackEvent, setFeedbackEvent] = useState<DiscoveryItem>();
+  const [editingActivity, setEditingActivity] = useState<DiscoveryItem>();
   const [selectedItem, setSelectedItem] = useState<DiscoveryItem>();
-  const [feedbackCandidate, setFeedbackCandidate] = useState<DiscoveryItem>();
-  const [hostToolsVisible, setHostToolsVisible] = useState(false);
-  const [hostedItems, setHostedItems] = useState<DiscoveryItem[]>([]);
   const [blockedHosts, setBlockedHosts] = useState<string[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [apiEvents, setApiEvents] = useState<DiscoveryItem[]>([]);
   const [apiCircles, setApiCircles] = useState<DiscoveryItem[]>([]);
+  const [myActivities, setMyActivities] = useState<DiscoveryItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [apiError, setApiError] = useState<string>();
-  const [joinedItemIds, setJoinedItemIds] = useState<Set<string>>(
-    () => new Set(),
+  const [settings, setSettings] = useState<CommunitySettings>();
+  const [hostApproval, setHostApproval] = useState<HostApproval | null>();
+  const [guidelinesAccepted, setGuidelinesAccepted] = useState(
+    user.communityGuidelinesAccepted,
   );
-  const [notificationsVisible, setNotificationsVisible] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [apiError, setApiError] = useState<string>();
+  const [secondaryScreen, setSecondaryScreen] = useState<SecondaryScreen>();
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const verified = user.verificationStatus === 'approved';
-  const visibleEvents = apiEvents.length ? apiEvents : weeklyEvents;
-  const visibleCircles = apiCircles.length ? apiCircles : circles;
+  const visibleEvents = apiEvents;
+  const visibleCircles = apiCircles;
   const allItems = useMemo(
-    () =>
-      apiEvents.length || apiCircles.length
-        ? [...hostedItems, ...apiEvents, ...apiCircles, ...workshops]
-        : [...hostedItems, ...allDiscoveryItems],
-    [apiCircles, apiEvents, hostedItems],
+    () => [...apiEvents, ...apiCircles],
+    [apiCircles, apiEvents],
   );
   const recommended = useMemo(() => {
     const userInterests = new Set(user.interests);
@@ -138,8 +174,13 @@ export function HomeScreen({
     });
   }, [activeFilter, allItems, query]);
   const joinedItems = useMemo(
-    () => allItems.filter((item) => joinedItemIds.has(item.id)),
-    [allItems, joinedItemIds],
+    () =>
+      myActivities.filter(
+        (item) =>
+          item.membershipStatus === 'APPROVED' ||
+          item.membershipStatus === 'ATTENDED',
+      ),
+    [myActivities],
   );
 
   useEffect(() => {
@@ -154,11 +195,17 @@ export function HomeScreen({
         circlesPayload,
         activitiesPayload,
         notificationsPayload,
+          settingsPayload,
+          blocksPayload,
+          hostApprovalPayload,
       ] = await Promise.all([
         listEvents(idToken, user.city),
         listCircles(idToken, user.city),
         listMyActivities(idToken),
         listNotifications(idToken),
+        getSettings(idToken),
+        listBlocks(idToken),
+        getHostApproval(idToken),
       ]);
 
       const events = eventsPayload.events.map((event) =>
@@ -167,17 +214,36 @@ export function HomeScreen({
       const circles = circlesPayload.circles.map((circle) =>
         activityToDiscoveryItem(circle, 'circle'),
       );
-      const joinedIds = new Set<string>();
-
-      activitiesPayload.events.forEach(({ event }) => joinedIds.add(event.id));
-      activitiesPayload.circles.forEach(({ circle }) =>
-        joinedIds.add(circle.id),
-      );
+      const memberships: DiscoveryItem[] = [
+        ...activitiesPayload.events.flatMap((membership) =>
+          membership.event
+            ? [
+                {
+                  ...activityToDiscoveryItem(membership.event, 'event'),
+                  membershipStatus: membership.status,
+                },
+              ]
+            : [],
+        ),
+        ...activitiesPayload.circles.flatMap((membership) =>
+          membership.circle
+            ? [
+                {
+                  ...activityToDiscoveryItem(membership.circle, 'circle'),
+                  membershipStatus: membership.status,
+                },
+              ]
+            : [],
+        ),
+      ];
 
       setApiEvents(events);
       setApiCircles(circles);
-      setJoinedItemIds(joinedIds);
+      setMyActivities(memberships);
       setNotifications(notificationsPayload.notifications);
+      setSettings(settingsPayload.settings);
+      setBlockedUsers(blocksPayload.blocks);
+      setHostApproval(hostApprovalPayload.approval);
     } catch (error) {
       setApiError(
         error instanceof Error
@@ -188,6 +254,20 @@ export function HomeScreen({
   };
 
   const requestJoin = (item: DiscoveryItem) => {
+    if (!item.remoteId) {
+      setApiError(
+        'This activity is not published yet. Join requests open only for live Niva activities.',
+      );
+      return;
+    }
+
+    if (item.seats === 0) {
+      setApiError(
+        'This activity is full. Please choose another nearby gathering.',
+      );
+      return;
+    }
+
     if (!verified) {
       if (user.verificationStatus === 'not_started') {
         onStartVerification(item.title);
@@ -198,7 +278,32 @@ export function HomeScreen({
       return;
     }
 
+    if (!guidelinesAccepted) {
+      setGuidelinesJoin(item);
+      return;
+    }
+
     setJoinCandidate(item);
+  };
+
+  const acceptGuidelinesForJoin = async () => {
+    const pendingItem = guidelinesJoin;
+    if (!pendingItem) {
+      return;
+    }
+
+    try {
+      await acceptCommunityGuidelines(idToken);
+      setGuidelinesAccepted(true);
+      setGuidelinesJoin(undefined);
+      setJoinCandidate(pendingItem);
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save your community agreement.',
+      );
+    }
   };
 
   const confirmJoin = async () => {
@@ -213,7 +318,6 @@ export function HomeScreen({
         await joinEvent(idToken, joinCandidate.remoteId ?? joinCandidate.id);
       }
 
-      setJoinedItemIds((current) => new Set(current).add(joinCandidate.id));
       setJoinRequest(joinCandidate.title);
       setJoinCandidate(undefined);
       await loadCommunityData();
@@ -224,28 +328,137 @@ export function HomeScreen({
     }
   };
 
-  const createHostedEvent = async (title: string) => {
+  const createHostedEvent = async (input: CreateEventInput) => {
     try {
-      const payload = await createCommunityEvent(idToken, {
-        capacity: 6,
+      await createCommunityEvent(idToken, {
+        capacity: input.capacity,
         city: user.city,
-        description: 'Host-created beta event draft.',
-        difficulty: 'SOCIAL',
-        interests: user.interests.slice(0, 2),
-        locationName: user.city,
-        startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        title: title.trim() || 'New hosted event',
+        description: input.description,
+        difficulty: input.difficulty,
+        interests: input.interests,
+        locationName: input.locationName,
+        startsAt: input.startsAt,
+        title: input.title,
       });
 
-      setHostedItems((current) => [
-        activityToDiscoveryItem(payload.event, 'event'),
-        ...current,
-      ]);
-      setHostToolsVisible(false);
+      setSecondaryScreen(undefined);
       await loadCommunityData();
     } catch (error) {
       setApiError(
         error instanceof Error ? error.message : 'Unable to create event.',
+      );
+    }
+  };
+
+  const createHostedCircle = async (input: CreateCircleInput) => {
+    try {
+      await createCommunityCircle(idToken, {
+        capacity: input.capacity,
+        city: user.city,
+        description: input.description,
+        difficulty: input.difficulty,
+        durationWeeks: input.durationWeeks,
+        interests: input.interests,
+        locationName: input.locationName,
+        schedule: input.schedule,
+        startsAt: input.startsAt,
+        title: input.title,
+      });
+      setSecondaryScreen(undefined);
+      await loadCommunityData();
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to create circle.',
+      );
+    }
+  };
+
+  const submitFeedback = async (input: { body?: string; rating: number }) => {
+    if (!feedbackEvent) {
+      return;
+    }
+
+    try {
+      await submitEventFeedback(
+        idToken,
+        feedbackEvent.remoteId ?? feedbackEvent.id,
+        input,
+      );
+      setFeedbackEvent(undefined);
+      setApiError('Thank you. Your feedback has been saved.');
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to save feedback.',
+      );
+    }
+  };
+
+  const updateHostedActivity = async (input: ActivityEditInput) => {
+    if (!editingActivity) {
+      return;
+    }
+
+    const activityId = editingActivity.remoteId ?? editingActivity.id;
+    if (editingActivity.category === 'circle') {
+      await updateCircle(idToken, activityId, {
+        capacity: input.capacity,
+        city: user.city,
+        description: input.description,
+        difficulty: input.difficulty,
+        durationWeeks: input.durationWeeks,
+        interests: input.interests,
+        locationName: input.locationName,
+        schedule: input.schedule,
+        startsAt: input.startsAt,
+        title: input.title,
+      });
+    } else {
+      await updateEvent(idToken, activityId, {
+        capacity: input.capacity,
+        city: user.city,
+        description: input.description,
+        difficulty: input.difficulty,
+        interests: input.interests,
+        locationName: input.locationName,
+        startsAt: input.startsAt,
+        title: input.title,
+      });
+    }
+
+    setEditingActivity(undefined);
+    setSelectedItem(undefined);
+    setApiError('Activity details updated. Affected members were notified.');
+    await loadCommunityData();
+  };
+
+  const cancelHostedActivity = async (reason: string) => {
+    if (!editingActivity) {
+      return;
+    }
+
+    const activityId = editingActivity.remoteId ?? editingActivity.id;
+    if (editingActivity.category === 'circle') {
+      await cancelCircle(idToken, activityId, reason);
+    } else {
+      await cancelEvent(idToken, activityId, reason);
+    }
+
+    setEditingActivity(undefined);
+    setSelectedItem(undefined);
+    setApiError('Activity cancelled. Affected members were notified.');
+    await loadCommunityData();
+  };
+
+  const requestHostAccess = async () => {
+    try {
+      const payload = await requestHostApproval(idToken);
+      setHostApproval(payload.approval);
+      setApiError(undefined);
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to request host access.',
       );
     }
   };
@@ -262,6 +475,7 @@ export function HomeScreen({
         current.includes(host) ? current : [...current, host],
       );
       setSelectedItem(undefined);
+      await loadCommunityData();
     } catch (error) {
       setApiError(
         error instanceof Error ? error.message : 'Unable to block this host.',
@@ -269,41 +483,286 @@ export function HomeScreen({
     }
   };
 
+  const leaveActivity = async (item: DiscoveryItem) => {
+    try {
+      if (item.category === 'circle') {
+        await leaveCircle(idToken, item.remoteId ?? item.id);
+      } else if (item.category === 'event') {
+        await leaveEvent(idToken, item.remoteId ?? item.id);
+      }
+
+      setSelectedItem(undefined);
+      await loadCommunityData();
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to leave this activity.',
+      );
+    }
+  };
+
+  const updateMemberSettings = async (nextSettings: CommunitySettings) => {
+    try {
+      const payload = await updateSettings(idToken, nextSettings);
+      setSettings(payload.settings);
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : 'Unable to update settings.',
+      );
+    }
+  };
+
+  const unblockMember = async (blockedUserId: string) => {
+    try {
+      await unblockUser(idToken, blockedUserId);
+      await loadCommunityData();
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to unblock this member.',
+      );
+    }
+  };
+
+  const readNotification = async (notificationId: string) => {
+    try {
+      const payload = await markNotificationRead(idToken, notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, ...payload.notification }
+            : notification,
+        ),
+      );
+    } catch (error) {
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to update this notification.',
+      );
+    }
+  };
+
+  if (selectedItem) {
+    const hostName = selectedItem.host
+      .replace('Hosted by ', '')
+      .replace('Led by ', '');
+    const blocked =
+      (selectedItem.hostId
+        ? blockedUsers.some((item) => item.blockedId === selectedItem.hostId)
+        : false) || blockedHosts.includes(hostName);
+
+    return (
+      <ActivityDetailScreen
+        blocked={blocked}
+        isHost={selectedItem.hostId === user.id}
+        item={selectedItem}
+        onBack={() => setSelectedItem(undefined)}
+        onBlock={() => void blockHost(selectedItem)}
+        onJoin={() => {
+          setSelectedItem(undefined);
+          requestJoin(selectedItem);
+        }}
+        onLeave={() => void leaveActivity(selectedItem)}
+        onManage={() => {
+          if (selectedItem.category === 'circle') {
+            setManagedCircle(selectedItem);
+          } else {
+            setManagedEvent(selectedItem);
+          }
+          setSelectedItem(undefined);
+        }}
+        onEdit={() => {
+          setEditingActivity(selectedItem);
+          setSelectedItem(undefined);
+        }}
+      />
+    );
+  }
+
+  if (editingActivity) {
+    return (
+      <EditActivityScreen
+        activity={editingActivity}
+        onBack={() => setEditingActivity(undefined)}
+        onCancel={cancelHostedActivity}
+        onSave={updateHostedActivity}
+        user={user}
+      />
+    );
+  }
+
+  if (guidelinesJoin) {
+    return (
+      <CommunityGuidelinesScreen
+        activityTitle={guidelinesJoin.title}
+        onAccept={() => void acceptGuidelinesForJoin()}
+        onBack={() => setGuidelinesJoin(undefined)}
+      />
+    );
+  }
+
+  if (managedEvent) {
+    return (
+      <ManageEventScreen
+        event={managedEvent}
+        idToken={idToken}
+        onBack={() => setManagedEvent(undefined)}
+      />
+    );
+  }
+
+  if (managedCircle) {
+    return (
+      <ManageCircleScreen
+        circle={managedCircle}
+        idToken={idToken}
+        onBack={() => setManagedCircle(undefined)}
+      />
+    );
+  }
+
+  if (feedbackEvent) {
+    return (
+      <EventFeedbackScreen
+        event={feedbackEvent}
+        onBack={() => setFeedbackEvent(undefined)}
+        onSubmit={(input) => void submitFeedback(input)}
+      />
+    );
+  }
+
+  if (chatItem) {
+    return (
+      <ChatScreen
+        activity={chatItem}
+        idToken={idToken}
+        onBack={() => setChatItem(undefined)}
+        userId={user.id}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'my-activities') {
+    return (
+      <MyActivitiesScreen
+        items={myActivities}
+        onBack={() => setSecondaryScreen(undefined)}
+        onFeedback={setFeedbackEvent}
+        onLeave={(item) => void leaveActivity(item)}
+        onOpen={setSelectedItem}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'notifications') {
+    return (
+      <NotificationsScreen
+        notifications={notifications}
+        onBack={() => setSecondaryScreen(undefined)}
+        onRead={(notificationId) => void readNotification(notificationId)}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'settings') {
+    return (
+      <SettingsScreen
+        blockedUsers={blockedUsers}
+        onBack={() => setSecondaryScreen(undefined)}
+        onChange={(nextSettings) => void updateMemberSettings(nextSettings)}
+        onUnblock={(blockedUserId) => void unblockMember(blockedUserId)}
+        settings={settings ?? defaultSettings}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'create-event') {
+    return (
+      <CreateEventScreen
+        onBack={() => setSecondaryScreen(undefined)}
+        onCreate={createHostedEvent}
+        user={user}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'create-circle') {
+    return (
+      <CreateCircleScreen
+        onBack={() => setSecondaryScreen(undefined)}
+        onCreate={createHostedCircle}
+        user={user}
+      />
+    );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
         return (
           <>
             <Header
-              onOpenNotifications={() => setNotificationsVisible(true)}
+              onOpenNotifications={() => setSecondaryScreen('notifications')}
               user={user}
             />
             <TrustCard user={user} verified={verified} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSecondaryScreen('my-activities')}
+              style={styles.myPlansAction}
+            >
+              <CalendarDays color={colors.ink} size={19} strokeWidth={2.4} />
+              <Text style={styles.myPlansText}>My plans</Text>
+            </Pressable>
             {apiError ? (
               <View style={styles.apiBanner}>
                 <Text style={styles.apiBannerText}>{apiError}</Text>
               </View>
             ) : null}
             <Section title="This week near you">
-              <HorizontalCards
-                items={[...hostedItems, ...visibleEvents]}
-                onJoin={requestJoin}
-                onOpen={setSelectedItem}
-              />
+              {visibleEvents.length ? (
+                <HorizontalCards
+                  items={visibleEvents}
+                  onJoin={requestJoin}
+                  onOpen={setSelectedItem}
+                />
+              ) : (
+                <EmptyState
+                  icon={
+                    <CalendarDays
+                      color={colors.info}
+                      size={26}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  title="No events published yet"
+                  text="Your city’s next small gathering will appear here."
+                />
+              )}
             </Section>
             <Section title="Circles starting soon">
-              <HorizontalCards
-                items={visibleCircles}
-                onJoin={requestJoin}
-                onOpen={setSelectedItem}
-              />
-            </Section>
-            <Section title="Workshops">
-              <HorizontalCards
-                items={workshops}
-                onJoin={requestJoin}
-                onOpen={setSelectedItem}
-              />
+              {visibleCircles.length ? (
+                <HorizontalCards
+                  items={visibleCircles}
+                  onJoin={requestJoin}
+                  onOpen={setSelectedItem}
+                />
+              ) : (
+                <EmptyState
+                  icon={
+                    <UsersRound
+                      color={colors.info}
+                      size={26}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  title="No circles announced yet"
+                  text="Recurring groups will appear here when hosts publish them."
+                />
+              )}
             </Section>
             <Section title="Recommended for your interests">
               {recommended.length ? (
@@ -443,7 +902,12 @@ export function HomeScreen({
             {verified && joinedItems.length ? (
               <View style={styles.verticalCards}>
                 {joinedItems.map((item) => (
-                  <View key={item.id} style={styles.chatRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    key={item.id}
+                    onPress={() => setChatItem(item)}
+                    style={styles.chatRow}
+                  >
                     <MessageCircle
                       color={colors.info}
                       size={22}
@@ -455,7 +919,7 @@ export function HomeScreen({
                         Event and circle chats only. No random DMs.
                       </Text>
                     </View>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             ) : (
@@ -470,7 +934,7 @@ export function HomeScreen({
                 title={verified ? 'No cohort chats yet' : 'Chats are locked'}
                 text={
                   verified
-                    ? 'Join your first circle to start a private group chat.'
+                    ? 'Cohort chats open when a host approves your first join request.'
                     : 'Complete verification to message cohorts.'
                 }
               />
@@ -524,44 +988,62 @@ export function HomeScreen({
                 ))}
               </View>
             </View>
-            <Section title="My events">
-              {joinedItems.length ? (
-                <MyActivityCards
-                  items={joinedItems}
-                  onOpen={setSelectedItem}
-                  onFeedback={setFeedbackCandidate}
-                />
-              ) : (
-                <EmptyState
-                  icon={
-                    <CalendarCheck
-                      color={colors.info}
-                      size={26}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  title="No joined activities yet"
-                  text="Join an event or circle to see it here."
-                />
-              )}
-            </Section>
             <View style={styles.profileActions}>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setSettingsVisible(true)}
+                onPress={() => setSecondaryScreen('my-activities')}
                 style={styles.secondaryAction}
               >
-                <Settings color={colors.ink} size={19} strokeWidth={2.4} />
-                <Text style={styles.secondaryActionText}>Settings</Text>
+                <CalendarCheck color={colors.ink} size={19} strokeWidth={2.4} />
+                <Text style={styles.secondaryActionText}>My plans</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setHostToolsVisible(true)}
+                onPress={() => setSecondaryScreen('settings')}
                 style={styles.secondaryAction}
               >
-                <UserPlus color={colors.muted} size={19} strokeWidth={2.4} />
-                <Text style={styles.secondaryActionText}>Create event</Text>
+                <Settings color={colors.muted} size={19} strokeWidth={2.4} />
+                <Text style={styles.secondaryActionText}>Settings</Text>
               </Pressable>
+              {hostApproval?.status === 'APPROVED' ? (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setSecondaryScreen('create-event')}
+                    style={styles.secondaryAction}
+                  >
+                    <UserPlus color={colors.muted} size={19} strokeWidth={2.4} />
+                    <Text style={styles.secondaryActionText}>Create event</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setSecondaryScreen('create-circle')}
+                    style={styles.secondaryAction}
+                  >
+                    <UsersRound color={colors.muted} size={19} strokeWidth={2.4} />
+                    <Text style={styles.secondaryActionText}>Create circle</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={hostApproval?.status === 'PENDING'}
+                  onPress={() => void requestHostAccess()}
+                  style={[
+                    styles.secondaryAction,
+                    hostApproval?.status === 'PENDING' && styles.actionDisabled,
+                  ]}
+                >
+                  <UserPlus color={colors.muted} size={19} strokeWidth={2.4} />
+                  <Text style={styles.secondaryActionText}>
+                    {hostApproval?.status === 'PENDING'
+                      ? 'Host request pending'
+                      : hostApproval?.status === 'REJECTED'
+                        ? 'Request host access again'
+                        : 'Request host access'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
             <Pressable
               accessibilityRole="button"
@@ -647,97 +1129,11 @@ export function HomeScreen({
         </View>
       </Modal>
 
-      <ActivityDetailModal
-        blocked={blockedHosts.includes(
-          selectedItem?.host.replace('Hosted by ', '').replace('Led by ', '') ??
-            '',
-        )}
-        item={selectedItem}
-        onBlock={blockHost}
-        onClose={() => setSelectedItem(undefined)}
-        onJoin={requestJoin}
-      />
-
-      <FeedbackModal
-        idToken={idToken}
-        item={feedbackCandidate}
-        onSubmitted={loadCommunityData}
-        onClose={() => setFeedbackCandidate(undefined)}
-      />
-
-      <HostToolsModal
-        onClose={() => setHostToolsVisible(false)}
-        onCreate={createHostedEvent}
-        user={user}
-        visible={hostToolsVisible}
-      />
-
       <JoinConfirmModal
         item={joinCandidate}
         onCancel={() => setJoinCandidate(undefined)}
         onConfirm={confirmJoin}
       />
-
-      <SimplePanelModal
-        onClose={() => setNotificationsVisible(false)}
-        title="Notifications"
-        visible={notificationsVisible}
-      >
-        {notifications.length ? (
-          notifications.map((notification) => (
-            <PanelRow
-              icon={<Bell color={colors.primary} size={22} strokeWidth={2.3} />}
-              key={notification.id}
-              title={notification.title}
-              text={notification.body}
-            />
-          ))
-        ) : (
-          <PanelRow
-            icon={
-              <CheckCircle2
-                color={colors.success}
-                size={22}
-                strokeWidth={2.3}
-              />
-            }
-            title="No notifications yet"
-            text="Join requests, reminders, and review updates will appear here."
-          />
-        )}
-      </SimplePanelModal>
-
-      <SimplePanelModal
-        onClose={() => setSettingsVisible(false)}
-        title="Settings"
-        visible={settingsVisible}
-      >
-        <PanelRow
-          icon={
-            <CircleUserRound
-              color={colors.primary}
-              size={22}
-              strokeWidth={2.3}
-            />
-          }
-          title="Edit profile"
-          text="Update photo, bio, interests, languages, and city."
-        />
-        <PanelRow
-          icon={<Bell color={colors.info} size={22} strokeWidth={2.3} />}
-          title="Notifications"
-          text="Verification, join requests, reminders, and host updates."
-        />
-        <PanelRow
-          icon={<Ban color={colors.warning} size={22} strokeWidth={2.3} />}
-          title="Blocked users"
-          text={
-            blockedHosts.length
-              ? `${blockedHosts.join(', ')} blocked. Tap activity details to block a host in this prototype.`
-              : 'No blocked users yet. Blocked users cannot message or appear in recommendations.'
-          }
-        />
-      </SimplePanelModal>
     </View>
   );
 }
@@ -894,40 +1290,6 @@ function VerticalCards({
   );
 }
 
-function MyActivityCards({
-  items,
-  onFeedback,
-  onOpen,
-}: {
-  items: DiscoveryItem[];
-  onFeedback: (item: DiscoveryItem) => void;
-  onOpen: (item: DiscoveryItem) => void;
-}) {
-  return (
-    <View style={styles.verticalCards}>
-      {items.map((item) => (
-        <View key={item.id} style={styles.card}>
-          <Pressable accessibilityRole="button" onPress={() => onOpen(item)}>
-            <Text style={styles.category}>{formatCategory(item.category)}</Text>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardSummary}>{item.time}</Text>
-          </Pressable>
-          <View style={styles.cardFooter}>
-            <Text style={styles.host}>Requested</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onFeedback(item)}
-              style={styles.joinButton}
-            >
-              <Text style={styles.joinButtonText}>Feedback</Text>
-            </Pressable>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 function DiscoveryCard({
   compact = false,
   item,
@@ -964,93 +1326,15 @@ function DiscoveryCard({
         <Text style={styles.host}>{item.host}</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => onJoin(item)}
+          onPress={() => (item.remoteId ? onJoin(item) : onOpen(item))}
           style={styles.joinButton}
         >
-          <Text style={styles.joinButtonText}>Join</Text>
+          <Text style={styles.joinButtonText}>
+            {item.remoteId ? 'Join' : 'Details'}
+          </Text>
         </Pressable>
       </View>
     </Pressable>
-  );
-}
-
-function ActivityDetailModal({
-  blocked,
-  item,
-  onBlock,
-  onClose,
-  onJoin,
-}: {
-  blocked: boolean;
-  item?: DiscoveryItem;
-  onBlock: (item: DiscoveryItem) => Promise<void>;
-  onClose: () => void;
-  onJoin: (item: DiscoveryItem) => void;
-}) {
-  if (!item) {
-    return null;
-  }
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible>
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.detailSheet}>
-          <View style={styles.detailHeader}>
-            <View>
-              <Text style={styles.category}>
-                {formatCategory(item.category)}
-              </Text>
-              <Text style={styles.detailTitle}>{item.title}</Text>
-            </View>
-            <Pressable onPress={onClose}>
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.detailSummary}>{item.summary}</Text>
-          <View style={styles.detailMetaGrid}>
-            <ProfileMetric label="Where" value={item.location} />
-            <ProfileMetric label="When" value={item.time} />
-            <ProfileMetric label="Seats" value={`${item.seats ?? 0}`} />
-          </View>
-          <Text style={styles.subsectionTitle}>People you'll meet</Text>
-          <View style={styles.icebreakerList}>
-            {[
-              ['Aditi', 'Runs 5Ks', 'Loves coffee'],
-              ['Meera', 'Reads fiction', 'New to Bangalore'],
-              ['Kavya', 'Badminton beginner', 'Likes painting'],
-            ].map(([name, first, second]) => (
-              <View key={name} style={styles.icebreakerCard}>
-                <Text style={styles.icebreakerName}>{name}</Text>
-                <Text style={styles.icebreakerText}>{first}</Text>
-                <Text style={styles.icebreakerText}>{second}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.safetyActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onBlock(item)}
-              style={styles.safetyButton}
-            >
-              <Ban color={colors.warning} size={17} strokeWidth={2.4} />
-              <Text style={styles.safetyButtonText}>
-                {blocked ? 'Blocked' : 'Block host'}
-              </Text>
-            </Pressable>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              onClose();
-              onJoin(item);
-            }}
-            style={styles.modalButton}
-          >
-            <Text style={styles.modalButtonText}>Request to join</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -1098,228 +1382,6 @@ function JoinConfirmModal({
         </View>
       </View>
     </Modal>
-  );
-}
-
-function FeedbackModal({
-  idToken,
-  item,
-  onClose,
-  onSubmitted,
-}: {
-  idToken: string;
-  item?: DiscoveryItem;
-  onClose: () => void;
-  onSubmitted: () => Promise<void>;
-}) {
-  const [rating, setRating] = useState(5);
-  const [body, setBody] = useState('');
-  const [error, setError] = useState<string>();
-
-  if (!item) {
-    return null;
-  }
-
-  return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible>
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.detailSheet}>
-          <View style={styles.detailHeader}>
-            <View>
-              <Text style={styles.category}>Post-event feedback</Text>
-              <Text style={styles.detailTitle}>{item.title}</Text>
-            </View>
-            <Pressable onPress={onClose}>
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.detailSummary}>
-            Capture the beta signal: attendance quality, safety, and whether the
-            group should continue.
-          </Text>
-          <View style={styles.ratingRow}>
-            {[1, 2, 3, 4, 5].map((value) => (
-              <Pressable
-                accessibilityRole="button"
-                key={value}
-                onPress={() => setRating(value)}
-                style={[
-                  styles.ratingButton,
-                  rating === value && styles.ratingButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.ratingText,
-                    rating === value && styles.ratingTextActive,
-                  ]}
-                >
-                  {value}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput
-            multiline
-            onChangeText={(value) => {
-              setBody(value);
-              setError(undefined);
-            }}
-            placeholder="What worked? What should improve?"
-            placeholderTextColor={colors.muted}
-            style={styles.feedbackInput}
-            value={body}
-          />
-          {error ? <Text style={styles.formError}>{error}</Text> : null}
-          <Pressable
-            accessibilityRole="button"
-            onPress={async () => {
-              try {
-                if (item.category === 'event') {
-                  await submitEventFeedback(idToken, item.remoteId ?? item.id, {
-                    body,
-                    rating,
-                  });
-                  await onSubmitted();
-                }
-
-                onClose();
-              } catch (submitError) {
-                setError(
-                  submitError instanceof Error
-                    ? submitError.message
-                    : 'Unable to submit feedback.',
-                );
-              }
-            }}
-            style={styles.modalButton}
-          >
-            <Text style={styles.modalButtonText}>Submit feedback</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function HostToolsModal({
-  onClose,
-  onCreate,
-  user,
-  visible,
-}: {
-  onClose: () => void;
-  onCreate: (title: string) => Promise<void>;
-  user: NivaUser;
-  visible: boolean;
-}) {
-  const [title, setTitle] = useState('');
-  const canHost =
-    user.trustTier === 'trusted' ||
-    user.trustTier === 'host_eligible' ||
-    user.trustTier === 'host';
-
-  return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.detailSheet}>
-          <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>Create event</Text>
-            <Pressable onPress={onClose}>
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </View>
-          {canHost ? (
-            <>
-              <Text style={styles.detailSummary}>
-                Draft a small beta event. Published events still need admin
-                review before real users can join.
-              </Text>
-              <TextInput
-                onChangeText={setTitle}
-                placeholder="Sunday pottery table"
-                placeholderTextColor={colors.muted}
-                style={styles.hostInput}
-                value={title}
-              />
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => onCreate(title)}
-                style={styles.modalButton}
-              >
-                <Text style={styles.modalButtonText}>Create draft</Text>
-              </Pressable>
-            </>
-          ) : (
-            <EmptyState
-              icon={
-                <LockKeyhole color={colors.info} size={26} strokeWidth={2.3} />
-              }
-              title="Host tools are locked"
-              text="Create Event opens for trusted members and manually approved hosts."
-            />
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function SimplePanelModal({
-  children,
-  onClose,
-  title,
-  visible,
-}: {
-  children: ReactNode;
-  onClose: () => void;
-  title: string;
-  visible: boolean;
-}) {
-  return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.detailSheet}>
-          <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>{title}</Text>
-            <Pressable onPress={onClose}>
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </View>
-          <View style={styles.panelList}>{children}</View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function PanelRow({
-  icon,
-  text,
-  title,
-}: {
-  icon: ReactNode;
-  text: string;
-  title: string;
-}) {
-  return (
-    <View style={styles.panelRow}>
-      <View style={styles.panelIcon}>{icon}</View>
-      <View style={styles.panelCopy}>
-        <Text style={styles.panelTitle}>{title}</Text>
-        <Text style={styles.panelText}>{text}</Text>
-      </View>
-    </View>
   );
 }
 
@@ -1404,6 +1466,10 @@ function activityToDiscoveryItem(
   return {
     id: activity.id,
     remoteId: activity.id,
+    activityStatus: activity.status,
+    cancellationReason: activity.cancellationReason,
+    capacity: activity.capacity,
+    startsAt: activity.startsAt,
     hostId: activity.host?.id,
     category,
     title: activity.title,
@@ -1421,6 +1487,7 @@ function activityToDiscoveryItem(
     duration: activity.durationWeeks
       ? `${activity.durationWeeks} weeks`
       : undefined,
+    schedule: activity.schedule,
     difficulty: formatActivityDifficulty(activity.difficulty),
     interests: activity.interests,
     host:
@@ -1445,6 +1512,9 @@ function formatActivityDifficulty(
 }
 
 const styles = StyleSheet.create({
+  actionDisabled: {
+    opacity: 0.55,
+  },
   apiBanner: {
     backgroundColor: colors.accentSoft,
     borderColor: colors.warning,
@@ -1851,6 +1921,23 @@ const styles = StyleSheet.create({
     fontSize: typography.subheading,
     fontWeight: '800',
     lineHeight: 26,
+  },
+  myPlansAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  myPlansText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
   },
   panelCopy: {
     flex: 1,

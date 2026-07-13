@@ -16,8 +16,10 @@ import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   const verifyIdToken = jest.fn();
+  const createCustomTokenFromPnvToken = jest.fn();
   const upsertFromFirebase = jest.fn();
   const firebaseAdminService = {
+    createCustomTokenFromPnvToken,
     verifyIdToken,
   } as unknown as FirebaseAdminService;
   const usersService = {
@@ -78,5 +80,16 @@ describe('AuthService', () => {
     await expect(
       authService.createSession('firebase-id-token'),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('delegates Firebase PNV token exchange to the Firebase Admin service', async () => {
+    createCustomTokenFromPnvToken.mockResolvedValue('firebase-custom-token');
+
+    await expect(
+      authService.exchangePnvToken('signed-pnv-token'),
+    ).resolves.toBe('firebase-custom-token');
+    expect(createCustomTokenFromPnvToken).toHaveBeenCalledWith(
+      'signed-pnv-token',
+    );
   });
 });

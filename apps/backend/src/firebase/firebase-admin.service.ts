@@ -8,9 +8,12 @@ import { App, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { DecodedIdToken, getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
 
+type PnvJwks = ReturnType<(typeof import('jose'))['createRemoteJWKSet']>;
+
 @Injectable()
 export class FirebaseAdminService {
   private readonly app?: App;
+  private pnvJwks?: PnvJwks;
 
   constructor(private readonly configService: ConfigService) {
     const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
@@ -75,7 +78,9 @@ export class FirebaseAdminService {
       );
     }
 
-    const bucketName = this.configService.get<string>('FIREBASE_STORAGE_BUCKET');
+    const bucketName = this.configService.get<string>(
+      'FIREBASE_STORAGE_BUCKET',
+    );
     if (!bucketName) {
       throw new ServiceUnavailableException(
         'Set FIREBASE_STORAGE_BUCKET before viewing verification images.',
@@ -97,6 +102,74 @@ export class FirebaseAdminService {
     return url;
   }
 
+  async createCustomTokenFromPnvToken(pnvToken: string): Promise<string> {
+    if (
+      this.configService.get<string>('FIREBASE_PNV_ENABLED') !== 'true' ||
+      !this.app
+    ) {
+      throw new ServiceUnavailableException(
+        'Firebase Phone Number Verification is not enabled for this environment.',
+      );
+    }
+
+    const projectNumber = this.configService.get<string>(
+      'FIREBASE_PROJECT_NUMBER',
+    );
+    if (!projectNumber) {
+      throw new ServiceUnavailableException(
+        'Set FIREBASE_PROJECT_NUMBER before enabling Firebase Phone Number Verification.',
+      );
+    }
+
+    const issuer = `https://fpnv.googleapis.com/projects/${projectNumber}`;
+    let phoneNumber: string | undefined;
+
+    try {
+      const { createRemoteJWKSet, jwtVerify } = await import('jose');
+      this.pnvJwks ??= createRemoteJWKSet(
+        new URL('https://fpnv.googleapis.com/v1beta/jwks'),
+      );
+      const { payload } = await jwtVerify(pnvToken, this.pnvJwks, {
+        audience: issuer,
+        issuer,
+      });
+      phoneNumber = payload.sub;
+    } catch {
+      throw new UnauthorizedException(
+        'The Firebase Phone Number Verification token is invalid or expired.',
+      );
+    }
+
+    if (!phoneNumber || !/^\+\d{8,15}$/.test(phoneNumber)) {
+      throw new UnauthorizedException(
+        'The Firebase Phone Number Verification token does not contain a valid phone number.',
+      );
+    }
+
+    const auth = getAuth(this.app);
+    let firebaseUser;
+
+    try {
+      firebaseUser = await auth.getUserByPhoneNumber(phoneNumber);
+    } catch (error) {
+      if (getFirebaseErrorCode(error) !== 'auth/user-not-found') {
+        throw new ServiceUnavailableException(
+          'Unable to look up the Firebase user for this phone number.',
+        );
+      }
+
+      try {
+        firebaseUser = await auth.createUser({ phoneNumber });
+      } catch {
+        throw new ServiceUnavailableException(
+          'Unable to create the Firebase user for this phone number.',
+        );
+      }
+    }
+
+    return auth.createCustomToken(firebaseUser.uid);
+  }
+
   private getBetaPhone(idToken: string): string | undefined {
     const betaAuthEnabled =
       this.configService.get<string>('NIVA_BETA_AUTH_ENABLED') === 'true';
@@ -109,4 +182,17 @@ export class FirebaseAdminService {
 
     return /^\+\d{8,15}$/.test(phone) ? phone : undefined;
   }
+}
+
+function getFirebaseErrorCode(error: unknown): string | undefined {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+
+  return undefined;
 }

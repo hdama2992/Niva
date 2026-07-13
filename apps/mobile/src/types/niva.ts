@@ -18,6 +18,7 @@ export type NivaUser = {
   interests: string[];
   selfieUrl?: string;
   selfDeclarationAccepted: boolean;
+  communityGuidelinesAccepted: boolean;
   verificationStatus: VerificationStatus;
   trustScore: number;
   trustTier: TrustTier;

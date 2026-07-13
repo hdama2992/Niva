@@ -31,6 +31,9 @@ const publicUserSelect = {
   selfDeclarationAccepted: true,
   selfDeclarationAcceptedAt: true,
   selfDeclarationVersion: true,
+  communityGuidelinesAccepted: true,
+  communityGuidelinesAcceptedAt: true,
+  communityGuidelinesVersion: true,
   profile: true,
   selfieVerification: true,
   trust: true,
@@ -366,11 +369,77 @@ export class UsersService {
     return this.getPublicUserById(userId);
   }
 
+  async acceptCommunityGuidelines(
+    userId: string,
+    accepted: boolean,
+    version: string,
+  ): Promise<PublicUser> {
+    if (!accepted) {
+      throw new BadRequestException(
+        'Community guidelines must be accepted before joining an activity.',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        communityGuidelinesAccepted: true,
+        communityGuidelinesAcceptedAt: new Date(),
+        communityGuidelinesVersion: version,
+      },
+    });
+
+    return this.getPublicUserById(userId);
+  }
+
+  async recordAttendanceOutcome(
+    userId: string,
+    type: 'EVENT_ATTENDED' | 'NO_SHOW',
+    activityId: string,
+  ) {
+    await this.ensureTrustProfile(userId);
+    await this.prisma.trustEvent.create({
+      data: {
+        userId,
+        type,
+        points: TRUST_POINTS[type],
+        metadata: { activityId },
+      },
+    });
+    await this.recalculateTrustScore(userId);
+  }
+
+  async recordConfirmedReport(userId: string, reportId: string) {
+    await this.ensureTrustProfile(userId);
+    const existing = await this.prisma.trustEvent.findFirst({
+      where: {
+        userId,
+        type: TrustEventType.REPORT_CONFIRMED,
+        metadata: { path: ['reportId'], equals: reportId },
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      await this.prisma.trustEvent.create({
+        data: {
+          userId,
+          type: TrustEventType.REPORT_CONFIRMED,
+          points: TRUST_POINTS[TrustEventType.REPORT_CONFIRMED],
+          metadata: { reportId },
+        },
+      });
+      await this.recalculateTrustScore(userId);
+    }
+  }
+
   async submitSelfie(
     userId: string,
+    firebaseUid: string,
     dto: SubmitSelfieDto,
   ): Promise<PublicUser> {
     await this.ensureUserExists(userId);
+    assertSelfieStoragePathOwnership(firebaseUid, dto.selfieStoragePath);
     const legacyReference = `firebase-storage://${dto.selfieStoragePath}`;
 
     await this.prisma.$transaction([
@@ -676,5 +745,18 @@ export class UsersService {
       case VerificationReviewStatus.REJECTED:
         return SelfieVerificationStatus.REJECTED;
     }
+  }
+}
+
+export function assertSelfieStoragePathOwnership(
+  firebaseUid: string,
+  storagePath: string,
+) {
+  const expectedPrefix = `verification-selfies/${firebaseUid}/`;
+
+  if (!storagePath.startsWith(expectedPrefix)) {
+    throw new BadRequestException(
+      'A verification selfie must be uploaded to the authenticated member storage path.',
+    );
   }
 }

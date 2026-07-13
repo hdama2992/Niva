@@ -134,6 +134,26 @@ The Expo prototype now includes:
 Selfie check is for real-person, image-quality, and abuse-prevention review.
 Niva must not infer gender from face, name, style, or appearance.
 
+## Storage Privacy
+
+`firebase/storage.rules` is the deployable Firebase Storage rule set for Sprint
+2. It permits an authenticated member to create images only under her own
+Firebase UID path. Profile photos can be read by signed-in Niva members;
+verification selfies have no client read, update, or delete permission.
+
+The NestJS selfie endpoint also rejects a storage path unless it belongs to the
+authenticated Firebase UID. Firebase Admin bypasses Storage rules only on the
+server, where the protected admin review endpoint issues a five-minute signed
+viewer URL after the operator passes the admin guard.
+
+Deploy the rules after logging in to the Firebase CLI:
+
+```bash
+npx firebase-tools deploy --only storage --project niva-30f13
+```
+
+The rules are not active in Firebase until this deployment succeeds.
+
 ## Safety and foundation additions
 
 Sprint 2 also defines:

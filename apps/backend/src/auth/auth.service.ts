@@ -26,4 +26,8 @@ export class AuthService {
       firebaseTokenToSessionInput(firebaseUser),
     );
   }
+
+  async exchangePnvToken(pnvToken: string): Promise<string> {
+    return this.firebaseAdminService.createCustomTokenFromPnvToken(pnvToken);
+  }
 }

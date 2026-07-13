@@ -105,8 +105,42 @@ enum NotificationType {
   JOIN_REQUEST_ACCEPTED
   EVENT_REMINDER
   HOST_UPDATED_LOCATION
+  ACTIVITY_UPDATED
+  ACTIVITY_CANCELLED
   CIRCLE_STARTING
   REPORT_UPDATE
+  HOST_APPROVAL_UPDATE
+  ATTENDANCE_UPDATED
+}
+
+enum HostApprovalStatus {
+  NOT_REQUESTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AdminRole {
+  REVIEWER
+  MODERATOR
+  COMMUNITY_MANAGER
+  SUPER_ADMIN
+}
+
+enum AdminAuditAction {
+  ADMIN_ACCESS_GRANTED
+  VERIFICATION_REVIEWED
+  REPORT_STATUS_CHANGED
+  HOST_APPROVAL_CHANGED
+  ACTIVITY_CANCELLED
+  NOTIFICATION_DELIVERY_DISPATCHED
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
 }
 
 enum ChatThreadType {
@@ -127,6 +161,9 @@ model User {
   selfDeclarationAccepted   Boolean              @default(false)
   selfDeclarationAcceptedAt DateTime?
   selfDeclarationVersion    String?
+  communityGuidelinesAccepted   Boolean          @default(false)
+  communityGuidelinesAcceptedAt DateTime?
+  communityGuidelinesVersion    String?
   createdAt                 DateTime             @default(now())
   updatedAt                 DateTime             @updatedAt
   profile                   UserProfile?
@@ -150,6 +187,10 @@ model User {
   chatMessages              ChatMessage[]
   connectionsStarted        Connection[]         @relation("ConnectionUserA")
   connectionsReceived       Connection[]         @relation("ConnectionUserB")
+  hostApproval              HostApproval?
+  adminAccess               AdminAccess?
+  adminAuditLogs            AdminAuditLog[]     @relation("AdminAuditActor")
+  devicePushTokens          DevicePushToken[]
 }
 
 model UsernameReservation {
@@ -245,6 +286,8 @@ model Event {
   difficulty           ActivityDifficulty @default(SOCIAL)
   interests            String[]           @default([])
   status               ActivityStatus     @default(PUBLISHED)
+  cancellationReason   String?
+  cancelledAt          DateTime?
   requiresVerification Boolean            @default(true)
   hostId               String?
   host                 User?              @relation("EventHost", fields: [hostId], references: [id], onDelete: SetNull)
@@ -272,6 +315,8 @@ model Circle {
   difficulty           ActivityDifficulty @default(SOCIAL)
   interests            String[]           @default([])
   status               ActivityStatus     @default(PUBLISHED)
+  cancellationReason   String?
+  cancelledAt          DateTime?
   requiresVerification Boolean            @default(true)
   hostId               String?
   host                 User?              @relation("CircleHost", fields: [hostId], references: [id], onDelete: SetNull)
@@ -355,8 +400,40 @@ model Notification {
   metadata  Json?
   readAt    DateTime?
   createdAt DateTime         @default(now())
+  deliveries NotificationDelivery[]
 
   @@index([userId, readAt, createdAt])
+}
+
+model DevicePushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deliveries NotificationDelivery[]
+
+  @@index([userId, active])
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(cuid())
+  notificationId    String
+  notification      Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  devicePushTokenId String
+  devicePushToken   DevicePushToken            @relation(fields: [devicePushTokenId], references: [id], onDelete: Cascade)
+  status            NotificationDeliveryStatus @default(PENDING)
+  attempts          Int                        @default(0)
+  providerResponse  Json?
+  sentAt            DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@unique([notificationId, devicePushTokenId])
+  @@index([status, createdAt])
 }
 
 model UserSettings {
@@ -427,4 +504,42 @@ model Connection {
 
   @@unique([userAId, userBId])
   @@index([userBId])
+}
+
+model HostApproval {
+  userId     String             @id
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     HostApprovalStatus @default(NOT_REQUESTED)
+  reason     String?
+  reviewerId String?
+  requestedAt DateTime?
+  reviewedAt DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([status, requestedAt])
+}
+
+model AdminAccess {
+  userId    String    @id
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      AdminRole @default(REVIEWER)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model AdminAuditLog {
+  id          String           @id @default(cuid())
+  actorUserId String?
+  actorUser   User?            @relation("AdminAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorLabel  String
+  action      AdminAuditAction
+  targetType  String
+  targetId    String
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
 }

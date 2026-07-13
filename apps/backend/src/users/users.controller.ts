@@ -11,6 +11,7 @@ import {
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import type { RequestWithFirebaseUser } from '../firebase/firebase-auth.guard';
 import { AcceptSelfDeclarationDto } from './dto/accept-self-declaration.dto';
+import { AcceptCommunityGuidelinesDto } from './dto/accept-community-guidelines.dto';
 import { SetUsernameDto } from './dto/set-username.dto';
 import { SubmitSelfieDto } from './dto/submit-selfie.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -66,6 +67,22 @@ export class UsersController {
     };
   }
 
+  @Post('me/community-guidelines')
+  async acceptCommunityGuidelines(
+    @Req() request: RequestWithFirebaseUser,
+    @Body() body: AcceptCommunityGuidelinesDto,
+  ) {
+    const user = await this.currentUser(request);
+
+    return {
+      user: await this.usersService.acceptCommunityGuidelines(
+        user.id,
+        body.accepted,
+        body.version,
+      ),
+    };
+  }
+
   @Post('me/selfie')
   async submitSelfie(
     @Req() request: RequestWithFirebaseUser,
@@ -74,7 +91,11 @@ export class UsersController {
     const user = await this.currentUser(request);
 
     return {
-      user: await this.usersService.submitSelfie(user.id, body),
+      user: await this.usersService.submitSelfie(
+        user.id,
+        request.firebaseUser.uid,
+        body,
+      ),
     };
   }
 

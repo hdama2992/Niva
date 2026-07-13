@@ -18,16 +18,20 @@ import {
   ApiUser,
   createBetaSession,
   createSession,
+  exchangePnvToken,
   setUsername,
   submitSelfie,
   updateProfile,
 } from './src/services/session';
-import { firebaseConfig } from './src/services/firebase';
+import { firebaseConfig, initializeFirebase } from './src/services/firebase';
 import {
   getMobileAuthMode,
+  getPhoneNumberVerificationAvailability,
   logoutMobileUser,
+  requestPhoneNumberVerification,
   restoreFirebaseIdToken,
   sendPhoneCode,
+  signInWithPnvCustomToken,
   verifyPhoneCode,
 } from './src/services/mobile-auth';
 import {
@@ -56,8 +60,13 @@ type Route =
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
+  const [pnvAvailable, setPnvAvailable] = useState(false);
   const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const authMode = getMobileAuthMode();
+
+  if (authMode === 'firebase') {
+    initializeFirebase();
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -99,10 +108,38 @@ export default function App() {
     };
   }, []);
 
-  const handleOtpRequested = (phone: string) =>
+  useEffect(() => {
+    let isActive = true;
+
+    void getPhoneNumberVerificationAvailability()
+      .then((availability) => {
+        if (isActive) {
+          setPnvAvailable(availability.available);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setPnvAvailable(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [authMode]);
+
+  const handleOtpRequested = async (phone: string) => {
+    await sendPhoneCode(phone, recaptchaVerifier.current);
+    setRoute({ name: 'otp', phone });
+  };
+
+  const handlePnvRequested = () =>
     withApiErrors(async () => {
-      await sendPhoneCode(phone, recaptchaVerifier.current);
-      setRoute({ name: 'otp', phone });
+      const pnvToken = await requestPhoneNumberVerification();
+      const customToken = await exchangePnvToken(pnvToken);
+      const firebaseIdToken = await signInWithPnvCustomToken(customToken);
+      const user = await createSession(firebaseIdToken);
+      setRoute(routeForApiUser(firebaseIdToken, user));
     });
 
   const handleOtpVerified = (phone: string, code: string) =>
@@ -180,6 +217,8 @@ export default function App() {
           <LoginScreen
             authMode={authMode}
             onContinue={handleOtpRequested}
+            onVerifyPhoneNumber={handlePnvRequested}
+            pnvAvailable={pnvAvailable}
           />
         );
       case 'otp':
@@ -342,6 +381,7 @@ function mapApiUser(user: ApiUser): NivaUser {
       : ['Books', 'Coffee', 'Wellness'],
     selfieUrl: selfie?.selfieUrl ?? undefined,
     selfDeclarationAccepted: user.selfDeclarationAccepted,
+    communityGuidelinesAccepted: user.communityGuidelinesAccepted,
     verificationStatus: mapVerificationStatus(
       trust?.verificationStatus,
       selfie?.status,

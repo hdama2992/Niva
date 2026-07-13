@@ -1,6 +1,14 @@
-import { Check, ChevronDown, ShieldCheck, UsersRound } from 'lucide-react-native';
+import {
+  Check,
+  ChevronDown,
+  MessageSquareText,
+  ShieldCheck,
+  Smartphone,
+  UsersRound,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -18,7 +26,9 @@ import { MobileAuthMode } from '../services/mobile-auth';
 
 type LoginScreenProps = {
   authMode: MobileAuthMode;
-  onContinue: (phone: string) => void;
+  onContinue: (phone: string) => Promise<void>;
+  onVerifyPhoneNumber: () => void;
+  pnvAvailable: boolean;
 };
 
 type Country = {
@@ -37,15 +47,21 @@ const countries: Country[] = [
   { code: 'SG', dialCode: '+65', localDigits: 8, name: 'Singapore', placeholder: '8123 4567' },
 ];
 
-export function LoginScreen({ authMode, onContinue }: LoginScreenProps) {
+export function LoginScreen({
+  authMode,
+  onContinue,
+  onVerifyPhoneNumber,
+  pnvAvailable,
+}: LoginScreenProps) {
   const [phone, setPhone] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [error, setError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
 
   const cleanPhone = (value: string) => value.replace(/\D/g, '');
 
-  const continueToOtp = () => {
+  const continueToOtp = async () => {
     const localPhone = cleanPhone(phone.trim());
 
     if (localPhone.length !== selectedCountry.localDigits) {
@@ -53,8 +69,20 @@ export function LoginScreen({ authMode, onContinue }: LoginScreenProps) {
       return;
     }
 
+    setSubmitting(true);
     setError(undefined);
-    onContinue(`${selectedCountry.dialCode}${localPhone}`);
+
+    try {
+      await onContinue(`${selectedCountry.dialCode}${localPhone}`);
+    } catch (authError) {
+      setError(
+        authError instanceof Error
+          ? authError.message
+          : 'Unable to start phone verification. Try again.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,11 +98,39 @@ export function LoginScreen({ authMode, onContinue }: LoginScreenProps) {
         <View style={styles.copy}>
           <Text style={styles.title}>Find your people.</Text>
           <Text style={styles.subtitle}>
-            {authMode === 'firebase'
+            {pnvAvailable
+              ? 'Verify the phone number on this device in one secure step.'
+              : authMode === 'firebase'
               ? 'Enter your phone number to receive a verification code.'
               : 'Enter your phone number for the local beta preview.'}
           </Text>
         </View>
+
+        {pnvAvailable ? (
+          <View style={styles.pnvSection}>
+            <View style={styles.pnvCopy}>
+              <View style={styles.pnvIcon}>
+                <Smartphone color={colors.secondary} size={20} strokeWidth={2.4} />
+              </View>
+              <View style={styles.pnvTextGroup}>
+                <Text style={styles.pnvTitle}>Verify from your SIM</Text>
+                <Text style={styles.pnvText}>
+                  Your mobile carrier confirms the number after you consent. No SMS code is needed.
+                </Text>
+              </View>
+            </View>
+            <PrimaryButton
+              icon={<ShieldCheck color={colors.surface} size={20} strokeWidth={2.4} />}
+              label="Verify my phone number"
+              onPress={onVerifyPhoneNumber}
+            />
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerLabel}>or use SMS</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.phoneGroup}>
           <Text style={styles.label}>Phone number</Text>
@@ -110,9 +166,16 @@ export function LoginScreen({ authMode, onContinue }: LoginScreenProps) {
         </View>
 
         <PrimaryButton
-          icon={<ShieldCheck color={colors.surface} size={20} strokeWidth={2.4} />}
-          label="Continue"
-          onPress={continueToOtp}
+          disabled={submitting}
+          icon={
+            submitting ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <MessageSquareText color={colors.surface} size={20} strokeWidth={2.4} />
+            )
+          }
+          label={submitting ? 'Starting verification...' : pnvAvailable ? 'Send SMS code' : 'Continue'}
+          onPress={() => void continueToOtp()}
         />
       </View>
 
@@ -230,6 +293,22 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
+  divider: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  dividerLabel: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  dividerLine: {
+    backgroundColor: colors.border,
+    flex: 1,
+    height: 1,
+  },
   error: {
     color: colors.primaryDark,
     fontSize: typography.small,
@@ -269,6 +348,42 @@ const styles = StyleSheet.create({
   },
   phoneRowError: {
     borderColor: colors.primaryDark,
+  },
+  pnvCopy: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  pnvIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.pill,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  pnvSection: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  pnvText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  pnvTextGroup: {
+    flex: 1,
+  },
+  pnvTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
   sheetTitle: {
     color: colors.ink,

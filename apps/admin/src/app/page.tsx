@@ -18,6 +18,32 @@ type VerificationReview = {
   userId: string;
 };
 
+type HostApproval = {
+  id: string;
+  reason: string | null;
+  requestedAt: string | null;
+  status: 'APPROVED' | 'NOT_REQUESTED' | 'PENDING' | 'REJECTED';
+  user: {
+    displayName: string | null;
+    id: string;
+    profile: { city: string | null; interests: string[] } | null;
+    trust: { score: number; tier: string } | null;
+    username: string | null;
+  };
+  userId: string;
+};
+
+type AdminActivity = {
+  city: string;
+  host: { displayName: string | null; username: string | null } | null;
+  id: string;
+  locationName: string;
+  schedule?: string;
+  startsAt: string;
+  title: string;
+  type: 'CIRCLE' | 'EVENT';
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function Home() {
@@ -25,8 +51,13 @@ export default function Home() {
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState<VerificationReview[]>([]);
+  const [approvals, setApprovals] = useState<HostApproval[]>([]);
+  const [activities, setActivities] = useState<AdminActivity[]>([]);
   const [reviewingUserId, setReviewingUserId] = useState<string>();
   const [viewingUserId, setViewingUserId] = useState<string>();
+  const [updatingHostId, setUpdatingHostId] = useState<string>();
+  const [cancellingActivityId, setCancellingActivityId] = useState<string>();
+  const [loaded, setLoaded] = useState(false);
 
   const counts = useMemo(
     () => ({
@@ -49,16 +80,40 @@ export default function Home() {
     setLoading(true);
     setError(undefined);
     try {
-      const response = await fetch(`${apiUrl}/admin/verification-reviews`, {
-        headers: { 'x-niva-admin-key': key },
-      });
+      const headers = { 'x-niva-admin-key': key };
+      const [reviewsResponse, approvalsResponse, activitiesResponse] =
+        await Promise.all([
+          fetch(`${apiUrl}/admin/verification-reviews`, { headers }),
+          fetch(`${apiUrl}/admin/host-approvals?status=PENDING`, { headers }),
+          fetch(`${apiUrl}/admin/activities?status=PUBLISHED`, { headers }),
+        ]);
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+      if (!reviewsResponse.ok || !approvalsResponse.ok || !activitiesResponse.ok) {
+        const failedResponse = [reviewsResponse, approvalsResponse, activitiesResponse].find(
+          (response) => !response.ok,
+        );
+        throw new Error((await failedResponse?.text()) || 'Unable to load admin queues.');
       }
 
-      const payload = (await response.json()) as { reviews: VerificationReview[] };
-      setReviews(payload.reviews);
+      const [reviewsPayload, approvalsPayload, activitiesPayload] = (await Promise.all([
+        reviewsResponse.json(),
+        approvalsResponse.json(),
+        activitiesResponse.json(),
+      ])) as [
+        { reviews: VerificationReview[] },
+        { approvals: HostApproval[] },
+        {
+          circles: Omit<AdminActivity, 'type'>[];
+          events: Omit<AdminActivity, 'type'>[];
+        },
+      ];
+      setReviews(reviewsPayload.reviews);
+      setApprovals(approvalsPayload.approvals);
+      setActivities([
+        ...activitiesPayload.events.map((activity) => ({ ...activity, type: 'EVENT' as const })),
+        ...activitiesPayload.circles.map((activity) => ({ ...activity, type: 'CIRCLE' as const })),
+      ]);
+      setLoaded(true);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -67,6 +122,72 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateHostApproval = async (
+    approval: HostApproval,
+    status: 'APPROVED' | 'REJECTED',
+  ) => {
+    setUpdatingHostId(approval.userId);
+    setError(undefined);
+    try {
+      const response = await fetch(
+        `${apiUrl}/admin/host-approvals/${approval.userId}`,
+        {
+          body: JSON.stringify({ status }),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-niva-admin-key': adminKey.trim(),
+          },
+          method: 'PATCH',
+        },
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      setApprovals((current) =>
+        current.filter((item) => item.userId !== approval.userId),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : 'Unable to update host access.',
+      );
+    } finally {
+      setUpdatingHostId(undefined);
+    }
+  };
+
+  const cancelActivity = async (activity: AdminActivity, reason: string) => {
+    setCancellingActivityId(activity.id);
+    setError(undefined);
+    try {
+      const path =
+        activity.type === 'EVENT'
+          ? `/admin/events/${activity.id}/cancel`
+          : `/admin/circles/${activity.id}/cancel`;
+      const response = await fetch(`${apiUrl}${path}`, {
+        body: JSON.stringify({ reason }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-niva-admin-key': adminKey.trim(),
+        },
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      setActivities((current) => current.filter((item) => item.id !== activity.id));
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : 'Unable to cancel this activity.',
+      );
+    } finally {
+      setCancellingActivityId(undefined);
     }
   };
 
@@ -219,6 +340,58 @@ export default function Home() {
           </section>
         )}
 
+        {loaded ? (
+          <section className="grid gap-4 border-t border-stone-200 pt-6">
+            <div className="flex items-baseline justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-teal-700">Community</p>
+                <h2 className="mt-1 text-2xl font-bold">Host approvals</h2>
+              </div>
+              <p className="text-sm font-semibold text-stone-500">{approvals.length} pending</p>
+            </div>
+            {approvals.length ? (
+              <div className="grid gap-3">
+                {approvals.map((approval) => (
+                  <HostApprovalCard
+                    approval={approval}
+                    busy={updatingHostId === approval.userId}
+                    key={approval.userId}
+                    onUpdate={updateHostApproval}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="border-y border-stone-200 py-6 text-sm text-stone-600">No host requests waiting for review.</p>
+            )}
+          </section>
+        ) : null}
+
+        {loaded ? (
+          <section className="grid gap-4 border-t border-stone-200 pt-6">
+            <div className="flex items-baseline justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-700">Operations</p>
+                <h2 className="mt-1 text-2xl font-bold">Published activities</h2>
+              </div>
+              <p className="text-sm font-semibold text-stone-500">{activities.length} live</p>
+            </div>
+            {activities.length ? (
+              <div className="grid gap-3">
+                {activities.map((activity) => (
+                  <ActivityCancellationCard
+                    activity={activity}
+                    busy={cancellingActivityId === activity.id}
+                    key={`${activity.type}-${activity.id}`}
+                    onCancel={cancelActivity}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="border-y border-stone-200 py-6 text-sm text-stone-600">No published activities.</p>
+            )}
+          </section>
+        ) : null}
+
         <section className="grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2">
           <div>
             <h2 className="text-xl font-bold">What the admin key means</h2>
@@ -238,6 +411,90 @@ export default function Home() {
         </section>
       </section>
     </main>
+  );
+}
+
+function HostApprovalCard({
+  approval,
+  busy,
+  onUpdate,
+}: {
+  approval: HostApproval;
+  busy: boolean;
+  onUpdate: (approval: HostApproval, status: 'APPROVED' | 'REJECTED') => Promise<void>;
+}) {
+  return (
+    <article className="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-center">
+      <div>
+        <p className="text-sm font-semibold text-teal-700">{approval.user.trust?.tier ?? 'TRUSTED'} · {approval.user.trust?.score ?? 0} trust points</p>
+        <h3 className="mt-1 text-lg font-bold">{approval.user.displayName ?? approval.user.username ?? 'Niva member'}</h3>
+        <p className="mt-1 text-sm text-stone-600">@{approval.user.username ?? 'pending'} · {approval.user.profile?.city ?? 'City not set'}</p>
+        {approval.user.profile?.interests?.length ? <p className="mt-3 text-sm text-stone-700">{approval.user.profile.interests.join(' · ')}</p> : null}
+      </div>
+      <div className="grid grid-cols-2 gap-2 lg:w-64">
+        <button
+          className="min-h-10 rounded-md bg-teal-700 px-3 text-sm font-bold text-white disabled:opacity-60"
+          disabled={busy}
+          onClick={() => void onUpdate(approval, 'APPROVED')}
+          type="button"
+        >
+          Approve
+        </button>
+        <button
+          className="min-h-10 rounded-md border border-rose-300 bg-rose-50 px-3 text-sm font-bold text-rose-900 disabled:opacity-60"
+          disabled={busy}
+          onClick={() => void onUpdate(approval, 'REJECTED')}
+          type="button"
+        >
+          Reject
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function ActivityCancellationCard({
+  activity,
+  busy,
+  onCancel,
+}: {
+  activity: AdminActivity;
+  busy: boolean;
+  onCancel: (activity: AdminActivity, reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const when = new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(activity.startsAt));
+  const host = activity.host?.displayName ?? activity.host?.username ?? 'Niva host';
+  const canCancel = reason.trim().length >= 3 && !busy;
+
+  return (
+    <article className="grid gap-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_22rem] lg:items-end">
+      <div>
+        <p className="text-sm font-semibold text-amber-700">{activity.type === 'EVENT' ? 'Event' : 'Circle'}</p>
+        <h3 className="mt-1 text-lg font-bold">{activity.title}</h3>
+        <p className="mt-1 text-sm text-stone-600">{when} · {activity.locationName} · {activity.city}</p>
+        <p className="mt-1 text-sm text-stone-600">Hosted by {host}{activity.schedule ? ` · ${activity.schedule}` : ''}</p>
+      </div>
+      <div className="grid gap-2">
+        <input
+          className="min-h-10 rounded-md border border-stone-300 px-3 text-sm outline-none ring-rose-300 focus:ring-2"
+          onChange={(event) => setReason(event.target.value)}
+          placeholder="Cancellation reason for members"
+          value={reason}
+        />
+        <button
+          className="min-h-10 rounded-md border border-rose-300 bg-rose-50 px-3 text-sm font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!canCancel}
+          onClick={() => void onCancel(activity, reason.trim())}
+          type="button"
+        >
+          {busy ? 'Cancelling...' : 'Cancel activity'}
+        </button>
+      </div>
+    </article>
   );
 }
 

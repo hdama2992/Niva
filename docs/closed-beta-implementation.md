@@ -29,9 +29,16 @@ mode, and the external configuration required before real users are invited.
    viewer URL from that internal storage path. Approve, hold, or reject calls
    `PATCH /admin/verification-reviews/:userId`. The backend updates the review,
    selfie state, trust events, score, tier, and verification access.
-10. A verified member can create a persisted event/circle join request. The
-    backend stores membership and creates an in-app notification. Feedback is
-    persisted after a joined event.
+10. Before her first join, a verified member accepts the explicit community
+    guidelines. The backend stores a version and timestamp, then accepts the
+    persisted event/circle join request.
+11. An approved host accepts the request from the host-management screen. Only
+    then does the member enter the persisted cohort chat; Niva has no random
+    direct messages.
+12. Approved hosts can create events and circles, approve their members, and
+    record event attendance. Members can submit private feedback after a past
+    event. Reporting is intentionally held from the active UI until moderation
+    operations are ready.
 
 ## Local Preview Versus Production
 
@@ -68,6 +75,10 @@ In Firebase Console:
 5. Supply the backend Firebase Admin service account variables from
    `apps/backend/.env.example`.
 
+Firebase Phone Authentication cannot be completed from `localhost` in the web
+preview. Use beta auth locally, or test real SMS on an Android development
+build or an approved HTTPS hosted domain.
+
 Use Firebase Storage rules that restrict each member to writes in their own
 folder and do not permit public reads of verification selfies. The admin
 dashboard requests a five-minute signed viewer URL from the backend only after
@@ -76,10 +87,10 @@ the operator has supplied the admin credential.
 ## Admin Security
 
 The current closed-beta dashboard accepts `NIVA_ADMIN_KEY` at runtime and keeps
-it only in page memory. It is sent as `x-niva-admin-key` to the backend. This is
-appropriate for a small, trusted operator group but must be replaced before a
-public launch with named administrator accounts, server-side authorization, and
-an audit log.
+it only in page memory. It is sent as `x-niva-admin-key` to the backend. The
+backend now also supports named Firebase-token administrators through
+`AdminAccess` plus audit history. The dashboard needs a Firebase sign-in screen
+before the shared-key fallback can be removed for public launch.
 
 ## Implemented Data Ownership
 
@@ -90,19 +101,24 @@ an audit log.
 | Profile photos/selfies | Firebase Storage | Camera/library selection and direct authenticated upload |
 | Verification review | PostgreSQL via NestJS | Pending state in the app; live admin decision queue |
 | Events, circles, memberships, feedback | PostgreSQL via NestJS | API-backed discovery, joining, activity, feedback |
-| In-app notifications | PostgreSQL via NestJS | API-backed list in the Home experience |
+| Activity lifecycle | PostgreSQL via NestJS | Host/admin edits and cancellation reasons; affected members receive persisted alerts |
+| In-app notifications | PostgreSQL via NestJS | API-backed list plus push-delivery queue |
+| Cohort chat | PostgreSQL via NestJS | Approved event/circle members only; 12-second refresh |
+| Held reporting model | PostgreSQL via NestJS | Backend model retained; member and admin UI intentionally disabled |
 
 ## Still Required Before Inviting Users
 
 - Apply real Firebase credentials and disable beta auth.
 - Apply Firebase Storage rules and confirm that staff cannot access selfies
   outside the verification workflow.
-- Replace the shared admin key with individual admin authentication and add
-  audit history.
-- Add event/circle chat for joined members only.
-- Add push notification delivery for approvals, joins, reminders, and updates.
-- Add attendance/no-show and feedback-to-trust rules.
+- Add Firebase sign-in to the admin dashboard and remove its shared-key
+  fallback; backend named-admin access and audit history already exist.
+- Add Expo device token registration plus FCM/APNs configuration. The backend
+  queue and manual Expo dispatch route already exist.
+- Add a validated map/location picker and platform-native date/time picker.
+  Current host controls use a controlled day/time stepper and persisted edits.
+- Decide and staff the moderation process before re-enabling report submission
+  and the admin report queue.
 - Add privacy policy, selfie consent, retention/deletion rules, and operator
   escalation procedures.
-- Build the held report reasons flow and community-guidelines page when the
-  product decision is reopened.
+- Complete privacy, retention/deletion, and operator escalation policies.

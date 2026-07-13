@@ -35,6 +35,9 @@ export type ApiUser = {
   selfDeclarationAccepted: boolean;
   selfDeclarationAcceptedAt: string | null;
   selfDeclarationVersion: string | null;
+  communityGuidelinesAccepted: boolean;
+  communityGuidelinesAcceptedAt: string | null;
+  communityGuidelinesVersion: string | null;
   profile: ApiUserProfile | null;
   selfieVerification: ApiSelfieVerification | null;
   trust: ApiTrust | null;
@@ -86,6 +89,26 @@ export async function createSession(idToken: string): Promise<ApiUser> {
   return payload.user;
 }
 
+export async function exchangePnvToken(pnvToken: string): Promise<string> {
+  const response = await fetch(`${apiUrl}/auth/pnv/exchange`, {
+    body: JSON.stringify({ pnvToken }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      message || 'Unable to verify the phone number from this device.',
+    );
+  }
+
+  const payload = (await response.json()) as { customToken: string };
+  return payload.customToken;
+}
+
 export async function createBetaSession(phone: string): Promise<Session> {
   const idToken = `niva-beta:${phone}`;
   const user = await createSession(idToken);
@@ -125,6 +148,13 @@ export function updateProfile(
 
 export function acceptSelfDeclaration(idToken: string) {
   return request<{ user: ApiUser }>('/users/me/self-declaration', idToken, {
+    body: { accepted: true, version: 'v1' },
+    method: 'POST',
+  });
+}
+
+export function acceptCommunityGuidelines(idToken: string) {
+  return request<{ user: ApiUser }>('/users/me/community-guidelines', idToken, {
     body: { accepted: true, version: 'v1' },
     method: 'POST',
   });

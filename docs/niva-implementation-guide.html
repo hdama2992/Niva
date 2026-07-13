@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Niva Implementation Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #211a1d;
+      --muted: #6f6368;
+      --paper: #ffffff;
+      --page: #fff9f4;
+      --line: #e7dad2;
+      --rose: #a33b5a;
+      --teal: #197c7b;
+      --teal-soft: #e3f3f1;
+      --amber: #fff4d8;
+      --blue: #e8f0fa;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 72px; }
+    header { border-bottom: 1px solid var(--line); padding: 12px 0 28px; }
+    h1, h2, h3 { line-height: 1.2; margin: 0; }
+    h1 { font-size: clamp(2rem, 5vw, 3.25rem); max-width: 760px; }
+    h2 { font-size: 1.45rem; margin-bottom: 14px; }
+    h3 { font-size: 1rem; margin-bottom: 6px; }
+    p { margin: 0 0 12px; }
+    a { color: var(--rose); font-weight: 700; }
+    code { background: #f8f1ee; border: 1px solid var(--line); border-radius: 4px; font-family: "SFMono-Regular", Consolas, monospace; font-size: .9em; padding: 1px 4px; }
+    section { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-top: 18px; padding: 22px; }
+    .eyebrow { color: var(--rose); font-size: .78rem; font-weight: 800; letter-spacing: .06em; margin-bottom: 10px; text-transform: uppercase; }
+    .summary { color: var(--muted); font-size: 1.1rem; margin-top: 14px; max-width: 760px; }
+    .callout { background: var(--amber); border-left: 4px solid #d99000; border-radius: 4px; margin-top: 18px; padding: 14px 16px; }
+    .success { background: var(--teal-soft); border-left-color: var(--teal); }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    .card p { color: var(--muted); font-size: .94rem; margin: 0; }
+    .flow { display: grid; gap: 10px; counter-reset: step; list-style: none; margin: 0; padding: 0; }
+    .flow li { align-items: flex-start; display: grid; gap: 12px; grid-template-columns: 32px 1fr; }
+    .flow li::before { align-items: center; background: var(--teal-soft); border-radius: 50%; color: var(--teal); content: counter(step); counter-increment: step; display: flex; font-weight: 800; height: 30px; justify-content: center; width: 30px; }
+    .flow strong { display: block; margin-bottom: 3px; }
+    .flow span { color: var(--muted); display: block; }
+    table { border-collapse: collapse; font-size: .94rem; width: 100%; }
+    th, td { border: 1px solid var(--line); padding: 11px; text-align: left; vertical-align: top; }
+    th { background: #fcf7f4; font-size: .82rem; text-transform: uppercase; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+    .status { border-radius: 999px; display: inline-block; font-size: .76rem; font-weight: 800; padding: 3px 8px; white-space: nowrap; }
+    .implemented { background: var(--teal-soft); color: #12605f; }
+    .pending { background: var(--blue); color: #315f8f; }
+    .not-live { background: var(--amber); color: #8a5a00; }
+    .route { background: #fcf7f4; border: 1px solid var(--line); border-radius: 6px; font-family: "SFMono-Regular", Consolas, monospace; font-size: .88rem; margin: 6px 0; padding: 9px 10px; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .links a { background: #f8f1ee; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; text-decoration: none; }
+    @media (max-width: 640px) { main { padding: 20px 14px 44px; } section { padding: 17px; } table { font-size: .84rem; } th, td { padding: 8px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Niva closed-beta implementation</p>
+      <h1>What is real today, how it works, and what is still needed.</h1>
+      <p class="summary">Niva is now a database-backed closed-beta community app, not just a mocked mobile prototype. Core product decisions are enforced by the backend and persisted in PostgreSQL.</p>
+      <div class="callout success"><strong>Local state:</strong> migration <code>20260713120000_community_completion</code> is applied to the local <code>niva</code> database. The mobile app, API, and admin dashboard share the same records.</div>
+      <div class="links">
+        <a href="community-completion.md">Detailed Markdown implementation notes</a>
+        <a href="mvp-feature-status.md">MVP feature status</a>
+      </div>
+    </header>
+
+    <section>
+      <h2>The product boundary</h2>
+      <div class="grid">
+        <div class="card"><h3>What Niva is</h3><p>A controlled way for verified women in Bangalore to meet through small events and recurring circles.</p></div>
+        <div class="card"><h3>What Niva is not</h3><p>It is not a public social feed, a random-DM app, or a marketplace for anonymous hosts.</p></div>
+        <div class="card"><h3>Why this matters</h3><p>The safety model stays manageable in beta: verified joining, controlled chats, host review, and operator oversight. Reporting remains held until moderation operations are staffed.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>End-to-end member flow</h2>
+      <ol class="flow">
+        <li><div><strong>Authenticate and complete a profile</strong><span>Firebase proves the phone identity in production. The backend upserts the local User and TrustProfile. Username, profile, self-declaration, and selfie review remain API-backed.</span></div></li>
+        <li><div><strong>Browse before verification</strong><span>Anyone signed in can view published events and circles. There is no fake success state for placeholder activity cards.</span></div></li>
+        <li><div><strong>Verify before joining</strong><span>A first join attempt from an unverified member opens the selfie review path. The server rejects join requests until verification is approved.</span></div></li>
+        <li><div><strong>Accept community guidelines</strong><span>A verified member sees the women-centered community agreement before the first join. <code>POST /users/me/community-guidelines</code> records its version and timestamp. The join endpoint checks this again.</span></div></li>
+        <li><div><strong>Submit a join request</strong><span>The backend checks activity state, capacity, blocks, verification, and guidelines, then stores <code>REQUESTED</code> in EventMember or CircleMember.</span></div></li>
+        <li><div><strong>Host manages the activity</strong><span>For events and circles, the actual host can approve or decline requests, edit live details, or cancel with a required reason. Saved changes and cancellations create persisted member notifications.</span></div></li>
+        <li><div><strong>Use cohort chat</strong><span>The app shows approved event/circle chats only. Messages are saved in PostgreSQL and retrieved through guarded API routes. There are no direct messages.</span></div></li>
+        <li><div><strong>Close the loop after the event</strong><span>The host marks an approved member attended or no-show. The backend updates membership, writes a trust event, recalculates trust, and notifies the member. A participant can then leave a private one-to-five rating and optional note from My plans.</span></div></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Safety and moderation</h2>
+      <table>
+        <thead><tr><th>Capability</th><th>How it works now</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Selfie review</td><td>Private Firebase Storage path, pending review record, five-minute signed admin viewer URL, approval updates trust and access.</td><td><span class="status implemented">Implemented</span></td></tr>
+          <tr><td>Community agreement</td><td>Explicit women-centered eligibility and behavior rules stored per member before a first join.</td><td><span class="status implemented">Implemented</span></td></tr>
+          <tr><td>Activity lifecycle</td><td>Hosts edit published activities, adjust controlled day/time fields, and cancel with a reason. Members see cancellations in My plans; admins can cancel published activities with an audit entry.</td><td><span class="status implemented">Implemented</span></td></tr>
+          <tr><td>Block</td><td>Blocks are persisted. Discovery excludes blocked hosts; chat filters messages where either participant has blocked the other.</td><td><span class="status implemented">Implemented</span></td></tr>
+          <tr><td>Report</td><td>The backend model is retained, but member submission and the admin report queue are intentionally disabled until Niva has a staffed moderation process.</td><td><span class="status pending">Held</span></td></tr>
+          <tr><td>Trust impact</td><td>Attendance adds points and no-shows subtract points. Report-based trust changes are retained with the held reporting backend and are not reachable from the active UI.</td><td><span class="status implemented">Implemented</span></td></tr>
+          <tr><td>Policies</td><td>Privacy policy, retention/deletion, legal consent, escalation process, and response-time commitments still need operating documents.</td><td><span class="status pending">Remaining</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Host and admin responsibilities</h2>
+      <div class="grid">
+        <div class="card"><h3>Member</h3><p>Completes profile and verification, agrees to guidelines, requests to join, chats only after approval, can block, leave post-event feedback, and receives notifications.</p></div>
+        <div class="card"><h3>Host</h3><p>First needs trust eligibility plus an admin-approved HostApproval. Can create, edit, and cancel events/circles, approve/decline member requests, and record event attendance.</p></div>
+        <div class="card"><h3>Admin</h3><p>Reviews selfies and host requests, and can cancel a published activity with a member-visible reason. Decisions create audit records. Current dashboard uses the beta key; backend also supports named Firebase-token admins.</p></div>
+        <div class="card"><h3>Backend</h3><p>Enforces permissions and owns all state: memberships, messages, held reporting records, approvals, feedback, notifications, trust events, and audit logs.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What each app talks to</h2>
+      <table>
+        <thead><tr><th>Layer</th><th>Responsibility</th><th>Source of truth</th></tr></thead>
+        <tbody>
+          <tr><td>Expo mobile app</td><td>Member screens, image selection, API calls, local session restoration, chat polling.</td><td>It is a client, not the authority.</td></tr>
+          <tr><td>NestJS API</td><td>Authentication checks, permission checks, joins, hosting, feedback, trust, notifications, private selfie URLs.</td><td>Business rules.</td></tr>
+          <tr><td>PostgreSQL / Prisma</td><td>Users, profiles, memberships, events, circles, chat, feedback, held report records, notifications, trust, audit logs.</td><td>Persistent product data.</td></tr>
+          <tr><td>Firebase</td><td>Phone identity, Firebase ID tokens, profile image uploads, private selfie object storage.</td><td>Identity and media storage.</td></tr>
+          <tr><td>Next.js admin dashboard</td><td>Operator UI for selfie review and host approvals.</td><td>Never authoritative; it calls the API.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Important API boundaries</h2>
+      <div class="route">POST /users/me/community-guidelines</div>
+      <div class="route">GET and POST /community/chats/:type/:activityId/messages</div>
+      <div class="route">POST /community/host-approval/request and GET /community/host-approval</div>
+      <div class="route">PATCH /community/events/:eventId and POST /community/events/:eventId/cancel</div>
+      <div class="route">PATCH /community/circles/:circleId and POST /community/circles/:circleId/cancel</div>
+      <div class="route">GET /community/events/:eventId/members</div>
+      <div class="route">PATCH /community/events/:eventId/members/:memberId</div>
+      <div class="route">PATCH /community/events/:eventId/members/:memberId/attendance</div>
+      <div class="route">POST /community/circles and GET/PATCH /community/circles/:circleId/members</div>
+      <div class="route">POST /community/events/:eventId/feedback and POST /community/push-tokens</div>
+      <div class="route">GET/PATCH /admin/host-approvals</div>
+      <p class="callout"><strong>Key rule:</strong> the screen is never trusted by itself. The API repeats the authorization decision before it reads or changes data.</p>
+    </section>
+
+    <section>
+      <h2>Notifications: what is real versus not yet live</h2>
+      <p>In-app notifications are real today. Every relevant action creates a persistent Notification row and it appears in the mobile Notifications screen.</p>
+      <p>Push delivery has a real backend queue and Expo dispatch implementation. It is not yet sending to a physical phone because the mobile app does not register a native Expo push token.</p>
+      <ul>
+        <li><span class="status implemented">Implemented</span> notification preference, Notification rows, DevicePushToken model, NotificationDelivery queue, Expo dispatch endpoint.</li>
+        <li><span class="status not-live">Not live on devices</span> <code>expo-notifications</code>, FCM/APNs credentials, physical-device token registration, automatic worker scheduling.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Remaining work, in the right order</h2>
+      <ol class="flow">
+        <li><div><strong>Finish provider/device integrations</strong><span>Test Firebase Phone Auth and Storage on physical devices; add Expo push token registration and FCM/APNs credentials.</span></div></li>
+        <li><div><strong>Harden admin access</strong><span>Add Firebase sign-in to the web dashboard, authorize actions by AdminRole, then retire the shared beta key.</span></div></li>
+        <li><div><strong>Refine host operations</strong><span>Add a validated map picker, platform-native date/time picker, richer activity search, and host-facing feedback insights. Current date/time controls are intentionally constrained day and 30-minute adjustments.</span></div></li>
+        <li><div><strong>Prepare public-launch operations</strong><span>Write privacy, selfie retention/deletion, moderation escalation, support, incident-response procedures, and the workflow required before report UI is re-enabled.</span></div></li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
