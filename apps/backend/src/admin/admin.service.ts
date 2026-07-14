@@ -7,6 +7,7 @@ import {
   ActivityStatus,
   AdminAuditAction,
   AdminRole,
+  ChatThreadType,
   HostApprovalStatus,
   MembershipStatus,
   NotificationType,
@@ -15,8 +16,10 @@ import {
 } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { UsersService } from '../users/users.service';
 import { AdminActor } from './admin-access.guard';
+import { UpdateActivityLocationDto } from './dto/update-activity-location.dto';
 
 @Injectable()
 export class AdminService {
@@ -24,6 +27,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly notifications: NotificationService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async grantAccess(actor: AdminActor, userId: string, role: AdminRole) {
@@ -175,10 +179,38 @@ export class AdminService {
     return approval;
   }
 
-  async listActivities(status: ActivityStatus = ActivityStatus.PUBLISHED) {
+  async listActivities(
+    status: ActivityStatus = ActivityStatus.PUBLISHED,
+    query?: string,
+    city?: string,
+  ) {
+    const normalizedQuery = query?.trim();
+    const normalizedCity = city?.trim();
+    const activityFilter = {
+      OR: normalizedQuery
+        ? [
+            {
+              title: {
+                contains: normalizedQuery,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
+            {
+              locationName: {
+                contains: normalizedQuery,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
+          ]
+        : undefined,
+      city: normalizedCity
+        ? { equals: normalizedCity, mode: Prisma.QueryMode.insensitive }
+        : undefined,
+      status,
+    };
     const [events, circles] = await Promise.all([
       this.prisma.event.findMany({
-        where: { status },
+        where: activityFilter,
         orderBy: { startsAt: 'asc' },
         select: {
           id: true,
@@ -190,7 +222,7 @@ export class AdminService {
         },
       }),
       this.prisma.circle.findMany({
-        where: { status },
+        where: activityFilter,
         orderBy: { startsAt: 'asc' },
         select: {
           id: true,
@@ -205,6 +237,114 @@ export class AdminService {
     ]);
 
     return { circles, events };
+  }
+
+  async listMembers(query?: string, city?: string, limit?: string) {
+    const normalizedQuery = query?.trim();
+    const normalizedCity = city?.trim();
+    const parsedLimit = Number.parseInt(limit ?? '', 10);
+    const take = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 50)
+      : 20;
+
+    return this.prisma.user.findMany({
+      where: {
+        OR: normalizedQuery
+          ? [
+              {
+                displayName: {
+                  contains: normalizedQuery,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+              {
+                username: {
+                  contains: normalizedQuery,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+              {
+                profile: {
+                  is: {
+                    city: {
+                      contains: normalizedQuery,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                },
+              },
+            ]
+          : undefined,
+        profile: normalizedCity
+          ? {
+              is: {
+                city: {
+                  equals: normalizedCity,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+            }
+          : undefined,
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        createdAt: true,
+        displayName: true,
+        id: true,
+        profile: {
+          select: {
+            city: true,
+            interests: true,
+            profileCompleteness: true,
+          },
+        },
+        selfieVerification: { select: { status: true } },
+        trust: {
+          select: { score: true, tier: true, verificationStatus: true },
+        },
+        username: true,
+      },
+      take,
+    });
+  }
+
+  async getAnalyticsSummary() {
+    const [analyticsByType, attendedMemberships, continuityPreferences] =
+      await Promise.all([
+        this.prisma.productAnalyticsEvent.groupBy({
+          by: ['type'],
+          _count: { _all: true },
+        }),
+        this.prisma.eventMember.findMany({
+          where: { status: MembershipStatus.ATTENDED },
+          select: { userId: true },
+        }),
+        this.prisma.continuityPreference.count(),
+      ]);
+
+    const counts = Object.fromEntries(
+      analyticsByType.map((entry) => [entry.type, entry._count._all]),
+    ) as Record<string, number>;
+    const attendanceByUser = new Map<string, number>();
+    for (const membership of attendedMemberships) {
+      attendanceByUser.set(
+        membership.userId,
+        (attendanceByUser.get(membership.userId) ?? 0) + 1,
+      );
+    }
+
+    return {
+      attendanceRecorded: counts.ATTENDANCE_RECORDED ?? 0,
+      continuityPreferences,
+      feedbackSubmitted: counts.FEEDBACK_SUBMITTED ?? 0,
+      icebreakersViewed: counts.ICEBREAKER_VIEWED ?? 0,
+      joinRequests: counts.JOIN_REQUESTED ?? 0,
+      membershipApprovals: counts.MEMBERSHIP_APPROVED ?? 0,
+      recommendationViews: counts.RECOMMENDATIONS_VIEWED ?? 0,
+      repeatParticipants: [...attendanceByUser.values()].filter(
+        (attendanceCount) => attendanceCount > 1,
+      ).length,
+    };
   }
 
   async cancelEvent(actor: AdminActor, eventId: string, reason: string) {
@@ -226,6 +366,16 @@ export class AdminService {
       },
     });
     await this.notifyEventCancellation(eventId, cancelled.title, reason);
+    this.realtime.publishToCohort(
+      ChatThreadType.EVENT,
+      eventId,
+      'cohort:activity-cancelled',
+      {
+        activityId: eventId,
+        reason: reason.trim(),
+        type: ChatThreadType.EVENT,
+      },
+    );
     await this.audit(
       actor,
       AdminAuditAction.ACTIVITY_CANCELLED,
@@ -237,6 +387,50 @@ export class AdminService {
     );
 
     return cancelled;
+  }
+
+  async updateEventLocation(
+    actor: AdminActor,
+    eventId: string,
+    input: UpdateActivityLocationDto,
+  ) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { city: true, id: true, status: true, title: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Event not found.');
+    }
+    this.assertPublishedActivity(event.status);
+
+    const updated = await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        city: input.city?.trim() || event.city,
+        locationName: input.locationName.trim(),
+      },
+    });
+    await this.notifyEventLocationUpdate(
+      eventId,
+      updated.title,
+      updated.locationName,
+      updated.city,
+    );
+    this.realtime.publishToCohort(
+      ChatThreadType.EVENT,
+      eventId,
+      'cohort:activity-updated',
+      { activityId: eventId, type: ChatThreadType.EVENT },
+    );
+    await this.audit(
+      actor,
+      AdminAuditAction.ACTIVITY_LOCATION_UPDATED,
+      'event',
+      eventId,
+      { city: updated.city, locationName: updated.locationName },
+    );
+
+    return updated;
   }
 
   async cancelCircle(actor: AdminActor, circleId: string, reason: string) {
@@ -258,6 +452,16 @@ export class AdminService {
       },
     });
     await this.notifyCircleCancellation(circleId, cancelled.title, reason);
+    this.realtime.publishToCohort(
+      ChatThreadType.CIRCLE,
+      circleId,
+      'cohort:activity-cancelled',
+      {
+        activityId: circleId,
+        reason: reason.trim(),
+        type: ChatThreadType.CIRCLE,
+      },
+    );
     await this.audit(
       actor,
       AdminAuditAction.ACTIVITY_CANCELLED,
@@ -267,6 +471,50 @@ export class AdminService {
     );
 
     return cancelled;
+  }
+
+  async updateCircleLocation(
+    actor: AdminActor,
+    circleId: string,
+    input: UpdateActivityLocationDto,
+  ) {
+    const circle = await this.prisma.circle.findUnique({
+      where: { id: circleId },
+      select: { city: true, id: true, status: true, title: true },
+    });
+    if (!circle) {
+      throw new NotFoundException('Circle not found.');
+    }
+    this.assertPublishedActivity(circle.status);
+
+    const updated = await this.prisma.circle.update({
+      where: { id: circleId },
+      data: {
+        city: input.city?.trim() || circle.city,
+        locationName: input.locationName.trim(),
+      },
+    });
+    await this.notifyCircleLocationUpdate(
+      circleId,
+      updated.title,
+      updated.locationName,
+      updated.city,
+    );
+    this.realtime.publishToCohort(
+      ChatThreadType.CIRCLE,
+      circleId,
+      'cohort:activity-updated',
+      { activityId: circleId, type: ChatThreadType.CIRCLE },
+    );
+    await this.audit(
+      actor,
+      AdminAuditAction.ACTIVITY_LOCATION_UPDATED,
+      'circle',
+      circleId,
+      { city: updated.city, locationName: updated.locationName },
+    );
+
+    return updated;
   }
 
   async audit(
@@ -320,6 +568,31 @@ export class AdminService {
     );
   }
 
+  private async notifyEventLocationUpdate(
+    eventId: string,
+    title: string,
+    locationName: string,
+    city: string,
+  ) {
+    const members = await this.prisma.eventMember.findMany({
+      where: {
+        eventId,
+        status: { in: [MembershipStatus.REQUESTED, MembershipStatus.APPROVED] },
+      },
+      select: { userId: true },
+    });
+    await Promise.all(
+      members.map((member) =>
+        this.notifications.createForUser(member.userId, {
+          type: NotificationType.HOST_UPDATED_LOCATION,
+          title: 'Event location updated',
+          body: `${title} is now at ${locationName}, ${city}.`,
+          metadata: { city, eventId, locationName },
+        }),
+      ),
+    );
+  }
+
   private async notifyCircleCancellation(
     circleId: string,
     title: string,
@@ -339,6 +612,31 @@ export class AdminService {
           title: 'Circle cancelled',
           body: `${title} was cancelled. ${reason.trim()}`,
           metadata: { circleId, reason: reason.trim() },
+        }),
+      ),
+    );
+  }
+
+  private async notifyCircleLocationUpdate(
+    circleId: string,
+    title: string,
+    locationName: string,
+    city: string,
+  ) {
+    const members = await this.prisma.circleMember.findMany({
+      where: {
+        circleId,
+        status: { in: [MembershipStatus.REQUESTED, MembershipStatus.APPROVED] },
+      },
+      select: { userId: true },
+    });
+    await Promise.all(
+      members.map((member) =>
+        this.notifications.createForUser(member.userId, {
+          type: NotificationType.HOST_UPDATED_LOCATION,
+          title: 'Circle location updated',
+          body: `${title} is now at ${locationName}, ${city}.`,
+          metadata: { circleId, city, locationName },
         }),
       ),
     );

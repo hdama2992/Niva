@@ -6,13 +6,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AdminRole } from '@prisma/client';
 import { Request } from 'express';
 import { FirebaseAdminService } from '../firebase/firebase-admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type AdminActor = {
   label: string;
-  role?: string;
+  role?: AdminRole;
   userId?: string;
 };
 

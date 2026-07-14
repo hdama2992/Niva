@@ -22,6 +22,7 @@ type ActivityDetailScreenProps = {
   onBack: () => void;
   onBlock: () => void;
   onEdit: () => void;
+  onIcebreakers: () => void;
   onJoin: () => void;
   onLeave: () => void;
   onManage: () => void;
@@ -34,6 +35,7 @@ export function ActivityDetailScreen({
   onBack,
   onBlock,
   onEdit,
+  onIcebreakers,
   onJoin,
   onLeave,
   onManage,
@@ -41,11 +43,17 @@ export function ActivityDetailScreen({
   const membershipLabel = formatMembershipStatus(item.membershipStatus);
   const cancelled = item.activityStatus === 'CANCELLED';
   const canJoin =
-    !cancelled && Boolean(item.remoteId) && item.seats !== 0 && !item.membershipStatus;
+    !cancelled &&
+    Boolean(item.remoteId) &&
+    item.seats !== 0 &&
+    !item.membershipStatus;
   const canLeave =
     !cancelled &&
     (item.membershipStatus === 'REQUESTED' ||
       item.membershipStatus === 'APPROVED');
+  const canOpenIcebreakers =
+    item.membershipStatus === 'APPROVED' ||
+    item.membershipStatus === 'ATTENDED';
 
   return (
     <View style={styles.screen}>
@@ -79,9 +87,12 @@ export function ActivityDetailScreen({
           <View style={styles.cancelledBanner}>
             <CircleAlert color={colors.primary} size={21} strokeWidth={2.4} />
             <View style={styles.statusCopy}>
-              <Text style={styles.cancelledTitle}>This activity was cancelled</Text>
+              <Text style={styles.cancelledTitle}>
+                This activity was cancelled
+              </Text>
               <Text style={styles.statusText}>
-                {item.cancellationReason ?? 'The host will share a new plan if one is available.'}
+                {item.cancellationReason ??
+                  'The host will share a new plan if one is available.'}
               </Text>
             </View>
           </View>
@@ -179,7 +190,9 @@ export function ActivityDetailScreen({
           </Pressable>
         ) : null}
 
-        {isHost && !cancelled && (item.category === 'event' || item.category === 'circle') ? (
+        {isHost &&
+        !cancelled &&
+        (item.category === 'event' || item.category === 'circle') ? (
           <View style={styles.hostActions}>
             <Pressable
               accessibilityRole="button"
@@ -188,7 +201,9 @@ export function ActivityDetailScreen({
             >
               <UsersRound color={colors.surface} size={19} strokeWidth={2.4} />
               <Text style={styles.manageActionText}>
-                {item.category === 'circle' ? 'Manage circle' : 'Manage members'}
+                {item.category === 'circle'
+                  ? 'Manage circle'
+                  : 'Manage members'}
               </Text>
             </Pressable>
             <Pressable
@@ -199,6 +214,24 @@ export function ActivityDetailScreen({
               <Text style={styles.editActionText}>Edit details</Text>
             </Pressable>
           </View>
+        ) : null}
+
+        {canOpenIcebreakers && !cancelled ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onIcebreakers}
+            style={styles.icebreakerAction}
+          >
+            <UsersRound color={colors.secondary} size={20} strokeWidth={2.4} />
+            <View style={styles.icebreakerCopy}>
+              <Text style={styles.icebreakerTitle}>
+                People you&apos;ll meet
+              </Text>
+              <Text style={styles.icebreakerText}>
+                See all interests you share with approved members.
+              </Text>
+            </View>
+          </Pressable>
         ) : null}
 
         {canJoin ? (
@@ -352,6 +385,29 @@ const styles = StyleSheet.create({
   },
   hostTitle: {
     color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  icebreakerAction: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderColor: colors.secondary,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    padding: spacing.md,
+  },
+  icebreakerCopy: { flex: 1 },
+  icebreakerText: {
+    color: colors.secondary,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  icebreakerTitle: {
+    color: colors.secondary,
     fontSize: typography.body,
     fontWeight: '800',
   },

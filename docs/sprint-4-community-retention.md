@@ -21,14 +21,28 @@ Join -> attend -> chat safely -> give feedback -> continue circle -> earn trust 
 
 ## Current implementation state
 
-The codebase now has the core data scaffolding for Sprint 4:
+Sprint 4's closed-beta loop is now backed by PostgreSQL and guarded API
+routes:
 
-- Host-gated event creation endpoint.
-- Event feedback model and endpoint.
-- Connections model for continuity.
-- Event/circle chats scoped to joined activities.
-- Trust tiers that can later unlock host tools.
-- Notifications for reminders and community state changes.
+- Host-gated event and circle creation, member approval/decline, attendance,
+  edits, and cancellation.
+- Event/circle chats scoped to approved cohorts; there are no random DMs.
+- Firebase-token-authenticated real-time delivery for cohort messages and
+  activity/member updates, with PostgreSQL remaining the authoritative history.
+- Post-event rating and private note, plus host-only aggregate feedback
+  insights with anonymous comments.
+- Approved-member icebreakers that expose every mutual interest and two
+  prompts, but never the other member's full profile interests or a DM action.
+- A per-member opt-out for icebreakers in Settings.
+- Continuity choices after attendance, saved per event, and server-ranked
+  similar-event/circle recommendations.
+- Persistent aggregate beta metrics shown to admins without user-level
+  analytics.
+- Trust tiers and host approvals for hosting permissions, and notifications
+  for membership and activity changes.
+
+The `Connection` model remains reserved for a future explicit relationship
+feature. It is not used to create member-to-member links in the current MVP.
 
 ## Closed beta launch shape
 

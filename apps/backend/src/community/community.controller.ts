@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,6 +12,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ChatThreadType } from '@prisma/client';
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import { NotificationService } from '../notifications/notification.service';
 import type { RequestWithFirebaseUser } from '../firebase/firebase-auth.guard';
@@ -29,6 +31,7 @@ import { SendChatMessageDto } from './dto/send-chat-message.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateCircleDto } from './dto/update-circle.dto';
+import { UpdateContinuityPreferenceDto } from './dto/update-continuity-preference.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -128,6 +131,38 @@ export class CommunityController {
         userId,
         eventId,
         body,
+      ),
+    };
+  }
+
+  @Patch('events/:eventId/continuity-preference')
+  async updateContinuityPreference(
+    @Req() request: RequestWithFirebaseUser,
+    @Param('eventId') eventId: string,
+    @Body() body: UpdateContinuityPreferenceDto,
+  ) {
+    const userId = await this.currentUserId(request);
+
+    return {
+      preference: await this.communityService.updateContinuityPreference(
+        userId,
+        eventId,
+        body,
+      ),
+    };
+  }
+
+  @Get('events/:eventId/feedback-insights')
+  async getEventFeedbackInsights(
+    @Req() request: RequestWithFirebaseUser,
+    @Param('eventId') eventId: string,
+  ) {
+    const userId = await this.currentUserId(request);
+
+    return {
+      insights: await this.communityService.getEventFeedbackInsights(
+        userId,
+        eventId,
       ),
     };
   }
@@ -290,6 +325,28 @@ export class CommunityController {
     const userId = await this.currentUserId(request);
 
     return this.communityService.listMyActivities(userId);
+  }
+
+  @Get('recommendations')
+  async listRecommendations(@Req() request: RequestWithFirebaseUser) {
+    const userId = await this.currentUserId(request);
+
+    return this.communityService.listRecommendations(userId);
+  }
+
+  @Get('icebreakers/:type/:activityId')
+  async getIcebreakers(
+    @Req() request: RequestWithFirebaseUser,
+    @Param('type') type: string,
+    @Param('activityId') activityId: string,
+  ) {
+    if (type !== ChatThreadType.EVENT && type !== ChatThreadType.CIRCLE) {
+      throw new BadRequestException('Icebreakers require an event or circle.');
+    }
+
+    const userId = await this.currentUserId(request);
+
+    return this.communityService.getIcebreakers(userId, type, activityId);
   }
 
   @Post('host-approval/request')

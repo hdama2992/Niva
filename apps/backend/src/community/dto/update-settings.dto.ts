@@ -12,4 +12,8 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsBoolean()
   allowCircleContinuitySuggestions?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showInterestsInIcebreakers?: boolean;
 }

@@ -52,6 +52,7 @@ enum TrustEventType {
   SELFIE_APPROVED
   SELFIE_REJECTED
   EVENT_ATTENDED
+  EVENT_FEEDBACK_SUBMITTED
   NO_SHOW
   REPORT_CONFIRMED
 }
@@ -133,7 +134,9 @@ enum AdminAuditAction {
   REPORT_STATUS_CHANGED
   HOST_APPROVAL_CHANGED
   ACTIVITY_CANCELLED
+  ACTIVITY_LOCATION_UPDATED
   NOTIFICATION_DELIVERY_DISPATCHED
+  TRUST_RECALCULATED
 }
 
 enum NotificationDeliveryStatus {
@@ -184,6 +187,8 @@ model User {
   settings                  UserSettings?
   emergencyContact          EmergencyContact?
   feedback                  EventFeedback[]
+  continuityPreferences     ContinuityPreference[]
+  analyticsEvents           ProductAnalyticsEvent[]
   chatMessages              ChatMessage[]
   connectionsStarted        Connection[]         @relation("ConnectionUserA")
   connectionsReceived       Connection[]         @relation("ConnectionUserB")
@@ -294,6 +299,8 @@ model Event {
   members              EventMember[]
   reports              UserReport[]
   feedback             EventFeedback[]
+  continuityPreferences ContinuityPreference[]
+  analyticsEvents       ProductAnalyticsEvent[]
   chatThread           ChatThread?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -322,6 +329,7 @@ model Circle {
   host                 User?              @relation("CircleHost", fields: [hostId], references: [id], onDelete: SetNull)
   members              CircleMember[]
   reports              UserReport[]
+  analyticsEvents      ProductAnalyticsEvent[]
   chatThread           ChatThread?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -442,6 +450,7 @@ model UserSettings {
   notificationsEnabled             Boolean  @default(true)
   showProfileInRecommendations     Boolean  @default(true)
   allowCircleContinuitySuggestions Boolean  @default(true)
+  showInterestsInIcebreakers       Boolean  @default(true)
   createdAt                        DateTime @default(now())
   updatedAt                        DateTime @updatedAt
 }
@@ -491,6 +500,37 @@ model EventFeedback {
   createdAt DateTime @default(now())
 
   @@unique([eventId, userId])
+}
+
+model ContinuityPreference {
+  id                     String   @id @default(cuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId                String
+  event                  Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  wantsSimilarEvents     Boolean  @default(true)
+  wantsCircleSuggestions Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([userId, eventId])
+  @@index([userId, updatedAt])
+}
+
+model ProductAnalyticsEvent {
+  id        String   @id @default(cuid())
+  type      String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventId   String?
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  circleId  String?
+  circle    Circle?  @relation(fields: [circleId], references: [id], onDelete: SetNull)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Connection {

@@ -7,6 +7,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notifications/notification.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { UsersService } from '../users/users.service';
 import { CommunityService } from './community.service';
 
@@ -26,10 +27,15 @@ describe('CommunityService join capacity', () => {
   const notifications = {
     createForUser: notificationCreate,
   } as unknown as NotificationService;
+  const realtime = {
+    publishToCohort: jest.fn(),
+    publishToMember: jest.fn(),
+  } as unknown as RealtimeService;
   const service = new CommunityService(
     prisma,
     {} as UsersService,
     notifications,
+    realtime,
   );
 
   beforeEach(() => {
@@ -104,10 +110,15 @@ describe('CommunityService activity lifecycle', () => {
   const notifications = {
     createForUser: notificationCreate,
   } as unknown as NotificationService;
+  const realtime = {
+    publishToCohort: jest.fn(),
+    publishToMember: jest.fn(),
+  } as unknown as RealtimeService;
   const service = new CommunityService(
     prisma,
     {} as UsersService,
     notifications,
+    realtime,
   );
 
   beforeEach(() => {
@@ -145,5 +156,189 @@ describe('CommunityService activity lifecycle', () => {
       title: 'Event cancelled',
       type: NotificationType.ACTIVITY_CANCELLED,
     });
+  });
+});
+
+describe('CommunityService icebreaker access', () => {
+  const eventMemberFindUnique = jest.fn();
+  const circleMemberFindUnique = jest.fn();
+  const prisma = {
+    circleMember: { findUnique: circleMemberFindUnique },
+    eventMember: { findUnique: eventMemberFindUnique },
+  } as unknown as PrismaService;
+  const realtime = {
+    publishToCohort: jest.fn(),
+    publishToMember: jest.fn(),
+  } as unknown as RealtimeService;
+  const service = new CommunityService(
+    prisma,
+    {} as UsersService,
+    {} as NotificationService,
+    realtime,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('rejects a requested member from icebreakers', async () => {
+    eventMemberFindUnique.mockResolvedValue({
+      status: MembershipStatus.REQUESTED,
+    });
+
+    await expect(
+      (
+        service as unknown as {
+          assertIcebreakerAccess: (
+            userId: string,
+            type: 'EVENT',
+            activityId: string,
+          ) => Promise<void>;
+        }
+      ).assertIcebreakerAccess('member_1', 'EVENT', 'event_1'),
+    ).rejects.toThrow(
+      'Icebreakers are available only to approved activity members.',
+    );
+  });
+
+  it('allows an approved member into icebreakers', async () => {
+    circleMemberFindUnique.mockResolvedValue({
+      status: MembershipStatus.APPROVED,
+    });
+
+    await expect(
+      (
+        service as unknown as {
+          assertIcebreakerAccess: (
+            userId: string,
+            type: 'CIRCLE',
+            activityId: string,
+          ) => Promise<void>;
+        }
+      ).assertIcebreakerAccess('member_1', 'CIRCLE', 'circle_1'),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('CommunityService realtime chat delivery', () => {
+  const chatThreadFindFirst = jest.fn();
+  const eventMemberFindUnique = jest.fn();
+  const chatMessageCreate = jest.fn();
+  const publishToCohort = jest.fn();
+  const prisma = {
+    chatMessage: { create: chatMessageCreate },
+    chatThread: { findFirst: chatThreadFindFirst },
+    eventMember: { findUnique: eventMemberFindUnique },
+  } as unknown as PrismaService;
+  const service = new CommunityService(
+    prisma,
+    {} as UsersService,
+    {} as NotificationService,
+    {
+      publishToCohort,
+      publishToMember: jest.fn(),
+    } as unknown as RealtimeService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    chatThreadFindFirst.mockResolvedValue({
+      event: { hostId: 'host_1' },
+      id: 'thread_1',
+    });
+    eventMemberFindUnique.mockResolvedValue({
+      status: MembershipStatus.APPROVED,
+    });
+    chatMessageCreate.mockResolvedValue({
+      body: 'Hello everyone',
+      id: 'message_1',
+      sender: { displayName: 'Maya', id: 'member_1', username: 'maya' },
+      senderId: 'member_1',
+    });
+  });
+
+  it('persists a message before broadcasting it to its authorized cohort room', async () => {
+    await service.sendChatMessage(
+      'member_1',
+      'EVENT',
+      'event_1',
+      'Hello everyone',
+    );
+
+    expect(chatMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          body: 'Hello everyone',
+          senderId: 'member_1',
+          threadId: 'thread_1',
+        },
+      }),
+    );
+    expect(publishToCohort).toHaveBeenCalledWith(
+      'EVENT',
+      'event_1',
+      'cohort:message',
+      expect.objectContaining({
+        message: expect.objectContaining({ id: 'message_1' }),
+      }),
+    );
+  });
+});
+
+describe('CommunityService feedback trust policy', () => {
+  const eventMemberFindUnique = jest.fn();
+  const eventFeedbackFindUnique = jest.fn();
+  const eventFeedbackUpsert = jest.fn();
+  const analyticsCreate = jest.fn();
+  const recordFeedbackSubmitted = jest.fn();
+  const prisma = {
+    eventFeedback: {
+      findUnique: eventFeedbackFindUnique,
+      upsert: eventFeedbackUpsert,
+    },
+    eventMember: { findUnique: eventMemberFindUnique },
+    productAnalyticsEvent: { create: analyticsCreate },
+  } as unknown as PrismaService;
+  const service = new CommunityService(
+    prisma,
+    { recordFeedbackSubmitted } as unknown as UsersService,
+    {} as NotificationService,
+    {} as RealtimeService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('requires recorded attendance before accepting feedback', async () => {
+    eventMemberFindUnique.mockResolvedValue({
+      status: MembershipStatus.APPROVED,
+    });
+
+    await expect(
+      service.submitFeedback('member_1', 'event_1', { rating: 5 }),
+    ).rejects.toThrow('Feedback opens after the host records your attendance.');
+    expect(eventFeedbackUpsert).not.toHaveBeenCalled();
+    expect(recordFeedbackSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('records one feedback trust event for a first attended-event response', async () => {
+    eventMemberFindUnique.mockResolvedValue({
+      status: MembershipStatus.ATTENDED,
+    });
+    eventFeedbackFindUnique.mockResolvedValue(null);
+    eventFeedbackUpsert.mockResolvedValue({ id: 'feedback_1', rating: 5 });
+
+    await service.submitFeedback('member_1', 'event_1', { rating: 5 });
+
+    expect(recordFeedbackSubmitted).toHaveBeenCalledWith('member_1', 'event_1');
+    expect(analyticsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventId: 'event_1',
+          userId: 'member_1',
+        }),
+      }),
+    );
   });
 });

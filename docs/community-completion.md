@@ -10,17 +10,21 @@ including the `20260713150000_activity_lifecycle` migration. The mobile app,
 API, and admin dashboard use
 the following persistent records rather than device-only or mock state:
 
-| Flow | Records |
-| --- | --- |
-| Guidelines | `User.communityGuidelinesAccepted*` |
-| Join requests | `EventMember` and `CircleMember` |
-| Host review | `HostApproval` |
-| Cohort chat | `ChatThread` and `ChatMessage` |
-| Held reporting model | `UserReport` |
-| Admin decisions | `AdminAuditLog` |
-| Attendance and trust | `EventMember` and `TrustEvent` |
-| In-app alerts | `Notification` |
-| Push delivery queue | `DevicePushToken` and `NotificationDelivery` |
+| Flow                     | Records                                       |
+| ------------------------ | --------------------------------------------- |
+| Guidelines               | `User.communityGuidelinesAccepted*`           |
+| Join requests            | `EventMember` and `CircleMember`              |
+| Host review              | `HostApproval`                                |
+| Cohort chat              | `ChatThread` and `ChatMessage`                |
+| Realtime delivery        | Socket.IO rooms, after PostgreSQL persistence |
+| Held reporting model     | `UserReport`                                  |
+| Admin decisions          | `AdminAuditLog`                               |
+| Attendance and trust     | `EventMember` and `TrustEvent`                |
+| In-app alerts            | `Notification`                                |
+| Push delivery queue      | `DevicePushToken` and `NotificationDelivery`  |
+| Icebreaker privacy       | `UserSettings.showInterestsInIcebreakers`     |
+| Post-event continuity    | `ContinuityPreference`                        |
+| Aggregate beta analytics | `ProductAnalyticsEvent`                       |
 
 ## Member Flow
 
@@ -93,9 +97,16 @@ POST /community/chats/CIRCLE/:circleId/messages
 
 Only the host or an `APPROVED`/`ATTENDED` member may use those routes. No
 direct-message endpoint exists. The mobile Messages tab lists only approved
-cohorts and the chat screen persists messages in PostgreSQL, refreshing every
-twelve seconds. That is real persistence and authorized retrieval, though it
-is polling rather than WebSocket delivery.
+cohorts. The chat screen first loads persisted history through the API, then
+uses an authenticated Socket.IO connection for immediate messages.
+
+The socket handshake carries the same Firebase ID token as the REST app. The
+gateway resolves that token to the local member record, joins a private
+member room, and permits a cohort-room subscription only after it repeats the
+existing chat authorization. A message is inserted into `ChatMessage` before
+the server broadcasts it to `cohort:EVENT:<eventId>` or
+`cohort:CIRCLE:<circleId>`. Reconnecting clients re-authorize automatically;
+the database history endpoint remains the recovery source.
 
 Block relationships are checked in both directions for discovery and chat. If
 either member blocked the other, the blocked sender's messages are omitted from
@@ -121,13 +132,49 @@ the response to the existing feedback API, which persists it in PostgreSQL.
 Feedback is limited to past event memberships and is not exposed as a public
 review feed.
 
+### Icebreakers, continuity, and recommendations
+
+Icebreakers are deliberately cohort-scoped rather than a people directory.
+An `APPROVED` or `ATTENDED` event/circle member can open **People you'll meet**
+from the activity detail screen. The API repeats the same chat-membership
+authorization used by cohort chat, excludes blocks in either direction, and
+returns only approved co-members.
+
+For each returned member, Niva calculates the full set intersection of their
+two interest lists. The mobile UI shows **all** mutual interests, no arbitrary
+limit. It does not return or render the other member's remaining interests,
+phone, profile photo URL, verification material, or a direct-message action.
+Each person can opt out in Settings; opting out removes that person's interest
+overlap from other members' icebreaker results.
+
+After a host has recorded a member as `ATTENDED`, the feedback screen offers
+two optional continuity choices: similar future events and a related recurring
+circle. The choice is stored as one `ContinuityPreference` per member/event.
+The recommendation endpoint ranks only published activities in the member's
+city, excludes activities already joined and hosts involved in a block, and
+uses shared interests plus those saved continuity choices. It is a
+server-side ranking endpoint, not a hard-coded mobile list.
+
+### Host feedback insights and beta analytics
+
+The event host can see the response count, average rating, and anonymous
+feedback notes for her own event. The feedback API never sends the feedback
+author identity in this response. Other hosts and ordinary members are denied
+by the stored `Event.hostId` guard.
+
+The backend writes product events for join requests, approvals, attendance,
+feedback, icebreaker views, recommendation views, and continuity choices.
+The admin dashboard requests only aggregate counts and a repeat-participant
+count. It does not display an individual member's behavior history.
+
 ### Notifications and push queue
 
 All app notifications go through `NotificationService`:
 
 1. It creates an in-app `Notification` row.
-2. It respects the member's saved notification preference.
-3. It finds active `DevicePushToken` rows and creates a `PENDING`
+2. It publishes `notification:new` to that member's authenticated socket room.
+3. It respects the member's saved notification preference for push delivery.
+4. It finds active `DevicePushToken` rows and creates a `PENDING`
    `NotificationDelivery` per token.
 
 `POST /community/push-tokens` is the mobile token registration API. An operator
@@ -139,6 +186,12 @@ pending because the Expo app does not yet include `expo-notifications` or
 register native push tokens; FCM/APNs credentials and native builds are also
 required.
 
+Membership decisions, attendance changes, activity edits, and cancellations
+also produce scoped realtime events. The signed-in mobile client refreshes its
+persisted activity and notification data from those events. Socket delivery is
+an immediate-update layer, not an authorization bypass or a replacement for
+the API/database.
+
 ## Admin Access and Audit
 
 `NIVA_ADMIN_KEY` remains the closed-beta dashboard fallback. The API also now
@@ -149,12 +202,31 @@ supports named administrators:
    an `AdminRole`.
 3. The admin can then use a Firebase Bearer token. `AdminAccessGuard` verifies
    Firebase and requires an active `AdminAccess` record.
-4. Verification, host-approval, access-grant, and notification-dispatch
-   actions all create `AdminAuditLog` rows with the actor identity.
+4. Named admins are checked against the smallest permitted role for each
+   operation. A `SUPER_ADMIN` can perform all named-admin actions.
+5. Verification, host-approval, access-grant, location-change, trust-rebuild,
+   and notification-dispatch actions all create `AdminAuditLog` rows with the
+   actor identity.
 
 The dashboard still enters the shared key because it does not yet have a
 Firebase browser sign-in screen. Before public launch, switch the dashboard to
 Bearer tokens and remove the key fallback.
+
+The dashboard now also supports member lookup, activity/city filtering, and
+an audited event/circle location correction. A location correction creates
+persisted member notifications and a scoped realtime refresh, just like a host
+location update.
+
+## Maintenance Jobs
+
+- `NIVA_NOTIFICATION_DISPATCH_MINUTES` enables the persisted Expo delivery
+  queue worker. It is disabled when unset; manual dispatch remains available.
+- `NIVA_TRUST_RECALCULATION_MINUTES` enables a trust-profile rebuild from
+  durable trust events. It is disabled when unset; a community manager can
+  trigger `POST /admin/trust/recalculate` for a controlled rebuild.
+- Submitted feedback is accepted only after a host records attendance. The
+  first feedback per attended event creates a +2, event-scoped trust event;
+  changing the feedback does not add further points.
 
 ## Added API Routes
 
@@ -175,6 +247,10 @@ PATCH /community/events/:eventId/members/:memberId/attendance
 GET   /community/circles/:circleId/members
 PATCH /community/circles/:circleId/members/:memberId
 POST  /community/push-tokens
+GET   /community/recommendations
+GET   /community/icebreakers/:type/:activityId
+PATCH /community/events/:eventId/continuity-preference
+GET   /community/events/:eventId/feedback-insights
 
 GET   /admin/me
 POST  /admin/access
@@ -184,6 +260,7 @@ GET   /admin/activities
 POST  /admin/events/:eventId/cancel
 POST  /admin/circles/:circleId/cancel
 POST  /admin/notification-deliveries/dispatch
+GET   /admin/analytics/summary
 ```
 
 ## Remaining Before Public Launch
@@ -195,7 +272,8 @@ POST  /admin/notification-deliveries/dispatch
    `AdminRole`, and retire the shared-key fallback.
 3. Add a validated map/location picker and replace the compact date/time stepper
    with platform-native date/time controls once the native dependency can be
-   added to the Expo build.
+   added to the Expo build. Decide whether feedback should ever affect trust;
+   it currently does not.
 4. Decide whether to re-enable the held reporting flow with moderation
    operations in place.
 5. Test real Firebase Phone Auth, Storage rules, and selfie upload/review on

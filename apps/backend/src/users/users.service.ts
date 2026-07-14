@@ -51,6 +51,7 @@ const TRUST_POINTS: Record<TrustEventType, number> = {
   [TrustEventType.SELFIE_APPROVED]: 25,
   [TrustEventType.SELFIE_REJECTED]: 0,
   [TrustEventType.EVENT_ATTENDED]: 5,
+  [TrustEventType.EVENT_FEEDBACK_SUBMITTED]: 2,
   [TrustEventType.NO_SHOW]: -10,
   [TrustEventType.REPORT_CONFIRMED]: -50,
 };
@@ -431,6 +432,49 @@ export class UsersService {
       });
       await this.recalculateTrustScore(userId);
     }
+  }
+
+  /**
+   * A small, one-time point award acknowledges useful post-event feedback.
+   * It is tied to an attended event so it cannot be farmed from join requests.
+   */
+  async recordFeedbackSubmitted(userId: string, eventId: string) {
+    await this.ensureTrustProfile(userId);
+    const existing = await this.prisma.trustEvent.findFirst({
+      where: {
+        userId,
+        type: TrustEventType.EVENT_FEEDBACK_SUBMITTED,
+        metadata: { path: ['eventId'], equals: eventId },
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return;
+    }
+
+    await this.prisma.trustEvent.create({
+      data: {
+        userId,
+        type: TrustEventType.EVENT_FEEDBACK_SUBMITTED,
+        points: TRUST_POINTS[TrustEventType.EVENT_FEEDBACK_SUBMITTED],
+        metadata: { eventId },
+      },
+    });
+    await this.recalculateTrustScore(userId);
+  }
+
+  async recalculateAllTrustScores() {
+    const users = await this.prisma.user.findMany({
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+
+    for (const user of users) {
+      await this.recalculateTrustScore(user.id);
+    }
+
+    return { recalculated: users.length };
   }
 
   async submitSelfie(

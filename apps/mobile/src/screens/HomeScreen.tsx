@@ -44,6 +44,7 @@ import { CreateCircleInput, CreateCircleScreen } from './CreateCircleScreen';
 import { CreateEventInput, CreateEventScreen } from './CreateEventScreen';
 import { ActivityEditInput, EditActivityScreen } from './EditActivityScreen';
 import { EventFeedbackScreen } from './EventFeedbackScreen';
+import { IcebreakersScreen } from './IcebreakersScreen';
 import { ManageCircleScreen } from './ManageCircleScreen';
 import { MyActivitiesScreen } from './MyActivitiesScreen';
 import { ManageEventScreen } from './ManageEventScreen';
@@ -69,6 +70,7 @@ import {
   listBlocks,
   listCircles,
   listEvents,
+  listRecommendations,
   listMyActivities,
   listNotifications,
   markNotificationRead,
@@ -78,8 +80,13 @@ import {
   unblockUser,
   updateCircle,
   updateEvent,
+  updateContinuityPreference,
   updateSettings,
 } from '../services/community';
+import {
+  disconnectRealtime,
+  subscribeToMemberRealtime,
+} from '../services/realtime';
 import { NivaUser } from '../types/niva';
 
 type HomeScreenProps = {
@@ -109,6 +116,7 @@ const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Career', 'Safety'];
 const defaultSettings: CommunitySettings = {
   allowCircleContinuitySuggestions: true,
   notificationsEnabled: true,
+  showInterestsInIcebreakers: true,
   showProfileInRecommendations: true,
 };
 
@@ -124,6 +132,7 @@ export function HomeScreen({
   const [joinCandidate, setJoinCandidate] = useState<DiscoveryItem>();
   const [guidelinesJoin, setGuidelinesJoin] = useState<DiscoveryItem>();
   const [chatItem, setChatItem] = useState<DiscoveryItem>();
+  const [icebreakerActivity, setIcebreakerActivity] = useState<DiscoveryItem>();
   const [managedEvent, setManagedEvent] = useState<DiscoveryItem>();
   const [managedCircle, setManagedCircle] = useState<DiscoveryItem>();
   const [feedbackEvent, setFeedbackEvent] = useState<DiscoveryItem>();
@@ -133,6 +142,9 @@ export function HomeScreen({
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [apiEvents, setApiEvents] = useState<DiscoveryItem[]>([]);
   const [apiCircles, setApiCircles] = useState<DiscoveryItem[]>([]);
+  const [apiRecommendations, setApiRecommendations] = useState<DiscoveryItem[]>(
+    [],
+  );
   const [myActivities, setMyActivities] = useState<DiscoveryItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<CommunitySettings>();
@@ -151,13 +163,7 @@ export function HomeScreen({
     () => [...apiEvents, ...apiCircles],
     [apiCircles, apiEvents],
   );
-  const recommended = useMemo(() => {
-    const userInterests = new Set(user.interests);
-
-    return allItems.filter((item) =>
-      item.interests.some((interest) => userInterests.has(interest)),
-    );
-  }, [allItems, user.interests]);
+  const recommended = apiRecommendations;
   const exploreResults = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -195,9 +201,10 @@ export function HomeScreen({
         circlesPayload,
         activitiesPayload,
         notificationsPayload,
-          settingsPayload,
-          blocksPayload,
-          hostApprovalPayload,
+        settingsPayload,
+        blocksPayload,
+        hostApprovalPayload,
+        recommendationsPayload,
       ] = await Promise.all([
         listEvents(idToken, user.city),
         listCircles(idToken, user.city),
@@ -206,6 +213,7 @@ export function HomeScreen({
         getSettings(idToken),
         listBlocks(idToken),
         getHostApproval(idToken),
+        listRecommendations(idToken),
       ]);
 
       const events = eventsPayload.events.map((event) =>
@@ -236,9 +244,16 @@ export function HomeScreen({
             : [],
         ),
       ];
+      const recommendations = recommendationsPayload.recommendations.flatMap(
+        (activity) =>
+          activity.category === 'circle' || activity.category === 'event'
+            ? [activityToDiscoveryItem(activity, activity.category)]
+            : [],
+      );
 
       setApiEvents(events);
       setApiCircles(circles);
+      setApiRecommendations(recommendations);
       setMyActivities(memberships);
       setNotifications(notificationsPayload.notifications);
       setSettings(settingsPayload.settings);
@@ -252,6 +267,24 @@ export function HomeScreen({
       );
     }
   };
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeToMemberRealtime(idToken, () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      refreshTimer = setTimeout(() => void loadCommunityData(), 250);
+    });
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      unsubscribe();
+      disconnectRealtime();
+    };
+  }, [idToken, user.city]);
 
   const requestJoin = (item: DiscoveryItem) => {
     if (!item.remoteId) {
@@ -373,7 +406,14 @@ export function HomeScreen({
     }
   };
 
-  const submitFeedback = async (input: { body?: string; rating: number }) => {
+  const submitFeedback = async (input: {
+    body?: string;
+    continuity?: {
+      wantsCircleSuggestions: boolean;
+      wantsSimilarEvents: boolean;
+    };
+    rating: number;
+  }) => {
     if (!feedbackEvent) {
       return;
     }
@@ -382,10 +422,22 @@ export function HomeScreen({
       await submitEventFeedback(
         idToken,
         feedbackEvent.remoteId ?? feedbackEvent.id,
-        input,
+        { body: input.body, rating: input.rating },
       );
+      if (input.continuity) {
+        await updateContinuityPreference(
+          idToken,
+          feedbackEvent.remoteId ?? feedbackEvent.id,
+          input.continuity,
+        );
+      }
       setFeedbackEvent(undefined);
-      setApiError('Thank you. Your feedback has been saved.');
+      setApiError(
+        input.continuity
+          ? 'Thank you. Your feedback and continuity preferences have been saved.'
+          : 'Thank you. Your feedback has been saved.',
+      );
+      await loadCommunityData();
     } catch (error) {
       setApiError(
         error instanceof Error ? error.message : 'Unable to save feedback.',
@@ -578,6 +630,10 @@ export function HomeScreen({
           setEditingActivity(selectedItem);
           setSelectedItem(undefined);
         }}
+        onIcebreakers={() => {
+          setIcebreakerActivity(selectedItem);
+          setSelectedItem(undefined);
+        }}
       />
     );
   }
@@ -628,8 +684,19 @@ export function HomeScreen({
     return (
       <EventFeedbackScreen
         event={feedbackEvent}
+        canSetContinuity={feedbackEvent.membershipStatus === 'ATTENDED'}
         onBack={() => setFeedbackEvent(undefined)}
         onSubmit={(input) => void submitFeedback(input)}
+      />
+    );
+  }
+
+  if (icebreakerActivity) {
+    return (
+      <IcebreakersScreen
+        activity={icebreakerActivity}
+        idToken={idToken}
+        onBack={() => setIcebreakerActivity(undefined)}
       />
     );
   }
@@ -1012,7 +1079,11 @@ export function HomeScreen({
                     onPress={() => setSecondaryScreen('create-event')}
                     style={styles.secondaryAction}
                   >
-                    <UserPlus color={colors.muted} size={19} strokeWidth={2.4} />
+                    <UserPlus
+                      color={colors.muted}
+                      size={19}
+                      strokeWidth={2.4}
+                    />
                     <Text style={styles.secondaryActionText}>Create event</Text>
                   </Pressable>
                   <Pressable
@@ -1020,8 +1091,14 @@ export function HomeScreen({
                     onPress={() => setSecondaryScreen('create-circle')}
                     style={styles.secondaryAction}
                   >
-                    <UsersRound color={colors.muted} size={19} strokeWidth={2.4} />
-                    <Text style={styles.secondaryActionText}>Create circle</Text>
+                    <UsersRound
+                      color={colors.muted}
+                      size={19}
+                      strokeWidth={2.4}
+                    />
+                    <Text style={styles.secondaryActionText}>
+                      Create circle
+                    </Text>
                   </Pressable>
                 </>
               ) : (

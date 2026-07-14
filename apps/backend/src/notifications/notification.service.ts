@@ -6,6 +6,7 @@ import {
 } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 type CreateNotificationInput = {
   body: string;
@@ -19,6 +20,7 @@ export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async createForUser(userId: string, input: CreateNotificationInput) {
@@ -31,6 +33,7 @@ export class NotificationService {
         metadata: input.metadata,
       },
     });
+    this.realtime.publishToMember(userId, 'notification:new', { notification });
 
     const settings = await this.prisma.userSettings.findUnique({
       where: { userId },

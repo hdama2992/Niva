@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { DateTimeSelector } from '../components/DateTimeSelector';
 import { NivaUser } from '../types/niva';
 
 export type CreateEventInput = {
@@ -49,7 +50,7 @@ export function CreateEventScreen({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [locationName, setLocationName] = useState('');
-  const [startsAtText, setStartsAtText] = useState(defaultStartTime);
+  const [startsAt, setStartsAt] = useState(defaultStartTime);
   const [capacity, setCapacity] = useState(6);
   const [difficulty, setDifficulty] =
     useState<CreateEventInput['difficulty']>('SOCIAL');
@@ -77,15 +78,13 @@ export function CreateEventScreen({
   };
 
   const submit = async () => {
-    const startsAt = parseLocalDateTime(startsAtText);
-
     if (!title.trim() || !description.trim() || !locationName.trim()) {
       setError('Add a title, description, and specific meeting location.');
       return;
     }
 
-    if (!startsAt) {
-      setError('Use the date format YYYY-MM-DD HH:MM.');
+    if (startsAt.getTime() <= Date.now()) {
+      setError('Choose a start time in the future.');
       return;
     }
 
@@ -176,20 +175,11 @@ export function CreateEventScreen({
               />
             </View>
           </Field>
-          <Field label="Start date and time">
-            <TextInput
-              autoCapitalize="none"
-              keyboardType="numbers-and-punctuation"
-              onChangeText={setStartsAtText}
-              placeholder="2026-07-20 18:30"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={startsAtText}
-            />
-            <Text style={styles.helper}>
-              Use your local time in YYYY-MM-DD HH:MM format.
-            </Text>
-          </Field>
+          <DateTimeSelector
+            minimumDate={new Date()}
+            onChange={setStartsAt}
+            value={startsAt}
+          />
 
           <Field label="Group size">
             <View style={styles.stepper}>
@@ -310,41 +300,7 @@ function defaultStartTime() {
   const date = new Date();
   date.setDate(date.getDate() + 7);
   date.setHours(18, 30, 0, 0);
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-
-  return `${year}-${month}-${day} 18:30`;
-}
-
-function parseLocalDateTime(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$/.exec(value.trim());
-
-  if (!match) {
-    return undefined;
-  }
-
-  const [, year, month, day, hour, minute] = match;
-  const parsed = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-  );
-
-  if (
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() !== Number(month) - 1 ||
-    parsed.getDate() !== Number(day) ||
-    parsed.getHours() !== Number(hour) ||
-    parsed.getMinutes() !== Number(minute)
-  ) {
-    return undefined;
-  }
-
-  return parsed;
+  return date;
 }
 
 function formatDifficulty(value: CreateEventInput['difficulty']) {

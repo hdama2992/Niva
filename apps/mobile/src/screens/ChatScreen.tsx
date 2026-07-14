@@ -18,6 +18,7 @@ import {
   listChatMessages,
   sendChatMessage,
 } from '../services/community';
+import { subscribeToCohortRealtime } from '../services/realtime';
 
 type ChatScreenProps = {
   activity: DiscoveryItem;
@@ -33,7 +34,9 @@ export function ChatScreen({
   userId,
 }: ChatScreenProps) {
   const [draft, setDraft] = useState('');
+  const [activityNotice, setActivityNotice] = useState<string>();
   const [error, setError] = useState<string>();
+  const [live, setLive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -54,11 +57,27 @@ export function ChatScreen({
     }
   };
 
+  const upsertMessage = (message: ChatMessage) => {
+    setMessages((current) =>
+      current.some((existing) => existing.id === message.id)
+        ? current
+        : [...current, message],
+    );
+  };
+
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => void refresh(), 12000);
+    const unsubscribe = subscribeToCohortRealtime(idToken, type, activityId, {
+      onActivityChange: () => {
+        setActivityNotice(
+          'Activity details changed. Return to details for the latest plan.',
+        );
+      },
+      onConnectionChange: setLive,
+      onMessage: upsertMessage,
+    });
 
-    return () => clearInterval(interval);
+    return unsubscribe;
   }, [activityId, idToken, type]);
 
   const send = async () => {
@@ -70,7 +89,7 @@ export function ChatScreen({
     try {
       setSending(true);
       const payload = await sendChatMessage(idToken, type, activityId, body);
-      setMessages((current) => [...current, payload.message]);
+      upsertMessage(payload.message);
       setDraft('');
       setError(undefined);
     } catch (requestError) {
@@ -103,7 +122,9 @@ export function ChatScreen({
           <Text numberOfLines={1} style={styles.title}>
             {activity.title}
           </Text>
-          <Text style={styles.subtitle}>Cohort chat</Text>
+          <Text style={[styles.subtitle, live && styles.subtitleLive]}>
+            {live ? 'Cohort chat - live' : 'Cohort chat'}
+          </Text>
         </View>
         <View style={styles.iconButton} />
       </View>
@@ -111,7 +132,9 @@ export function ChatScreen({
       <ScrollView
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() =>
+          scrollRef.current?.scrollToEnd({ animated: false })
+        }
         ref={scrollRef}
       >
         <View style={styles.boundary}>
@@ -119,6 +142,9 @@ export function ChatScreen({
             This is a joined cohort space. No random direct messages.
           </Text>
         </View>
+        {activityNotice ? (
+          <Text style={styles.activityNotice}>{activityNotice}</Text>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {!messages.length && !error ? (
           <Text style={styles.emptyText}>
@@ -136,11 +162,13 @@ export function ChatScreen({
                 <Text style={[styles.sender, own && styles.senderOwn]}>
                   {own
                     ? 'You'
-                    : message.sender.displayName ??
+                    : (message.sender.displayName ??
                       message.sender.username ??
-                      'Niva member'}
+                      'Niva member')}
                 </Text>
-                <Text style={[styles.messageText, own && styles.messageTextOwn]}>
+                <Text
+                  style={[styles.messageText, own && styles.messageTextOwn]}
+                >
                   {message.body}
                 </Text>
               </View>
@@ -164,7 +192,10 @@ export function ChatScreen({
           accessibilityRole="button"
           disabled={!draft.trim() || sending}
           onPress={() => void send()}
-          style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton,
+            (!draft.trim() || sending) && styles.sendButtonDisabled,
+          ]}
         >
           <Send color={colors.surface} size={19} strokeWidth={2.5} />
         </Pressable>
@@ -174,6 +205,12 @@ export function ChatScreen({
 }
 
 const styles = StyleSheet.create({
+  activityNotice: {
+    color: colors.info,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
   boundary: {
     backgroundColor: colors.infoSoft,
     borderRadius: radius.md,
@@ -283,6 +320,10 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     marginTop: 1,
+  },
+  subtitleLive: {
+    color: colors.secondary,
+    fontWeight: '800',
   },
   title: {
     color: colors.ink,

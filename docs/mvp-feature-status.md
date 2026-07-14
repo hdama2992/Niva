@@ -125,6 +125,10 @@ Community: event chats and circle chats only
 - Admin-reviewed host approval and host-gated event creation.
 - Host member management: approve/decline requests and record attendance/no-show.
 - Persistent event/circle cohort chat for approved members only; no random DMs.
+- Firebase-token-authenticated Socket.IO delivery for cohort messages and
+  member updates. The chat screen loads durable history once and receives new
+  messages, activity updates, membership outcomes, and in-app notifications
+  immediately rather than polling every twelve seconds.
 - Report model and guarded API retained, with member/admin report UI held.
 - Admin audit history for verification, host approvals, access grants,
   and notification dispatch.
@@ -134,9 +138,36 @@ Community: event chats and circle chats only
 - Host event/circle edit controls with persisted notifications to affected members.
 - Host cancellation with a mandatory reason, member-visible cancelled state, and
   admin cancellation controls with an audit record.
+- Approved-member icebreakers on event and circle details. Members see every
+  interest they have in common with another approved member, plus two scoped
+  conversation prompts. They never see the other member's full interest list
+  or a direct-message control.
+- A persisted icebreaker privacy toggle. Turning it off removes that member
+  from other members' icebreaker results.
+- Post-attendance continuity choices for similar-event and small-circle
+  suggestions, stored per member and event.
+- Server-side recommendations that use city, mutual interests, prior
+  memberships, blocks, the member's continuity choices, and settings rather
+  than a device-only filter.
+- Host feedback insights with aggregate rating, response count, and anonymous
+  feedback notes.
+- Persistent beta analytics for joins, approvals, attendance, feedback,
+  icebreaker views, recommendation views, and continuity choices. The admin
+  dashboard shows aggregates only.
 - Bangalore seed data script for beta events and circles.
 - Local PostgreSQL migration applied for the MVP schema.
 - Mobile API client functions for community endpoints.
+- Native iOS/Android date and time pickers for event/circle creation and
+  editing, with the same no-typed-date control for Expo web previews.
+- Admin member lookup, server-side activity/city search, and audited
+  event/circle location corrections with member notifications.
+- Role-scoped access checks for named Firebase admins. The temporary bootstrap
+  key remains available only for closed-beta operations.
+- Post-attendance feedback now awards a one-time, event-scoped trust event.
+- Manual and optional interval-based trust recalculation from durable trust
+  events.
+- Optional interval-based notification queue dispatch, in addition to the
+  manual admin dispatch action.
 - Connection model for future circle continuity.
 - Chat-thread and chat-message models scoped to events/circles.
 - Notification model for reminders and community updates.
@@ -148,11 +179,8 @@ Community: event chats and circle chats only
 
 ### Product And UX
 
-- Platform-native date/time picker and location-map integration for host
-  creation/editing. The current UI has controlled day and 30-minute time
-  controls rather than manual date entry.
-- More polished empty states and loading states.
-- Real responsive QA across phone sizes.
+- Location-map integration for host creation/editing.
+- Final visual and responsive QA across supported phone sizes.
 
 ### Mobile Integration
 
@@ -162,7 +190,6 @@ Community: event chats and circle chats only
   Android development-build testing before enabling the one-tap PNV path.
 - Google sign-in in the Expo app.
 - Verify session restoration with real Firebase credentials on physical devices.
-- Logout wired to auth state.
 - Apply and verify production Firebase Storage security rules with real
   credentials and physical-device uploads.
 - Expo native push-token registration and FCM/APNs provider configuration. The
@@ -170,30 +197,22 @@ Community: event chats and circle chats only
 
 ### Backend And Data
 
-- Role-specific authorization policy tests.
-- Admin event/circle location-management endpoints.
-- Post-event feedback trust updates and host-facing feedback insights.
-- Scheduled notification dispatch worker or Cloud Function. A manual admin
-  dispatch endpoint exists.
-- Trust recalculation job.
-- Connection/circle-continuity logic.
-- Stronger input validation for phone, profile photo URL, and event timing.
+- Direct member-to-member connection/follow logic and automatic circle
+  completion workflows. Current continuity is opt-in recommendation logic,
+  not a social graph or direct messaging feature.
 
 ### Admin
 
 - Switch the dashboard from its beta key field to named Firebase admin login.
-- Restrict each admin action by role instead of allowing all active roles.
-- Add member lookup tools and richer activity search/filtering.
 
 ### Legal, Privacy, And Safety
 
 - Privacy policy.
-- Terms/community guidelines.
+- Terms and formal community-guideline policy.
 - Consent copy for selfie and profile data.
 - Data retention policy for selfies.
 - Deletion request flow.
-- Admin access controls beyond a shared beta key.
-- Audit logging for admin actions.
+- Remove the shared bootstrap key after named dashboard login is deployed.
 - Abuse escalation process.
 - Moderation safety playbook, then re-enable report submission and review UI.
 

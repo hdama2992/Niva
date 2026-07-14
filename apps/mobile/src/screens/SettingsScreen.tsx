@@ -3,6 +3,7 @@ import {
   Ban,
   Bell,
   Eye,
+  HeartHandshake,
   ShieldCheck,
   UsersRound,
 } from 'lucide-react-native';
@@ -91,6 +92,21 @@ export function SettingsScreen({
           }
           text="Allow suggestions for another small circle after one finishes."
           value={settings.allowCircleContinuitySuggestions}
+        />
+        <SettingToggle
+          icon={
+            <HeartHandshake
+              color={colors.secondary}
+              size={20}
+              strokeWidth={2.3}
+            />
+          }
+          label="Share mutual interests in icebreakers"
+          onChange={(showInterestsInIcebreakers) =>
+            onChange({ ...settings, showInterestsInIcebreakers })
+          }
+          text="Approved members can see every interest you share, never your full interests list."
+          value={settings.showInterestsInIcebreakers}
         />
 
         <View style={styles.safetyNote}>

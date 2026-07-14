@@ -64,7 +64,21 @@ export type NotificationItem = {
 export type CommunitySettings = {
   allowCircleContinuitySuggestions: boolean;
   notificationsEnabled: boolean;
+  showInterestsInIcebreakers: boolean;
   showProfileInRecommendations: boolean;
+};
+
+export type IcebreakerMember = {
+  displayName: string | null;
+  id: string;
+  prompts: string[];
+  sharedInterests: string[];
+};
+
+export type EventFeedbackInsights = {
+  averageRating: number | null;
+  comments: Array<{ body: string | null; createdAt: string; rating: number }>;
+  responseCount: number;
 };
 
 export type ChatMessage = {
@@ -200,10 +214,14 @@ export function updateEvent(
     title: string;
   }>,
 ) {
-  return request<{ event: CommunityActivity }>(`/community/events/${eventId}`, idToken, {
-    body: event,
-    method: 'PATCH',
-  });
+  return request<{ event: CommunityActivity }>(
+    `/community/events/${eventId}`,
+    idToken,
+    {
+      body: event,
+      method: 'PATCH',
+    },
+  );
 }
 
 export function updateCircle(
@@ -257,9 +275,13 @@ export function getHostApproval(idToken: string) {
 }
 
 export function requestHostApproval(idToken: string) {
-  return request<{ approval: HostApproval }>('/community/host-approval/request', idToken, {
-    method: 'POST',
-  });
+  return request<{ approval: HostApproval }>(
+    '/community/host-approval/request',
+    idToken,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 export function listMyActivities(idToken: string) {
@@ -267,6 +289,24 @@ export function listMyActivities(idToken: string) {
     circles: CommunityMembership[];
     events: CommunityMembership[];
   }>('/community/me/activities', idToken);
+}
+
+export function listRecommendations(idToken: string) {
+  return request<{ recommendations: CommunityActivity[] }>(
+    '/community/recommendations',
+    idToken,
+  );
+}
+
+export function listIcebreakers(
+  idToken: string,
+  type: 'CIRCLE' | 'EVENT',
+  activityId: string,
+) {
+  return request<{ activityTitle: string; members: IcebreakerMember[] }>(
+    `/community/icebreakers/${type}/${activityId}`,
+    idToken,
+  );
 }
 
 export function listNotifications(idToken: string) {
@@ -358,6 +398,7 @@ export function updateSettings(
   settings: {
     allowCircleContinuitySuggestions?: boolean;
     notificationsEnabled?: boolean;
+    showInterestsInIcebreakers?: boolean;
     showProfileInRecommendations?: boolean;
   },
 ) {
@@ -380,6 +421,28 @@ export function submitEventFeedback(
     body: feedback,
     method: 'POST',
   });
+}
+
+export function updateContinuityPreference(
+  idToken: string,
+  eventId: string,
+  preference: {
+    wantsCircleSuggestions: boolean;
+    wantsSimilarEvents: boolean;
+  },
+) {
+  return request(
+    `/community/events/${eventId}/continuity-preference`,
+    idToken,
+    { body: preference, method: 'PATCH' },
+  );
+}
+
+export function getEventFeedbackInsights(idToken: string, eventId: string) {
+  return request<{ insights: EventFeedbackInsights }>(
+    `/community/events/${eventId}/feedback-insights`,
+    idToken,
+  );
 }
 
 export function listEventMembers(idToken: string, eventId: string) {
@@ -427,8 +490,12 @@ export function updateCircleMembership(
   memberId: string,
   status: 'APPROVED' | 'CANCELLED',
 ) {
-  return request(`/community/circles/${circleId}/members/${memberId}`, idToken, {
-    body: { status },
-    method: 'PATCH',
-  });
+  return request(
+    `/community/circles/${circleId}/members/${memberId}`,
+    idToken,
+    {
+      body: { status },
+      method: 'PATCH',
+    },
+  );
 }

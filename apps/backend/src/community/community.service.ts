@@ -10,18 +10,21 @@ import {
   HostApprovalStatus,
   MembershipStatus,
   NotificationType,
+  Prisma,
   TrustTier,
   TrustVerificationStatus,
 } from '@prisma/client';
 import { NotificationService } from '../notifications/notification.service';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { BlockUserDto } from './dto/block-user.dto';
 import { CreateCircleDto } from './dto/create-circle.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { ReportUserDto } from './dto/report-user.dto';
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto';
 import { UpdateCircleDto } from './dto/update-circle.dto';
+import { UpdateContinuityPreferenceDto } from './dto/update-continuity-preference.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpsertEmergencyContactDto } from './dto/upsert-emergency-contact.dto';
@@ -38,6 +41,7 @@ export class CommunityService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly notifications: NotificationService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async listEvents(userId: string, city?: string) {
@@ -88,6 +92,12 @@ export class CommunityService {
 
   async createEvent(userId: string, dto: CreateEventDto) {
     await this.assertCanHost(userId);
+    const startsAt = this.parseFutureActivityTime(dto.startsAt, 'start time');
+    const endsAt = dto.endsAt
+      ? this.parseActivityTime(dto.endsAt, 'end time')
+      : undefined;
+    this.assertEventTimeRange(startsAt, endsAt);
+    const interests = this.normalizeRequiredList(dto.interests, 'interests');
 
     return this.prisma.event.create({
       data: {
@@ -96,11 +106,11 @@ export class CommunityService {
         description: dto.description.trim(),
         city: dto.city.trim(),
         locationName: dto.locationName.trim(),
-        startsAt: new Date(dto.startsAt),
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
+        startsAt,
+        endsAt,
         capacity: dto.capacity,
         difficulty: dto.difficulty,
-        interests: this.normalizeList(dto.interests),
+        interests,
         chatThread: {
           create: { type: 'EVENT' },
         },
@@ -111,6 +121,11 @@ export class CommunityService {
 
   async createCircle(userId: string, dto: CreateCircleDto) {
     await this.assertCanHost(userId);
+    const startsAt = this.parseFutureActivityTime(
+      dto.startsAt,
+      'first session',
+    );
+    const interests = this.normalizeRequiredList(dto.interests, 'interests');
 
     return this.prisma.circle.create({
       data: {
@@ -119,12 +134,12 @@ export class CommunityService {
         description: dto.description.trim(),
         city: dto.city.trim(),
         locationName: dto.locationName.trim(),
-        startsAt: new Date(dto.startsAt),
+        startsAt,
         schedule: dto.schedule.trim(),
         durationWeeks: dto.durationWeeks,
         capacity: dto.capacity,
         difficulty: dto.difficulty,
-        interests: this.normalizeList(dto.interests),
+        interests,
         chatThread: {
           create: { type: ChatThreadType.CIRCLE },
         },
@@ -137,6 +152,19 @@ export class CommunityService {
     const event = await this.assertEventHost(userId, eventId);
     this.assertActivityCanBeChanged(event.status);
     await this.assertEventCapacity(eventId, dto.capacity);
+    const startsAt = dto.startsAt
+      ? this.parseFutureActivityTime(dto.startsAt, 'start time')
+      : event.startsAt;
+    const endsAt = dto.endsAt
+      ? this.parseActivityTime(dto.endsAt, 'end time')
+      : event.endsAt;
+
+    if (dto.startsAt || dto.endsAt) {
+      this.assertEventTimeRange(startsAt, endsAt);
+    }
+    const interests = dto.interests
+      ? this.normalizeRequiredList(dto.interests, 'interests')
+      : undefined;
 
     const updated = await this.prisma.event.update({
       where: { id: eventId },
@@ -145,12 +173,10 @@ export class CommunityService {
         city: dto.city?.trim(),
         description: dto.description?.trim(),
         difficulty: dto.difficulty,
-        endsAt: dto.endsAt ? new Date(dto.endsAt) : undefined,
-        interests: dto.interests
-          ? this.normalizeList(dto.interests)
-          : undefined,
+        endsAt,
+        interests,
         locationName: dto.locationName?.trim(),
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
+        startsAt: dto.startsAt ? startsAt : undefined,
         title: dto.title?.trim(),
       },
     });
@@ -159,6 +185,12 @@ export class CommunityService {
       eventId,
       updatedFields: this.updatedFields(dto),
     });
+    this.realtime.publishToCohort(
+      ChatThreadType.EVENT,
+      eventId,
+      'cohort:activity-updated',
+      { activityId: eventId, type: ChatThreadType.EVENT },
+    );
 
     return updated;
   }
@@ -167,6 +199,12 @@ export class CommunityService {
     const circle = await this.assertCircleHost(userId, circleId);
     this.assertActivityCanBeChanged(circle.status);
     await this.assertCircleCapacity(circleId, dto.capacity);
+    const startsAt = dto.startsAt
+      ? this.parseFutureActivityTime(dto.startsAt, 'first session')
+      : undefined;
+    const interests = dto.interests
+      ? this.normalizeRequiredList(dto.interests, 'interests')
+      : undefined;
 
     const updated = await this.prisma.circle.update({
       where: { id: circleId },
@@ -176,12 +214,10 @@ export class CommunityService {
         description: dto.description?.trim(),
         difficulty: dto.difficulty,
         durationWeeks: dto.durationWeeks,
-        interests: dto.interests
-          ? this.normalizeList(dto.interests)
-          : undefined,
+        interests,
         locationName: dto.locationName?.trim(),
         schedule: dto.schedule?.trim(),
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
+        startsAt,
         title: dto.title?.trim(),
       },
     });
@@ -190,6 +226,12 @@ export class CommunityService {
       circleId,
       updatedFields: this.updatedFields(dto),
     });
+    this.realtime.publishToCohort(
+      ChatThreadType.CIRCLE,
+      circleId,
+      'cohort:activity-updated',
+      { activityId: circleId, type: ChatThreadType.CIRCLE },
+    );
 
     return updated;
   }
@@ -212,6 +254,16 @@ export class CommunityService {
       cancelled.title,
       reason,
     );
+    this.realtime.publishToCohort(
+      ChatThreadType.EVENT,
+      eventId,
+      'cohort:activity-cancelled',
+      {
+        activityId: eventId,
+        reason: reason.trim(),
+        type: ChatThreadType.EVENT,
+      },
+    );
 
     return cancelled;
   }
@@ -233,6 +285,16 @@ export class CommunityService {
       circleId,
       cancelled.title,
       reason,
+    );
+    this.realtime.publishToCohort(
+      ChatThreadType.CIRCLE,
+      circleId,
+      'cohort:activity-cancelled',
+      {
+        activityId: circleId,
+        reason: reason.trim(),
+        type: ChatThreadType.CIRCLE,
+      },
     );
 
     return cancelled;
@@ -302,6 +364,14 @@ export class CommunityService {
       body: `Your request for ${membership.event.title} is ready for host review.`,
       metadata: { eventId },
     });
+    await this.recordAnalytics('JOIN_REQUESTED', { eventId, userId });
+    if (membership.event.hostId) {
+      this.realtime.publishToMember(
+        membership.event.hostId,
+        'activity:membership-updated',
+        { activityId: eventId, type: ChatThreadType.EVENT },
+      );
+    }
 
     return membership;
   }
@@ -379,6 +449,14 @@ export class CommunityService {
       body: `Your request for ${membership.circle.title} is ready for host review.`,
       metadata: { circleId },
     });
+    await this.recordAnalytics('JOIN_REQUESTED', { circleId, userId });
+    if (membership.circle.hostId) {
+      this.realtime.publishToMember(
+        membership.circle.hostId,
+        'activity:membership-updated',
+        { activityId: circleId, type: ChatThreadType.CIRCLE },
+      );
+    }
 
     return membership;
   }
@@ -409,6 +487,284 @@ export class CommunityService {
     return { events, circles };
   }
 
+  async getIcebreakers(
+    userId: string,
+    type: ChatThreadType,
+    activityId: string,
+  ) {
+    await this.assertIcebreakerAccess(userId, type, activityId);
+    const blockedUserIds = await this.listMutuallyBlockedUserIds(userId);
+    const viewer = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profile: { select: { interests: true } } },
+    });
+    const activity =
+      type === ChatThreadType.EVENT
+        ? await this.prisma.event.findUnique({
+            where: { id: activityId },
+            select: { interests: true, title: true },
+          })
+        : await this.prisma.circle.findUnique({
+            where: { id: activityId },
+            select: { interests: true, title: true },
+          });
+
+    if (!activity) {
+      throw new NotFoundException('Activity not found.');
+    }
+
+    const memberships =
+      type === ChatThreadType.EVENT
+        ? await this.prisma.eventMember.findMany({
+            where: {
+              eventId: activityId,
+              status: MembershipStatus.APPROVED,
+              userId: { notIn: [userId, ...blockedUserIds] },
+            },
+            include: {
+              user: {
+                select: {
+                  displayName: true,
+                  id: true,
+                  profile: { select: { interests: true } },
+                  settings: { select: { showInterestsInIcebreakers: true } },
+                },
+              },
+            },
+          })
+        : await this.prisma.circleMember.findMany({
+            where: {
+              circleId: activityId,
+              status: MembershipStatus.APPROVED,
+              userId: { notIn: [userId, ...blockedUserIds] },
+            },
+            include: {
+              user: {
+                select: {
+                  displayName: true,
+                  id: true,
+                  profile: { select: { interests: true } },
+                  settings: { select: { showInterestsInIcebreakers: true } },
+                },
+              },
+            },
+          });
+    const viewerInterests = viewer?.profile?.interests ?? [];
+    const members = memberships
+      .filter(
+        (membership) =>
+          membership.user.settings?.showInterestsInIcebreakers !== false,
+      )
+      .map((membership) => {
+        const sharedInterests = this.sharedInterests(
+          viewerInterests,
+          membership.user.profile?.interests ?? [],
+        );
+        return {
+          displayName: membership.user.displayName,
+          id: membership.user.id,
+          prompts: this.icebreakerPrompts(
+            activity.title,
+            activity.interests,
+            sharedInterests,
+          ),
+          sharedInterests,
+        };
+      });
+
+    await this.recordAnalytics('ICEBREAKER_VIEWED', {
+      circleId: type === ChatThreadType.CIRCLE ? activityId : undefined,
+      eventId: type === ChatThreadType.EVENT ? activityId : undefined,
+      metadata: { memberCount: members.length },
+      userId,
+    });
+
+    return { activityTitle: activity.title, members };
+  }
+
+  async listRecommendations(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        circleMemberships: { select: { circleId: true } },
+        eventMemberships: { select: { eventId: true } },
+        profile: { select: { city: true, interests: true } },
+        settings: {
+          select: {
+            allowCircleContinuitySuggestions: true,
+          },
+        },
+      },
+    });
+    if (!user?.profile?.city) {
+      return { recommendations: [] };
+    }
+
+    const blockedHostIds = await this.listMutuallyBlockedUserIds(userId);
+    const [preferences, events, circles] = await Promise.all([
+      this.prisma.continuityPreference.findMany({
+        where: { userId },
+        select: { wantsCircleSuggestions: true, wantsSimilarEvents: true },
+      }),
+      this.prisma.event.findMany({
+        where: {
+          city: { equals: user.profile.city, mode: 'insensitive' },
+          hostId: {
+            notIn: [userId, ...blockedHostIds],
+          },
+          id: {
+            notIn: user.eventMemberships.map(
+              (membership) => membership.eventId,
+            ),
+          },
+          status: ActivityStatus.PUBLISHED,
+        },
+        include: {
+          _count: {
+            select: {
+              members: { where: { status: { in: activeMembershipStatuses } } },
+            },
+          },
+          host: { select: { displayName: true, id: true, username: true } },
+        },
+        take: 40,
+      }),
+      this.prisma.circle.findMany({
+        where: {
+          city: { equals: user.profile.city, mode: 'insensitive' },
+          hostId: {
+            notIn: [userId, ...blockedHostIds],
+          },
+          id: {
+            notIn: user.circleMemberships.map(
+              (membership) => membership.circleId,
+            ),
+          },
+          status: ActivityStatus.PUBLISHED,
+        },
+        include: {
+          _count: {
+            select: {
+              members: { where: { status: { in: activeMembershipStatuses } } },
+            },
+          },
+          host: { select: { displayName: true, id: true, username: true } },
+        },
+        take: 40,
+      }),
+    ]);
+    const wantsSimilarEvents = preferences.some(
+      (preference) => preference.wantsSimilarEvents,
+    );
+    const wantsCircles =
+      user.settings?.allowCircleContinuitySuggestions !== false &&
+      preferences.some((preference) => preference.wantsCircleSuggestions);
+    const score = (interests: string[], category: 'circle' | 'event') => {
+      const overlap = this.sharedInterests(
+        user.profile?.interests ?? [],
+        interests,
+      );
+      return (
+        overlap.length * 10 +
+        (category === 'event' && wantsSimilarEvents ? 3 : 0) +
+        (category === 'circle' && wantsCircles ? 5 : 0)
+      );
+    };
+    const recommendations = [
+      ...events.map((event) => ({
+        ...event,
+        category: 'event' as const,
+        score: score(event.interests, 'event'),
+      })),
+      ...(wantsCircles
+        ? circles.map((circle) => ({
+            ...circle,
+            category: 'circle' as const,
+            score: score(circle.interests, 'circle'),
+          }))
+        : []),
+    ]
+      .filter((activity) => activity.score > 0)
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          left.startsAt.getTime() - right.startsAt.getTime(),
+      )
+      .slice(0, 12);
+
+    await this.recordAnalytics('RECOMMENDATIONS_VIEWED', {
+      metadata: { recommendationCount: recommendations.length },
+      userId,
+    });
+    return { recommendations };
+  }
+
+  async updateContinuityPreference(
+    userId: string,
+    eventId: string,
+    dto: UpdateContinuityPreferenceDto,
+  ) {
+    const membership = await this.prisma.eventMember.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+      select: { status: true },
+    });
+    if (membership?.status !== MembershipStatus.ATTENDED) {
+      throw new ForbiddenException(
+        'Continuity preferences are available after attendance is recorded.',
+      );
+    }
+
+    const preference = await this.prisma.continuityPreference.upsert({
+      where: { userId_eventId: { eventId, userId } },
+      create: {
+        eventId,
+        userId,
+        wantsCircleSuggestions: dto.wantsCircleSuggestions,
+        wantsSimilarEvents: dto.wantsSimilarEvents,
+      },
+      update: {
+        wantsCircleSuggestions: dto.wantsCircleSuggestions,
+        wantsSimilarEvents: dto.wantsSimilarEvents,
+      },
+    });
+    await this.recordAnalytics('CONTINUITY_PREFERENCE_SET', {
+      eventId,
+      metadata: {
+        wantsCircleSuggestions: dto.wantsCircleSuggestions,
+        wantsSimilarEvents: dto.wantsSimilarEvents,
+      },
+      userId,
+    });
+    return preference;
+  }
+
+  async getEventFeedbackInsights(hostId: string, eventId: string) {
+    await this.assertEventHost(hostId, eventId);
+    const [summary, comments] = await Promise.all([
+      this.prisma.eventFeedback.aggregate({
+        where: { eventId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+      this.prisma.eventFeedback.findMany({
+        where: { body: { not: null }, eventId },
+        orderBy: { createdAt: 'desc' },
+        select: { body: true, createdAt: true, rating: true },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      averageRating: summary._avg.rating,
+      comments: comments.map((comment) => ({
+        body: comment.body,
+        createdAt: comment.createdAt,
+        rating: comment.rating,
+      })),
+      responseCount: summary._count.rating,
+    };
+  }
+
   async listChatMessages(
     userId: string,
     type: ChatThreadType,
@@ -432,6 +788,14 @@ export class CommunityService {
     });
   }
 
+  async authorizeCohortRealtimeAccess(
+    userId: string,
+    type: ChatThreadType,
+    activityId: string,
+  ) {
+    await this.assertChatAccess(userId, type, activityId);
+  }
+
   async sendChatMessage(
     userId: string,
     type: ChatThreadType,
@@ -446,7 +810,7 @@ export class CommunityService {
 
     const thread = await this.assertChatAccess(userId, type, activityId);
 
-    return this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: { threadId: thread.id, senderId: userId, body: trimmedBody },
       include: {
         sender: {
@@ -454,6 +818,13 @@ export class CommunityService {
         },
       },
     });
+    this.realtime.publishToCohort(type, activityId, 'cohort:message', {
+      activityId,
+      message,
+      type,
+    });
+
+    return message;
   }
 
   async requestHostApproval(userId: string) {
@@ -551,6 +922,19 @@ export class CommunityService {
           : `Your attendance for ${event.title} was marked as no-show.`,
       metadata: { eventId, membershipId: member.id, status },
     });
+    await this.recordAnalytics('ATTENDANCE_RECORDED', {
+      eventId,
+      metadata: { status },
+      userId: member.userId,
+    });
+    this.publishMembershipUpdate(
+      hostId,
+      member.userId,
+      ChatThreadType.EVENT,
+      eventId,
+      member.id,
+      status,
+    );
 
     return updated;
   }
@@ -615,6 +999,20 @@ export class CommunityService {
           : `Your request for ${event.title} was not approved this time.`,
       metadata: { eventId, membershipId: member.id, status },
     });
+    await this.recordAnalytics(
+      status === MembershipStatus.APPROVED
+        ? 'MEMBERSHIP_APPROVED'
+        : 'JOIN_REQUEST_DECLINED',
+      { eventId, userId: member.userId },
+    );
+    this.publishMembershipUpdate(
+      hostId,
+      member.userId,
+      ChatThreadType.EVENT,
+      eventId,
+      member.id,
+      status,
+    );
 
     return updated;
   }
@@ -679,6 +1077,20 @@ export class CommunityService {
           : `Your request for ${circle.title} was not approved this time.`,
       metadata: { circleId, membershipId: member.id, status },
     });
+    await this.recordAnalytics(
+      status === MembershipStatus.APPROVED
+        ? 'MEMBERSHIP_APPROVED'
+        : 'JOIN_REQUEST_DECLINED',
+      { circleId, userId: member.userId },
+    );
+    this.publishMembershipUpdate(
+      hostId,
+      member.userId,
+      ChatThreadType.CIRCLE,
+      circleId,
+      member.id,
+      status,
+    );
 
     return updated;
   }
@@ -690,14 +1102,20 @@ export class CommunityService {
   ) {
     const membership = await this.prisma.eventMember.findUnique({
       where: { eventId_userId: { eventId, userId } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
 
-    if (!membership) {
-      throw new ForbiddenException('Join the event before leaving feedback.');
+    if (membership?.status !== MembershipStatus.ATTENDED) {
+      throw new ForbiddenException(
+        'Feedback opens after the host records your attendance.',
+      );
     }
 
-    return this.prisma.eventFeedback.upsert({
+    const existingFeedback = await this.prisma.eventFeedback.findUnique({
+      where: { eventId_userId: { eventId, userId } },
+      select: { id: true },
+    });
+    const feedback = await this.prisma.eventFeedback.upsert({
       where: { eventId_userId: { eventId, userId } },
       create: {
         eventId,
@@ -710,6 +1128,13 @@ export class CommunityService {
         body: dto.body?.trim() || null,
       },
     });
+    if (!existingFeedback) {
+      await Promise.all([
+        this.recordAnalytics('FEEDBACK_SUBMITTED', { eventId, userId }),
+        this.usersService.recordFeedbackSubmitted(userId, eventId),
+      ]);
+    }
+    return feedback;
   }
 
   async report(userId: string, dto: ReportUserDto) {
@@ -819,11 +1244,13 @@ export class CommunityService {
         showProfileInRecommendations: dto.showProfileInRecommendations ?? true,
         allowCircleContinuitySuggestions:
           dto.allowCircleContinuitySuggestions ?? true,
+        showInterestsInIcebreakers: dto.showInterestsInIcebreakers ?? true,
       },
       update: {
         notificationsEnabled: dto.notificationsEnabled,
         showProfileInRecommendations: dto.showProfileInRecommendations,
         allowCircleContinuitySuggestions: dto.allowCircleContinuitySuggestions,
+        showInterestsInIcebreakers: dto.showInterestsInIcebreakers,
       },
     });
   }
@@ -955,10 +1382,63 @@ export class CommunityService {
     return thread;
   }
 
+  private publishMembershipUpdate(
+    hostId: string,
+    memberId: string,
+    type: ChatThreadType,
+    activityId: string,
+    membershipId: string,
+    status: MembershipStatus,
+  ) {
+    const payload = { activityId, membershipId, status, type };
+    this.realtime.publishToMember(
+      hostId,
+      'activity:membership-updated',
+      payload,
+    );
+    this.realtime.publishToMember(
+      memberId,
+      'activity:membership-updated',
+      payload,
+    );
+  }
+
+  private async assertIcebreakerAccess(
+    userId: string,
+    type: ChatThreadType,
+    activityId: string,
+  ) {
+    const membership =
+      type === ChatThreadType.EVENT
+        ? await this.prisma.eventMember.findUnique({
+            where: { eventId_userId: { eventId: activityId, userId } },
+            select: { status: true },
+          })
+        : await this.prisma.circleMember.findUnique({
+            where: { circleId_userId: { circleId: activityId, userId } },
+            select: { status: true },
+          });
+
+    if (
+      membership?.status !== MembershipStatus.APPROVED &&
+      membership?.status !== MembershipStatus.ATTENDED
+    ) {
+      throw new ForbiddenException(
+        'Icebreakers are available only to approved activity members.',
+      );
+    }
+  }
+
   private async assertEventHost(hostId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { hostId: true, status: true, title: true },
+      select: {
+        endsAt: true,
+        hostId: true,
+        startsAt: true,
+        status: true,
+        title: true,
+      },
     });
 
     if (!event) {
@@ -975,7 +1455,7 @@ export class CommunityService {
   private async assertCircleHost(hostId: string, circleId: string) {
     const circle = await this.prisma.circle.findUnique({
       where: { id: circleId },
-      select: { hostId: true, status: true, title: true },
+      select: { hostId: true, startsAt: true, status: true, title: true },
     });
 
     if (!circle) {
@@ -991,6 +1471,88 @@ export class CommunityService {
 
   private normalizeList(values: string[]): string[] {
     return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  }
+
+  private normalizeRequiredList(values: string[], label: string) {
+    const normalized = this.normalizeList(values);
+    if (!normalized.length) {
+      throw new BadRequestException(`Add at least one ${label}.`);
+    }
+    return normalized;
+  }
+
+  private parseActivityTime(value: string, label: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Enter a valid ${label}.`);
+    }
+    return parsed;
+  }
+
+  private parseFutureActivityTime(value: string, label: string) {
+    const parsed = this.parseActivityTime(value, label);
+    if (parsed.getTime() <= Date.now()) {
+      throw new BadRequestException(`Choose a future ${label}.`);
+    }
+    return parsed;
+  }
+
+  private assertEventTimeRange(startsAt: Date, endsAt?: Date | null) {
+    if (endsAt && endsAt.getTime() <= startsAt.getTime()) {
+      throw new BadRequestException(
+        'The event end time must be after its start time.',
+      );
+    }
+  }
+
+  private sharedInterests(left: string[], right: string[]) {
+    const rightByKey = new Map(
+      right.map((interest) => [
+        interest.trim().toLocaleLowerCase(),
+        interest.trim(),
+      ]),
+    );
+    return [...new Set(left.map((interest) => interest.trim()))]
+      .filter(Boolean)
+      .filter((interest) => rightByKey.has(interest.toLocaleLowerCase()))
+      .sort((first, second) => first.localeCompare(second));
+  }
+
+  private icebreakerPrompts(
+    title: string,
+    activityInterests: string[],
+    sharedInterests: string[],
+  ) {
+    const topic = sharedInterests[0] ?? activityInterests[0] ?? 'this activity';
+    return [
+      `What got you interested in ${topic}?`,
+      `Have you tried anything like ${title} before?`,
+    ];
+  }
+
+  private async recordAnalytics(
+    type: string,
+    input: {
+      circleId?: string;
+      eventId?: string;
+      metadata?: Record<string, boolean | number | string>;
+      userId?: string;
+    },
+  ) {
+    const analytics = this.prisma.productAnalyticsEvent;
+    if (!analytics) {
+      return;
+    }
+
+    await analytics.create({
+      data: {
+        circleId: input.circleId,
+        eventId: input.eventId,
+        metadata: input.metadata as Prisma.InputJsonValue | undefined,
+        type,
+        userId: input.userId,
+      },
+    });
   }
 
   private assertActivityCanBeChanged(status: ActivityStatus) {
