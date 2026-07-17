@@ -281,8 +281,7 @@ export function CreateEventScreen({
           </View>
           <Text style={styles.lockedTitle}>Host tools are locked</Text>
           <Text style={styles.lockedText}>
-            Event creation opens for trusted members and manually approved
-            hosts.
+            Event creation opens after your host request is approved.
           </Text>
         </View>
       )}

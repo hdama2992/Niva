@@ -22,8 +22,8 @@ export function VerificationPendingScreen({
         <Text style={styles.eyebrow}>Review pending</Text>
         <Text style={styles.title}>Thanks, {displayName}</Text>
         <Text style={styles.subtitle}>
-          Your selfie is waiting for manual approval. You can keep browsing
-          while join requests stay locked.
+          Your selfie is under review. You can keep browsing while join
+          requests stay locked.
         </Text>
       </View>
 

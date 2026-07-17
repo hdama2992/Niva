@@ -70,10 +70,8 @@ export function SelfieUploadScreen({
         <Text style={styles.title}>Verify before joining</Text>
         <Text style={styles.subtitle}>
           {joiningTitle
-            ? `Submit a current selfie before requesting to join ${joiningTitle}.`
-            : 'Submit a current selfie before requesting to join events or circles.'}{' '}
-          This checks real-person and profile consistency, not gender from
-          appearance.
+            ? `Take a clear, recent selfie before requesting to join ${joiningTitle}.`
+            : 'Take a clear, recent selfie before requesting to join events or circles.'}
         </Text>
       </View>
 
@@ -93,7 +91,7 @@ export function SelfieUploadScreen({
           </Text>
           <Text style={styles.uploadText}>
             {selfie
-              ? 'Ready for encrypted upload and manual review.'
+              ? 'Your selfie is ready to submit.'
               : 'Use a clear, recent photo with your face visible.'}
           </Text>
         </View>
@@ -111,15 +109,15 @@ export function SelfieUploadScreen({
       <View style={styles.privacyNote}>
         <ShieldCheck color={colors.secondary} size={21} strokeWidth={2.4} />
         <Text style={styles.privacyText}>
-          Private by design. Your selfie is used only for Niva's manual
-          verification review. Other members and hosts never see it.
+          Your selfie stays private. It is used only to review your request and
+          is never shown to members or hosts.
         </Text>
       </View>
 
       <View style={styles.checks}>
         <Text style={styles.check}>Real face visible</Text>
         <Text style={styles.check}>Good image quality</Text>
-        <Text style={styles.check}>Not a screenshot or fake profile image</Text>
+        <Text style={styles.check}>Current, unedited photo</Text>
       </View>
 
       <View style={styles.footer}>

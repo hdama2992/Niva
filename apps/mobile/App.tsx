@@ -322,11 +322,11 @@ async function withApiErrors(action: () => Promise<void>) {
   try {
     await action();
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Something went wrong connecting to Niva.';
-    Alert.alert('Niva backend', message);
+    console.error('Niva request failed.', error);
+    Alert.alert(
+      'Something went wrong',
+      'Please try again. If the problem continues, contact Niva support.',
+    );
   }
 }
 
