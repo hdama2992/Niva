@@ -12,6 +12,12 @@ import {
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
 import {
+  cadenceFromSchedule,
+  formatRecurringSchedule,
+  RecurringCadence,
+  RecurringScheduleSelector,
+} from '../components/RecurringScheduleSelector';
+import {
   ActivityLocation,
   LocationSelector,
 } from '../components/LocationSelector';
@@ -67,7 +73,9 @@ export function EditActivityScreen({
   const [startsAt, setStartsAt] = useState(
     activity.startsAt ? new Date(activity.startsAt) : new Date(),
   );
-  const [schedule, setSchedule] = useState(activity.schedule ?? activity.time);
+  const [cadence, setCadence] = useState<RecurringCadence>(() =>
+    cadenceFromSchedule(activity.schedule),
+  );
   const [capacity, setCapacity] = useState(activity.capacity ?? 6);
   const [durationWeeks, setDurationWeeks] = useState(
     Number.parseInt(activity.duration ?? '6', 10) || 6,
@@ -94,10 +102,6 @@ export function EditActivityScreen({
       setError('Add a title, description, and clear meeting location.');
       return;
     }
-    if (isCircle && !schedule.trim()) {
-      setError('Add the recurring schedule for this circle.');
-      return;
-    }
     if (!interests.length) {
       setError('Choose at least one interest for discovery.');
       return;
@@ -116,7 +120,9 @@ export function EditActivityScreen({
         latitude: location.latitude,
         locationName: location.locationName.trim(),
         longitude: location.longitude,
-        schedule: isCircle ? schedule.trim() : undefined,
+        schedule: isCircle
+          ? formatRecurringSchedule(startsAt, cadence)
+          : undefined,
         startsAt: startsAt.toISOString(),
         title: title.trim(),
       });
@@ -203,15 +209,11 @@ export function EditActivityScreen({
           value={startsAt}
         />
         {isCircle ? (
-          <Field label="Recurring schedule">
-            <TextInput
-              onChangeText={setSchedule}
-              placeholder="Every Saturday, 10:00 AM"
-              placeholderTextColor={colors.muted}
-              style={styles.input}
-              value={schedule}
-            />
-          </Field>
+          <RecurringScheduleSelector
+            cadence={cadence}
+            onChange={setCadence}
+            startsAt={startsAt}
+          />
         ) : null}
         {isCircle ? (
           <Stepper
@@ -505,32 +507,6 @@ const styles = StyleSheet.create({
   saveText: {
     color: colors.surface,
     fontSize: typography.body,
-    fontWeight: '800',
-  },
-  scheduleButton: {
-    alignItems: 'center',
-    height: 36,
-    justifyContent: 'center',
-    width: 32,
-  },
-  scheduleControl: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: spacing.xs,
-  },
-  scheduleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-  },
-  scheduleValue: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: typography.small,
     fontWeight: '800',
   },
   screen: { backgroundColor: colors.background, flex: 1 },

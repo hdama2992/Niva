@@ -1,10 +1,13 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsInt,
   IsOptional,
   IsString,
   IsUrl,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 export class UpdateProfileDto {
@@ -21,9 +24,10 @@ export class UpdateProfileDto {
   @IsString({ each: true })
   interests!: string[];
 
-  @IsString()
-  @MaxLength(30)
-  ageRange!: string;
+  @IsInt()
+  @Min(18)
+  @Max(100)
+  age!: number;
 
   @IsArray()
   @ArrayMinSize(1)

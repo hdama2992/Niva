@@ -7,6 +7,7 @@ export type ApiTrust = {
 };
 
 export type ApiUserProfile = {
+  age?: number | null;
   ageRange?: string | null;
   bio?: string | null;
   city?: string | null;
@@ -145,7 +146,7 @@ export function checkUsernameAvailability(idToken: string, username: string) {
 export function updateProfile(
   idToken: string,
   profile: {
-    ageRange: string;
+    age: number;
     bio?: string;
     city: string;
     displayName: string;

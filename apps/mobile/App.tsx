@@ -170,8 +170,8 @@ export default function App() {
     profile: ProfileDraft,
   ) =>
     withApiErrors(async () => {
-      const { ageRange, profilePhoto, ...profileData } = profile;
-      if (!profilePhoto || !ageRange) {
+      const { age, profilePhoto, ...profileData } = profile;
+      if (!profilePhoto || !age) {
         throw new Error(
           'Complete the required profile fields before continuing.',
         );
@@ -179,11 +179,7 @@ export default function App() {
 
       const profilePhotoUrl = await uploadProfilePhoto(profilePhoto);
 
-      await updateProfile(idToken, {
-        ageRange,
-        ...profileData,
-        profilePhotoUrl,
-      });
+      await updateProfile(idToken, { age, ...profileData, profilePhotoUrl });
       setRoute({
         idToken,
         name: 'declaration',
@@ -386,7 +382,7 @@ function mapApiUser(user: ApiUser): NivaUser {
     username: user.username ?? '',
     displayName: user.displayName ?? profile?.displayName ?? 'Niva member',
     city: profile?.city ?? 'Bangalore',
-    ageRange: profile?.ageRange ?? undefined,
+    age: profile?.age ?? undefined,
     bio: profile?.bio ?? undefined,
     languages: profile?.languages?.length ? profile.languages : ['English'],
     occupation: profile?.occupation ?? undefined,
@@ -416,7 +412,7 @@ function profileDraftFromApiUser(user: ApiUser): ProfileDraft | undefined {
   return {
     displayName: profile.displayName,
     city: profile.city,
-    ageRange: profile.ageRange ?? undefined,
+    age: profile.age ?? undefined,
     bio: profile.bio ?? undefined,
     languages: profile.languages?.length ? profile.languages : ['English'],
     occupation: profile.occupation ?? undefined,

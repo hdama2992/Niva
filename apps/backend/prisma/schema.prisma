@@ -233,6 +233,7 @@ model UserProfile {
   username            String
   bio                 String?
   city                String
+  age                 Int?
   ageRange            String?
   languages           String[] @default([])
   occupation          String?

@@ -325,14 +325,14 @@ export class UsersService {
 
     const displayName = dto.displayName.trim();
     const city = dto.city.trim();
-    const ageRange = dto.ageRange.trim();
     const interests = this.normalizeList(dto.interests);
     const languages = this.normalizeList(dto.languages);
 
     if (
       !displayName ||
       !city ||
-      !ageRange ||
+      dto.age < 18 ||
+      dto.age > 100 ||
       !dto.profilePhotoUrl ||
       languages.length < 1 ||
       interests.length < 3
@@ -362,7 +362,7 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
-          ageRange,
+          age: dto.age,
           languages,
           occupation: dto.occupation?.trim() || undefined,
           interests,
@@ -374,7 +374,7 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
-          ageRange,
+          age: dto.age,
           languages,
           occupation: dto.occupation?.trim() || null,
           interests,

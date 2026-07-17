@@ -1015,7 +1015,7 @@ export function HomeScreen({
                   'Ready to meet women through recurring activities.'}
               </Text>
               <Text style={styles.profileTextMuted}>
-                {[user.ageRange, user.occupation, user.languages.join(', ')]
+                {[user.age, user.occupation, user.languages.join(', ')]
                   .filter(Boolean)
                   .join(' · ')}
               </Text>

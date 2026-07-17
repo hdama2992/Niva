@@ -1,4 +1,11 @@
-import { ArrowRight, Camera, MapPin, Sparkles } from 'lucide-react-native';
+import {
+  ArrowRight,
+  Camera,
+  MapPin,
+  Minus,
+  Plus,
+  Sparkles,
+} from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   Image,
@@ -8,6 +15,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -34,16 +42,30 @@ const interestOptions = [
   'Career',
   'Wellness',
 ];
+const languageOptions = [
+  'English',
+  'Kannada',
+  'Hindi',
+  'Tamil',
+  'Telugu',
+  'Malayalam',
+  'Marathi',
+  'Bengali',
+  'Gujarati',
+  'Punjabi',
+  'Odia',
+  'Urdu',
+];
+const betaCity = 'Bangalore';
 
 export function ProfileSetupScreen({
   username,
   onComplete,
 }: ProfileSetupScreenProps) {
   const [displayName, setDisplayName] = useState(username);
-  const [city, setCity] = useState('Bangalore');
-  const [ageRange, setAgeRange] = useState('');
+  const [age, setAge] = useState<number>();
   const [bio, setBio] = useState('');
-  const [languages, setLanguages] = useState('');
+  const [languages, setLanguages] = useState<string[]>([]);
   const [occupation, setOccupation] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
@@ -53,19 +75,13 @@ export function ProfileSetupScreen({
   const canContinue = useMemo(
     () =>
       displayName.trim().length >= 2 &&
-      city.trim().length >= 2 &&
-      ageRange.trim().length >= 2 &&
-      languages.split(',').some((language) => language.trim().length > 0) &&
+      age !== undefined &&
+      age >= 18 &&
+      age <= 100 &&
+      languages.length > 0 &&
       Boolean(profilePhoto) &&
       selectedEnoughInterests,
-    [
-      ageRange,
-      city,
-      displayName,
-      languages,
-      profilePhoto,
-      selectedEnoughInterests,
-    ],
+    [age, displayName, languages, profilePhoto, selectedEnoughInterests],
   );
 
   const toggleInterest = (interest: string) => {
@@ -73,6 +89,15 @@ export function ProfileSetupScreen({
       current.includes(interest)
         ? current.filter((item) => item !== interest)
         : [...current, interest],
+    );
+    setError(undefined);
+  };
+
+  const toggleLanguage = (language: string) => {
+    setLanguages((current) =>
+      current.includes(language)
+        ? current.filter((item) => item !== language)
+        : [...current, language],
     );
     setError(undefined);
   };
@@ -87,13 +112,10 @@ export function ProfileSetupScreen({
 
     onComplete({
       displayName: displayName.trim(),
-      city: city.trim(),
+      city: betaCity,
       bio: bio.trim() || undefined,
-      ageRange: ageRange.trim() || undefined,
-      languages: languages
-        .split(',')
-        .map((language) => language.trim())
-        .filter(Boolean),
+      age,
+      languages,
       occupation: occupation.trim() || undefined,
       profilePhoto,
       interests,
@@ -169,29 +191,56 @@ export function ProfileSetupScreen({
             value={displayName}
           />
 
-          <TextField
-            label="City *"
-            onChangeText={(value) => {
-              setCity(value);
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>City *</Text>
+            <View style={styles.fixedField}>
+              <MapPin color={colors.secondary} size={21} strokeWidth={2.4} />
+              <View>
+                <Text style={styles.fixedFieldValue}>{betaCity}</Text>
+                <Text style={styles.fixedFieldMeta}>Closed beta city</Text>
+              </View>
+            </View>
+          </View>
+
+          <AgeField
+            age={age}
+            onChange={(value) => {
+              setAge(value);
               setError(undefined);
             }}
-            placeholder="Bangalore"
-            value={city}
           />
 
-          <TextField
-            label="Age range *"
-            onChangeText={setAgeRange}
-            placeholder="25-30"
-            value={ageRange}
-          />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Languages *</Text>
+            <Text style={styles.fieldMeta}>Select every language you use.</Text>
+            <View style={styles.choiceList}>
+              {languageOptions.map((language) => {
+                const selected = languages.includes(language);
 
-          <TextField
-            label="Languages *"
-            onChangeText={setLanguages}
-            placeholder="English, Kannada, Hindi"
-            value={languages}
-          />
+                return (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    key={language}
+                    onPress={() => toggleLanguage(language)}
+                    style={[
+                      styles.interestChip,
+                      selected && styles.interestChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.interestText,
+                        selected && styles.interestTextSelected,
+                      ]}
+                    >
+                      {language}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           <TextField
             label="Occupation (optional)"
@@ -215,7 +264,6 @@ export function ProfileSetupScreen({
             <Text style={styles.sectionTitle}>Interests *</Text>
             <Text style={styles.sectionMeta}>{interests.length}/3 minimum</Text>
           </View>
-          <MapPin color={colors.secondary} size={20} strokeWidth={2.3} />
         </View>
 
         <View style={styles.interests}>
@@ -259,11 +307,106 @@ export function ProfileSetupScreen({
   );
 }
 
+function AgeField({
+  age,
+  onChange,
+}: {
+  age?: number;
+  onChange: (age?: number) => void;
+}) {
+  const updateFromText = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 3);
+    onChange(digits ? Number(digits) : undefined);
+  };
+
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.fieldLabel}>Age *</Text>
+      <View style={styles.ageControl}>
+        <Pressable
+          accessibilityLabel="Decrease age"
+          accessibilityRole="button"
+          disabled={age === undefined || age <= 18}
+          onPress={() => onChange(Math.max(18, (age ?? 19) - 1))}
+          style={[
+            styles.ageButton,
+            (age === undefined || age <= 18) && styles.ageButtonDisabled,
+          ]}
+        >
+          <Minus color={colors.ink} size={20} strokeWidth={2.5} />
+        </Pressable>
+        <TextInput
+          accessibilityLabel="Age"
+          keyboardType="number-pad"
+          maxLength={3}
+          onChangeText={updateFromText}
+          placeholder="Enter age"
+          placeholderTextColor={colors.muted}
+          selectionColor={colors.primary}
+          style={styles.ageInput}
+          value={age?.toString() ?? ''}
+        />
+        <Pressable
+          accessibilityLabel="Increase age"
+          accessibilityRole="button"
+          disabled={age !== undefined && age >= 100}
+          onPress={() =>
+            onChange(age === undefined ? 18 : Math.min(100, age + 1))
+          }
+          style={[
+            styles.ageButton,
+            age !== undefined && age >= 100 && styles.ageButtonDisabled,
+          ]}
+        >
+          <Plus color={colors.ink} size={20} strokeWidth={2.5} />
+        </Pressable>
+      </View>
+      <Text style={styles.fieldMeta}>You must be 18 or older.</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  ageButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.sm,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  ageButtonDisabled: {
+    opacity: 0.35,
+  },
+  ageControl: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 56,
+    padding: spacing.xs,
+  },
+  ageInput: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typography.body,
+    fontWeight: '700',
+    minWidth: 0,
+    textAlign: 'center',
+  },
   bioInput: {
     minHeight: 92,
     paddingTop: spacing.md,
     textAlignVertical: 'top',
+  },
+  choiceList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   container: {
     flex: 1,
@@ -278,6 +421,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
     marginBottom: spacing.md,
+  },
+  fieldGroup: {
+    gap: spacing.xs,
+  },
+  fieldLabel: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  fieldMeta: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+  },
+  fixedField: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 56,
+    paddingHorizontal: spacing.md,
+  },
+  fixedFieldMeta: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 2,
+  },
+  fixedFieldValue: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
   eyebrow: {
     color: colors.secondary,

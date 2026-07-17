@@ -10,7 +10,7 @@ export type NivaUser = {
   username: string;
   displayName: string;
   city: string;
-  ageRange?: string;
+  age?: number;
   bio?: string;
   languages: string[];
   occupation?: string;
@@ -27,7 +27,7 @@ export type NivaUser = {
 export type ProfileDraft = {
   displayName: string;
   city: string;
-  ageRange?: string;
+  age?: number;
   bio?: string;
   languages: string[];
   occupation?: string;

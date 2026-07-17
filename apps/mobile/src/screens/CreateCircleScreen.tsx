@@ -12,6 +12,11 @@ import {
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
 import {
+  formatRecurringSchedule,
+  RecurringCadence,
+  RecurringScheduleSelector,
+} from '../components/RecurringScheduleSelector';
+import {
   ActivityLocation,
   LocationSelector,
 } from '../components/LocationSelector';
@@ -57,7 +62,7 @@ export function CreateCircleScreen({
     locationName: '',
   });
   const [startsAt, setStartsAt] = useState(defaultStartTime);
-  const [schedule, setSchedule] = useState('Every Saturday, 10:00 AM');
+  const [cadence, setCadence] = useState<RecurringCadence>('WEEKLY');
   const [durationWeeks, setDurationWeeks] = useState(6);
   const [capacity, setCapacity] = useState(6);
   const [difficulty, setDifficulty] =
@@ -79,8 +84,8 @@ export function CreateCircleScreen({
       setError('Add a title, description, and specific meeting location.');
       return;
     }
-    if (startsAt.getTime() <= Date.now() || !schedule.trim()) {
-      setError('Choose a future first session and add a recurring schedule.');
+    if (startsAt.getTime() <= Date.now()) {
+      setError('Choose a future first session.');
       return;
     }
     if (!interests.length) {
@@ -101,7 +106,7 @@ export function CreateCircleScreen({
         latitude: location.latitude,
         locationName: location.locationName.trim(),
         longitude: location.longitude,
-        schedule: schedule.trim(),
+        schedule: formatRecurringSchedule(startsAt, cadence),
         startsAt: startsAt.toISOString(),
         title: title.trim(),
       });
@@ -168,15 +173,11 @@ export function CreateCircleScreen({
           onChange={setStartsAt}
           value={startsAt}
         />
-        <Field label="Recurring schedule">
-          <TextInput
-            onChangeText={setSchedule}
-            placeholder="Every Saturday, 10:00 AM"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-            value={schedule}
-          />
-        </Field>
+        <RecurringScheduleSelector
+          cadence={cadence}
+          onChange={setCadence}
+          startsAt={startsAt}
+        />
         <Stepper
           label="Circle length"
           value={`${durationWeeks} weeks`}
