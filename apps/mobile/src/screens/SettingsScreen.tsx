@@ -1,12 +1,8 @@
 import {
   ArrowLeft,
   Ban,
-  Bell,
   Eye,
-  HeartHandshake,
-  ShieldCheck,
   Trash2,
-  UsersRound,
 } from 'lucide-react-native';
 import { ReactNode, useState } from 'react';
 import {
@@ -85,17 +81,6 @@ export function SettingsScreen({
           relevant.
         </Text>
 
-        <Text style={styles.sectionLabel}>Notifications</Text>
-        <SettingToggle
-          icon={<Bell color={colors.primary} size={20} strokeWidth={2.3} />}
-          label="Activity updates"
-          onChange={(notificationsEnabled) =>
-            onChange({ ...settings, notificationsEnabled })
-          }
-          text="Receive verification, request, and event update notifications."
-          value={settings.notificationsEnabled}
-        />
-
         <Text style={styles.sectionLabel}>Privacy and discovery</Text>
         <SettingToggle
           icon={<Eye color={colors.info} size={20} strokeWidth={2.3} />}
@@ -106,41 +91,6 @@ export function SettingsScreen({
           text="Let Niva consider your profile for safe, relevant group suggestions."
           value={settings.showProfileInRecommendations}
         />
-        <SettingToggle
-          icon={
-            <UsersRound color={colors.secondary} size={20} strokeWidth={2.3} />
-          }
-          label="Circle continuity"
-          onChange={(allowCircleContinuitySuggestions) =>
-            onChange({ ...settings, allowCircleContinuitySuggestions })
-          }
-          text="Allow suggestions for another small circle after one finishes."
-          value={settings.allowCircleContinuitySuggestions}
-        />
-        <SettingToggle
-          icon={
-            <HeartHandshake
-              color={colors.secondary}
-              size={20}
-              strokeWidth={2.3}
-            />
-          }
-          label="Share mutual interests in icebreakers"
-          onChange={(showInterestsInIcebreakers) =>
-            onChange({ ...settings, showInterestsInIcebreakers })
-          }
-          text="Approved members can see every interest you share, never your full interests list."
-          value={settings.showInterestsInIcebreakers}
-        />
-
-        <View style={styles.safetyNote}>
-          <ShieldCheck color={colors.secondary} size={21} strokeWidth={2.4} />
-          <Text style={styles.safetyText}>
-            Your verification selfie stays private. It is not visible to other
-            members.
-          </Text>
-        </View>
-
         <Text style={styles.sectionLabel}>Blocked members</Text>
         {blockedUsers.length ? (
           <View style={styles.blockList}>
@@ -429,22 +379,6 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     width: 44,
-  },
-  safetyNote: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.md,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-  },
-  safetyText: {
-    color: colors.secondary,
-    flex: 1,
-    fontSize: typography.small,
-    fontWeight: '700',
-    lineHeight: 19,
   },
   screen: {
     backgroundColor: colors.background,

@@ -1,4 +1,9 @@
-import { Camera, Image as ImageIcon, UploadCloud } from 'lucide-react-native';
+import {
+  Camera,
+  Image as ImageIcon,
+  ShieldCheck,
+  UploadCloud,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -103,6 +108,14 @@ export function SelfieUploadScreen({
         <Text style={styles.libraryButtonText}>Choose from library</Text>
       </Pressable>
 
+      <View style={styles.privacyNote}>
+        <ShieldCheck color={colors.secondary} size={21} strokeWidth={2.4} />
+        <Text style={styles.privacyText}>
+          Private by design. Your selfie is used only for Niva's manual
+          verification review. Other members and hosts never see it.
+        </Text>
+      </View>
+
       <View style={styles.checks}>
         <Text style={styles.check}>Real face visible</Text>
         <Text style={styles.check}>Good image quality</Text>
@@ -186,6 +199,22 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: typography.small,
     fontWeight: '800',
+  },
+  privacyNote: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+  },
+  privacyText: {
+    color: colors.secondary,
+    flex: 1,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 19,
   },
   selfiePreview: {
     borderRadius: radius.md,
