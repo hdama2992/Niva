@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Post,
   Put,
@@ -8,6 +9,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { FirebaseAdminService } from '../firebase/firebase-admin.service';
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import type { RequestWithFirebaseUser } from '../firebase/firebase-auth.guard';
 import { AcceptSelfDeclarationDto } from './dto/accept-self-declaration.dto';
@@ -15,6 +17,7 @@ import { AcceptCommunityGuidelinesDto } from './dto/accept-community-guidelines.
 import { SetUsernameDto } from './dto/set-username.dto';
 import { SubmitSelfieDto } from './dto/submit-selfie.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import {
   firebaseTokenToSessionInput,
   PublicUser,
@@ -24,7 +27,10 @@ import {
 @Controller('users')
 @UseGuards(FirebaseAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly firebaseAdminService: FirebaseAdminService,
+  ) {}
 
   @Get('me')
   async getMe(@Req() request: RequestWithFirebaseUser) {
@@ -99,14 +105,26 @@ export class UsersController {
     };
   }
 
+  @Delete('me')
+  async deleteAccount(
+    @Req() request: RequestWithFirebaseUser,
+    @Body() _body: DeleteAccountDto,
+  ) {
+    const user = await this.currentUser(request);
+    await this.firebaseAdminService.deleteUserIdentityAndMedia(
+      request.firebaseUser.uid,
+    );
+    await this.usersService.deleteAccountData(user.id);
+
+    return { deleted: true };
+  }
+
   private async currentUser(
     request: RequestWithFirebaseUser,
   ): Promise<PublicUser> {
-    const phone = request.firebaseUser.phone_number;
-
-    if (!phone) {
+    if (!request.firebaseUser.phone_number && !request.firebaseUser.email) {
       throw new UnauthorizedException(
-        'The Firebase token is not associated with a phone number.',
+        'The Firebase token does not contain a supported identity.',
       );
     }
 

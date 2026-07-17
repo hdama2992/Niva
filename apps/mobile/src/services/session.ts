@@ -53,7 +53,7 @@ export type Session = {
 async function request<T>(
   path: string,
   idToken: string,
-  options: { body?: unknown; method?: 'GET' | 'POST' | 'PUT' } = {},
+  options: { body?: unknown; method?: 'DELETE' | 'GET' | 'POST' | 'PUT' } = {},
 ): Promise<T> {
   const response = await fetch(`${apiUrl}${path}`, {
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -118,6 +118,13 @@ export async function createBetaSession(phone: string): Promise<Session> {
 
 export function getMe(idToken: string) {
   return request<{ user: ApiUser }>('/users/me', idToken);
+}
+
+export function deleteAccount(idToken: string) {
+  return request<{ deleted: true }>('/users/me', idToken, {
+    body: { confirmation: 'DELETE' },
+    method: 'DELETE',
+  });
 }
 
 export function setUsername(idToken: string, username: string) {

@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Niva Production Launch Guide</title>
+    <style>
+      :root {
+        --ink: #20252b;
+        --muted: #5d6872;
+        --page: #f6f8f7;
+        --surface: #ffffff;
+        --line: #dce4df;
+        --green: #166a57;
+        --green-soft: #e5f4ed;
+        --blue: #215f91;
+        --blue-soft: #e9f2f9;
+        --amber: #8b5b08;
+        --amber-soft: #fff5dc;
+        --red: #9a3941;
+        --red-soft: #fbecee;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        background: var(--page);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+        margin: 0;
+      }
+
+      main { max-width: 1160px; margin: 0 auto; padding: 28px 18px 64px; }
+
+      header { border-bottom: 1px solid var(--line); padding: 8px 0 28px; }
+
+      h1, h2, h3 { line-height: 1.2; margin: 0; }
+      h1 { font-size: clamp(2rem, 4vw, 3.1rem); max-width: 800px; }
+      h2 { font-size: 1.48rem; margin-bottom: 14px; }
+      h3 { font-size: 1.03rem; margin-bottom: 6px; }
+      p { margin: 0 0 12px; }
+      a { color: var(--blue); font-weight: 700; }
+      code { background: #f2f4f3; border: 1px solid var(--line); border-radius: 4px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.9em; padding: 1px 4px; }
+
+      .eyebrow { color: var(--green); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; margin-bottom: 10px; text-transform: uppercase; }
+      .lede { color: var(--muted); font-size: 1.1rem; margin-top: 14px; max-width: 820px; }
+      .meta { color: var(--muted); font-size: 0.9rem; margin-top: 16px; }
+
+      nav {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+        padding: 12px;
+      }
+      nav a { border-radius: 4px; padding: 4px 7px; text-decoration: none; }
+      nav a:hover { background: var(--blue-soft); }
+
+      section { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin-top: 18px; padding: 22px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); }
+      .card { border: 1px solid var(--line); border-radius: 7px; padding: 16px; }
+      .card p { color: var(--muted); font-size: 0.94rem; margin: 0; }
+      .card h3 { margin-bottom: 7px; }
+
+      .callout { background: var(--amber-soft); border-left: 4px solid var(--amber); border-radius: 4px; margin: 14px 0; padding: 13px 15px; }
+      .callout.ok { background: var(--green-soft); border-left-color: var(--green); }
+      .callout.info { background: var(--blue-soft); border-left-color: var(--blue); }
+      .callout.danger { background: var(--red-soft); border-left-color: var(--red); }
+      .callout p:last-child { margin-bottom: 0; }
+
+      .badge { border-radius: 999px; display: inline-block; font-size: 0.73rem; font-weight: 800; letter-spacing: 0.03em; padding: 3px 8px; white-space: nowrap; }
+      .done { background: var(--green-soft); color: #155b4b; }
+      .code { background: var(--blue-soft); color: #235b85; }
+      .setup { background: var(--amber-soft); color: #7b5005; }
+      .blocked { background: var(--red-soft); color: #8a303a; }
+      .later { background: #eef0f2; color: #5d6872; }
+
+      table { border-collapse: collapse; font-size: 0.93rem; width: 100%; }
+      th, td { border: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; }
+      th { background: #f4f7f5; font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; }
+      .table-wrap { overflow-x: auto; }
+      ul, ol { margin: 8px 0 0; padding-left: 21px; }
+      li { margin: 6px 0; }
+
+      .steps { counter-reset: step; list-style: none; margin: 0; padding: 0; }
+      .steps li { display: grid; gap: 12px; grid-template-columns: 32px 1fr; margin: 15px 0; }
+      .steps li::before { align-items: center; background: var(--green-soft); border-radius: 50%; color: var(--green); content: counter(step); counter-increment: step; display: flex; font-weight: 800; height: 30px; justify-content: center; width: 30px; }
+      .steps strong { display: block; margin-bottom: 3px; }
+      .steps span { color: var(--muted); display: block; }
+
+      .feature-flow {
+        align-items: stretch;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0;
+      }
+      .flow-box {
+        background: var(--green-soft);
+        border: 1px solid #bfe1d3;
+        border-radius: 6px;
+        color: #155b4b;
+        flex: 1 1 135px;
+        font-size: 0.88rem;
+        font-weight: 800;
+        padding: 10px;
+        text-align: center;
+      }
+      .flow-arrow { align-self: center; color: var(--muted); font-weight: 800; }
+      .feature-card { border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 6px; padding: 16px; }
+      .feature-card h3 { color: #194b70; }
+      .feature-card p { color: var(--muted); font-size: 0.94rem; }
+      .feature-card strong { color: var(--ink); }
+
+      .checklist { columns: 2; column-gap: 32px; }
+      .checklist li { break-inside: avoid; }
+
+      .source-list { font-size: 0.92rem; }
+      .small { color: var(--muted); font-size: 0.9rem; }
+      footer { color: var(--muted); font-size: 0.88rem; padding: 26px 4px 0; }
+
+      @media (max-width: 700px) {
+        main { padding: 20px 12px 44px; }
+        section { padding: 17px; }
+        .checklist { columns: 1; }
+        table { font-size: 0.88rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Niva closed beta to Play Store</p>
+        <h1>Production Integration, Testing, And Android Release Guide</h1>
+        <p class="lede">
+          Niva already has the closed-beta product code: onboarding, trusted joins, selfie review, events, circles, approved-member chat, host tools, feedback, continuity, realtime updates, and admin operations. This guide covers the remaining work that turns that code into a secure, testable Android app that can be released through Google Play.
+        </p>
+        <p class="meta">Repository baseline: <code>main</code> at <code>4a74ab6</code>, with the release-completion work documented here applied locally. Reviewed July 17, 2026. This is an implementation and release checklist, not legal advice.</p>
+        <nav aria-label="Guide sections">
+          <a href="#snapshot">Snapshot</a>
+          <a href="#core">Core features</a>
+          <a href="#remaining">Remaining work</a>
+          <a href="#integrations">Integrations</a>
+          <a href="#environments">Environments</a>
+          <a href="#testing">Testing</a>
+          <a href="#play">Play Store</a>
+          <a href="#sequence">Recommended sequence</a>
+          <a href="#sources">Sources</a>
+        </nav>
+      </header>
+
+      <section id="snapshot">
+        <h2>1. Honest Current Snapshot</h2>
+        <div class="callout ok">
+          <p><strong>The core product is not a front-end mock.</strong> User, profile, trust, verification-review, event, circle, membership, chat, feedback, notification, and audit records are persisted through the NestJS API in PostgreSQL. The mobile app and dashboard call that API.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <h3>Member experience</h3>
+            <p>Profile, explicit women-centered self-declaration, browse, recommendations, verified join restrictions, join-time selfie submission, host approval, cohort chat, icebreakers, feedback, settings, blocks, and continuity preferences are implemented.</p>
+          </article>
+          <article class="card">
+            <h3>Host and admin experience</h3>
+            <p>Host approval, create/edit/cancel activities, foreground-assisted venue coordinates, attendance, member decisions, feedback insights, named-admin verification review, deletion-request operations, audited corrections/cancellations, and aggregate analytics are implemented.</p>
+          </article>
+          <article class="card">
+            <h3>Security foundations</h3>
+            <p>Firebase ID tokens are verified by the backend. Storage paths are owner-scoped. Verification selfies are private to clients and viewed by administrators through short-lived signed URLs.</p>
+          </article>
+          <article class="card">
+            <h3>Realtime behavior</h3>
+            <p>Approved event/circle members receive scoped Socket.IO chat, membership/activity updates, and in-app notification events. There are no random direct messages.</p>
+          </article>
+        </div>
+        <div class="callout danger">
+          <p><strong>Do not treat the current Expo browser preview as a production test.</strong> It is useful for UI and local API work, but native phone authentication, notification permission/token registration, foreground location, image upload, and Android PNV still need configured providers and a physical Android development or release build.</p>
+        </div>
+      </section>
+
+      <section id="core">
+        <h2>2. Core Features In The App: What They Do And How To Test Them</h2>
+        <p>This is the product path as it exists today. The application is intentionally a safe community workflow, not an open social network.</p>
+
+        <h3>Visual Member Journey</h3>
+        <div class="feature-flow" aria-label="Niva member journey">
+          <div class="flow-box">Phone sign-in</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Profile and declaration</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Browse nearby activities</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Join request</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Selfie review when needed</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Host approval</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Private cohort chat</div><div class="flow-arrow">&rarr;</div>
+          <div class="flow-box">Attend and give feedback</div>
+        </div>
+        <div class="callout info">
+          <p><strong>Access boundaries are deliberate:</strong> browsing is open after sign-in; joining requires profile completion, verification and guidelines acceptance; chat and approved-member icebreakers require membership approval. No feature grants a random direct-message path.</p>
+        </div>
+
+        <div class="grid">
+          <article class="feature-card">
+            <h3>Phone sign-in and restored session</h3>
+            <p><strong>Member experience:</strong> enter phone number, confirm Firebase SMS OTP, then return to the app already signed in on the next launch.</p>
+            <p><strong>How it works:</strong> Firebase Auth proves the phone number and gives the app an ID token and refresh token. SecureStore holds the refresh token. NestJS verifies every Firebase ID token and upserts the PostgreSQL user.</p>
+            <p><strong>Test:</strong> sign in with a test and real number, force-close the app, reopen it, and confirm the session restores. Try an invalid/expired code and confirm no API session is created.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Profile and women-centered self-declaration</h3>
+            <p><strong>Member experience:</strong> choose username, name, city, age range, languages, interests, optional occupation/bio, profile photo, and explicitly confirm eligibility for the women-centered community.</p>
+            <p><strong>How it works:</strong> the mobile form writes to the Users API; server validation requires a valid username, display name, city, and at least three interests. The declaration is a persisted consent record, not automated gender detection.</p>
+            <p><strong>Test:</strong> try duplicate/invalid usernames and incomplete profiles. Complete a valid profile, restart the app, and confirm all data persists.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Join-time selfie verification and trust</h3>
+            <p><strong>Member experience:</strong> browsing works first. On the first join attempt, an unverified member is asked to upload/take a selfie and sees a pending state until an admin decides.</p>
+            <p><strong>How it works:</strong> the image uploads to a private Firebase Storage path owned by the Firebase UID. The API records a pending verification review. An admin approves, holds, or rejects it; the API updates trust events, score, tier, and join permission.</p>
+            <p><strong>Test:</strong> join as an unverified member, submit an image, try the Storage URL from another account, then approve/reject in admin. Confirm only approval unlocks joining and the signed viewer URL expires.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Home, explore, search, and recommendations</h3>
+            <p><strong>Member experience:</strong> a purposeful dashboard shows nearby activities, her circles, recommended events, workshops, notifications, and plans instead of an infinite social feed.</p>
+            <p><strong>How it works:</strong> the API queries persisted events/circles and calculates recommendations using city, interests, memberships, blocks, continuity choices, and settings. Searches and filters call the backend rather than filtering only a static device list.</p>
+            <p><strong>Test:</strong> use two profiles with different cities/interests, change an interest and a block, refresh Explore, and confirm recommendations and exclusions update from the server.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Events, circles, capacity, and join workflow</h3>
+            <p><strong>Member experience:</strong> see details, date/time, capacity, host, mutual-interest icebreakers after approval, and a clear join/leave state. My Plans groups upcoming, past, and cancelled items.</p>
+            <p><strong>How it works:</strong> NestJS persists events/circles and memberships. It checks verification, guidelines acceptance, capacity, blocks, and lifecycle state before accepting a join request. A host then approves or declines the member.</p>
+            <p><strong>Test:</strong> fill an activity, attempt another join from a second device, join/leave repeatedly, cancel an activity, and verify the server prevents invalid states even if a mobile request is replayed.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Community guidelines gate</h3>
+            <p><strong>Member experience:</strong> before the first authorized join, the member accepts the Niva community guidelines once.</p>
+            <p><strong>How it works:</strong> the API persists the accepted guideline version and timestamp. The join endpoint rejects an otherwise eligible user who has not accepted it.</p>
+            <p><strong>Test:</strong> call a join as a verified account without acceptance and confirm it fails. Accept guidelines, retry, and inspect the stored acceptance record.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Approved cohort chat and realtime updates</h3>
+            <p><strong>Member experience:</strong> after host approval, members can chat inside that event/circle. They see new messages, member decisions, edits/cancellations, and in-app notification updates without manually refreshing.</p>
+            <p><strong>How it works:</strong> chat history is stored in PostgreSQL. Socket.IO verifies a Firebase token and authorizes a member into only her activity room. The backend persists first, then broadcasts the update.</p>
+            <p><strong>Test:</strong> use two approved devices and one unapproved device. Send messages and make a host decision. Confirm only approved members receive the room event and history survives an app restart.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Icebreakers and continuity</h3>
+            <p><strong>Member experience:</strong> approved members see the interests they have in common with other approved members plus two conversation prompts. After attendance, they can opt into similar-event or circle suggestions.</p>
+            <p><strong>How it works:</strong> the API calculates mutual interests, never exposes the other member's complete interest list, and respects the privacy toggle. Continuity choices feed persisted recommendations, not direct messages or a public follow graph.</p>
+            <p><strong>Test:</strong> make two approved members share several interests, switch one member's icebreaker privacy off, refresh on the other account, and confirm that member disappears from icebreaker results.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Host creation, attendance, and feedback</h3>
+            <p><strong>Member experience:</strong> approved hosts can create/edit/cancel events and circles, decide member requests, record attendance/no-shows, and read aggregate feedback insights. Members can submit one post-event rating/note.</p>
+            <p><strong>How it works:</strong> host permissions are checked on the API. Cancellation needs a reason and creates member notifications. Feedback is available after attendance and creates a one-time trust event; later edits do not award extra points.</p>
+            <p><strong>Test:</strong> try creating as a normal member, then as an approved host. Record attendance, submit feedback twice, inspect trust events, and cancel an activity to verify notifications and audit records.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Notifications, settings, blocks, and privacy</h3>
+            <p><strong>Member experience:</strong> see a persisted notification inbox, control notification/recommendation/icebreaker settings, block hosts or members, and unblock them later.</p>
+            <p><strong>How it works:</strong> notifications, settings, and blocks are PostgreSQL records. Blocks remove relevant discovery/recommendation interactions and prevent disallowed direct interactions. Native push delivery still needs the device-token integration described later in this guide.</p>
+            <p><strong>Test:</strong> block a host then re-run discovery, change settings and restart, trigger an event notification, mark it read, and confirm the state is consistent across two sessions.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Admin dashboard and audit history</h3>
+            <p><strong>Operator experience:</strong> review selfie/host queues, look up members, search activities by city, correct locations, cancel activities, dispatch notifications, and inspect audit records.</p>
+            <p><strong>How it works:</strong> the backend checks the temporary admin key today or a named Firebase admin role where configured. Every sensitive action is server-authorized and audited. Selfie viewer URLs are backend-generated and short-lived.</p>
+            <p><strong>Test:</strong> use an unauthorized browser request, a low-privilege admin, and a correctly scoped admin. Confirm access fails/works exactly as intended and all changes have actor/time/action audit entries.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Report model: deliberately held</h3>
+            <p><strong>Member experience:</strong> there is currently no live report entry point in the member product.</p>
+            <p><strong>How it works:</strong> reasons and API persistence exist for spam, fake profile, harassment, inappropriate behaviour, and other. The member entry points and admin moderation queue stay disabled until an operator workflow is staffed.</p>
+            <p><strong>Test before enabling:</strong> submit each reason, verify reporter anonymity/authorization, assign and resolve in an admin queue, test suspension/appeal escalation, and measure response time.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="remaining">
+        <h2>3. What Is Still Remaining</h2>
+        <p>There are four different types of remaining work. Keeping them separate prevents an integration or operational requirement from being mistaken for missing core app code.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Area</th><th>Current state</th><th>What remains</th><th>Release impact</th></tr></thead>
+            <tbody>
+              <tr><td>Firebase production auth</td><td><span class="badge done">Code ready</span></td><td>Configure the real Firebase apps, enable Phone Auth, upload Android signing fingerprints, add public client config, configure backend service-account secrets, and disable beta auth.</td><td>Required before real-user testing.</td></tr>
+              <tr><td>Private image storage</td><td><span class="badge done">Rules written</span></td><td>Create/configure the Firebase Storage bucket, deploy <code>firebase/storage.rules</code>, then test profile and selfie upload with real authenticated users.</td><td>Required before real-user verification.</td></tr>
+              <tr><td>Push notifications</td><td><span class="badge done">Code implemented</span></td><td>The app requests permission, obtains/registers Expo tokens, creates an Android channel, and the backend dispatches validated tickets and deactivates unregistered devices. Configure EAS/FCM credentials and test on physical devices.</td><td>External setup and device proof remain.</td></tr>
+              <tr><td>Named admin login</td><td><span class="badge done">Code implemented</span></td><td>The dashboard signs in with Firebase email/password and sends bearer tokens. Create named <code>AdminAccess</code> records and retain the shared key only for controlled bootstrap/recovery.</td><td>Account provisioning and role tests remain.</td></tr>
+              <tr><td>Maps and venue selection</td><td><span class="badge code">MVP code implemented</span></td><td>Hosts can enter a public venue or explicitly use foreground location; validated coordinates persist and open in map directions. Provider-backed autocomplete/pin search remains optional for a broader city launch.</td><td>Physical permission/geocoding tests remain.</td></tr>
+              <tr><td>Report flow</td><td><span class="badge blocked">Held by product decision</span></td><td>The report data model/API and a screen exist, but the report entry points and admin moderation queue are intentionally not live. Define an on-call moderation process, then wire and test both sides.</td><td>Required before any broad public launch. It can remain held only for a tightly controlled, manually moderated closed beta.</td></tr>
+              <tr><td>Account deletion</td><td><span class="badge done">Code implemented</span></td><td>Signed-in members can delete Firebase identity, stored images, and cascaded product data. The website records fallback deletion requests and the admin dashboard exposes a processing queue. Finalize retention exceptions and test production deletion.</td><td>External policy and end-to-end proof remain.</td></tr>
+              <tr><td>Privacy and safety operations</td><td><span class="badge code">Public drafts implemented</span></td><td>The website has privacy, terms, and deletion pages. Obtain legal review, finalize selfie retention/consent language, publish the support contact, and staff the moderation/incident process.</td><td>Operational ownership remains required.</td></tr>
+              <tr><td>Production operations</td><td><span class="badge setup">Not deployed</span></td><td>Deploy API, PostgreSQL, dashboard, and public policies on HTTPS domains. Add database backups, monitoring, error reporting, log retention, access reviews, and a tested rollback process.</td><td>Required before a stable beta.</td></tr>
+              <tr><td>Device QA</td><td><span class="badge setup">Not complete</span></td><td>Test real Android phones, network changes, camera permissions, denied permissions, SMS failures, and app restart/session restoration across a defined device matrix.</td><td>Required before closed test.</td></tr>
+              <tr><td>Social sign-in, payments, DMs</td><td><span class="badge later">Deliberately excluded</span></td><td>Google/Facebook sign-in, payments/ticketing, direct messages, public feed, and a full social graph are not needed for this launch.</td><td>Do not add before the first closed beta.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="integrations">
+        <h2>4. Production Integrations, Exactly What Each One Does</h2>
+
+        <h3>3.1 Firebase Authentication</h3>
+        <div class="grid">
+          <article class="card">
+            <h3>Why it exists</h3>
+            <p>Firebase proves control of a phone number. It returns an ID token. Niva's backend verifies that token using Firebase Admin before it reads or changes private Niva data.</p>
+          </article>
+          <article class="card">
+            <h3>What to configure</h3>
+            <p>Create Android and web Firebase app records; enable Phone sign-in; add the Android SHA-1/SHA-256 signing fingerprints; put Firebase client values in the mobile build environment; put the service-account values only in the API secret store.</p>
+          </article>
+          <article class="card">
+            <h3>What changes at release</h3>
+            <p>Set <code>EXPO_PUBLIC_AUTH_MODE=firebase</code> and <code>NIVA_BETA_AUTH_ENABLED=false</code>. The local beta path then cannot create sessions in production.</p>
+          </article>
+        </div>
+        <ol class="steps">
+          <li><div><strong>Member submits a phone number.</strong><span>Firebase performs its abuse protection and sends an SMS code. On supported Android devices, the optional PNV path can show a consent prompt first; SMS remains the universal fallback.</span></div></li>
+          <li><div><strong>Firebase verifies the code or native PNV result.</strong><span>The mobile app receives a Firebase ID token and refresh token. The refresh token is stored in the device's protected SecureStore, not in Niva's database.</span></div></li>
+          <li><div><strong>Niva exchanges the ID token for an API session.</strong><span><code>POST /auth/session</code> verifies the Firebase signature server-side and creates/updates the PostgreSQL user/trust records. Every protected mobile API request includes a Firebase ID token.</span></div></li>
+        </ol>
+        <p class="small">Relevant code: <code>apps/mobile/src/services/mobile-auth.ts</code>, <code>apps/mobile/src/services/firebase.ts</code>, <code>apps/backend/src/auth</code>, and <code>apps/backend/src/firebase</code>.</p>
+        <div class="callout">
+          <p><strong>Important distinction:</strong> standard Firebase SMS OTP is the required baseline. Android Firebase PNV, the native consent prompt that can avoid typing an OTP, is optional, Android-only, carrier-dependent, and should not be enabled until its Firebase billing, OAuth-brand verification, native build, and carrier tests are complete.</p>
+        </div>
+
+        <h3>3.2 Firebase Storage For Profile Photos And Verification Selfies</h3>
+        <p>Firebase Storage holds binary image files; PostgreSQL holds only Niva records and internal Storage paths. The client uploads to an owner-scoped path, then sends the internal path to the API. It does not send a public selfie URL.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Path</th><th>Client behavior</th><th>Rule behavior</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td><code>profile-photos/{firebaseUid}/{file}</code></td><td>Authenticated user uploads/deletes only in her own UID folder.</td><td>Signed-in members can read profile photos; writes/deletes require path ownership; image and size limits apply.</td><td>Profile photos are visible to community members, but another member cannot overwrite them.</td></tr>
+              <tr><td><code>verification-selfies/{firebaseUid}/{file}</code></td><td>Authenticated user uploads only in her own UID folder.</td><td>Client reads, updates, and deletes are denied for everyone.</td><td>Members cannot browse verification images, including their own historical object after submission.</td></tr>
+              <tr><td>Admin review</td><td>Admin dashboard asks the API to view a specific selfie.</td><td>The backend Firebase Admin credential creates a signed URL valid for five minutes after authorization.</td><td>The image never becomes a public Storage object and the viewer URL has a short window.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Before using this with people, deploy the existing rules file, test every allow/deny path, and document how long verification selfies are retained after approval, rejection, or deletion.</p>
+
+        <h3>3.3 PostgreSQL And Backend Hosting</h3>
+        <p>Niva's API is the policy enforcement point. Firebase authenticates the member; NestJS decides whether she can join an event, access a chat, submit feedback, view icebreakers, or perform host/admin actions. PostgreSQL is the system of record for product data.</p>
+        <ul>
+          <li>Provision managed PostgreSQL with encryption, automated backups, point-in-time recovery, separate production credentials, and a tested restore procedure.</li>
+          <li>Deploy the API on an HTTPS domain with a WebSocket-capable reverse proxy/load balancer. Socket.IO traffic must be supported, not only ordinary HTTP requests.</li>
+          <li>Run <code>prisma migrate deploy</code> against production as a controlled release step. Never use <code>prisma migrate reset</code> in production.</li>
+          <li>Set production CORS origins for the admin domain and any hosted web preview. Do not leave localhost origins enabled unnecessarily.</li>
+          <li>Store <code>DATABASE_URL</code>, Firebase Admin credentials, and the temporary admin bootstrap key in the host's secret manager, never in Git or <code>EXPO_PUBLIC_*</code> variables.</li>
+          <li>Add uptime checks, structured error reporting, database backup alerts, and access-log retention before inviting external users.</li>
+        </ul>
+
+        <h3>3.4 Expo Builds And Android Push Notifications</h3>
+        <p>The repository now includes the complete notification code path: in-app records, realtime events, native permission and Expo-token registration, device-token records, delivery rows, an optional dispatch worker, Expo ticket validation, and stale-device deactivation.</p>
+        <div class="callout info">
+          <p><strong>Remaining integration item:</strong> create the EAS project ID, configure FCM V1 credentials, produce a development/release build, and validate permission denial, foreground/background delivery, and provider tickets on physical Android devices. Notification-tap deep links should be added when final navigation URLs are fixed.</p>
+        </div>
+        <ol>
+          <li>Set up an Expo account and run EAS configuration. Build profiles already exist in <code>apps/mobile/eas.json</code>.</li>
+          <li>Download <code>google-services.json</code> for <code>com.niva.niva</code>, add an <code>expo.android.googleServicesFile</code> reference, and use the same Firebase project as Auth/Storage.</li>
+          <li>Give EAS an FCM V1 service-account credential for push delivery. Keep the credential outside Git.</li>
+          <li>Create an internal Android build, accept notification permission, register the token, trigger a notification, and confirm the provider receipt and the delivered notification.</li>
+        </ol>
+
+        <h3>3.5 Maps And Venue Search</h3>
+        <p>Events persist a human-readable venue plus optional latitude/longitude. Hosts can explicitly request foreground location, the device reverse-geocodes the point, and activity details open exact directions. No continuous/background member location is collected.</p>
+        <ul>
+          <li>Choose one provider and an expected monthly spend limit.</li>
+          <li>Create separate restricted keys for Android production, Android debug, backend services, and admin web if needed.</li>
+          <li>The MVP selector and migration-safe backend fields are implemented. Add provider-backed autocomplete/pin search only if host testing shows it is necessary.</li>
+          <li>Do not collect continuous member location for MVP. A user-selected event location is enough.</li>
+        </ul>
+
+        <h3>3.6 Admin Identity, Support, Monitoring, And Safety Operations</h3>
+        <div class="grid">
+          <article class="card"><h3>Named admins</h3><p>The dashboard and API use Firebase-token administrators with persisted role checks and audit actors. Provision individual accounts and restrict <code>NIVA_ADMIN_KEY</code> to bootstrap/recovery because a shared key cannot identify a specific operator.</p></article>
+          <article class="card"><h3>Monitoring</h3><p>Integrate a crash/error service for the mobile app, API, and dashboard, plus uptime checks and alert routing. Keep personal data and selfie content out of error events and logs.</p></article>
+          <article class="card"><h3>Support</h3><p>Publish a support email and a simple support/deletion web page. Establish response expectations for verification status, event cancellation, safety incidents, and deletion requests.</p></article>
+          <article class="card"><h3>Moderation</h3><p>Before enabling reports, assign people who can triage reports, define severity/response times, document evidence handling, define temporary suspension rules, and test the moderator queue.</p></article>
+        </div>
+      </section>
+
+      <section id="environments">
+        <h2>5. Environments And Secret Handling</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Environment</th><th>Purpose</th><th>Authentication</th><th>Data rule</th></tr></thead>
+            <tbody>
+              <tr><td>Local development</td><td>Fast UI/API work on a developer machine.</td><td><code>EXPO_PUBLIC_AUTH_MODE=beta</code> and <code>NIVA_BETA_AUTH_ENABLED=true</code> are allowed only here.</td><td>Use seeded/local data only. Never place real selfies or production secrets here.</td></tr>
+              <tr><td>Staging / internal test</td><td>Real integration tests before inviting users.</td><td>Real Firebase Phone Auth on a separate Firebase project or carefully isolated staging configuration.</td><td>Use consenting testers. Separate database/bucket where feasible.</td></tr>
+              <tr><td>Production closed beta</td><td>Real beta members, real verification decisions, real events.</td><td><code>EXPO_PUBLIC_AUTH_MODE=firebase</code>; <code>NIVA_BETA_AUTH_ENABLED=false</code>; named admin access.</td><td>Backups, retention policy, access control, monitoring, and review workflows are mandatory.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout danger">
+          <p><strong>Secret rule:</strong> Firebase web/app configuration values may be exposed in an Expo client build because they identify the Firebase project, but they are not sufficient authorization. The Firebase Admin service-account private key, database URL, Expo push access token, map server key, and admin bootstrap key are secrets. They belong only in backend/CI/EAS secret stores. Do not add service-account JSON to <code>apps/mobile/.env</code>, source code, documentation, or Git.</p>
+        </div>
+        <p>Because a Firebase Admin private key was shared in an earlier conversation, confirm that it has been revoked/rotated in Google Cloud IAM, remove any old local copies, and audit Git history and deployment secret stores before launch.</p>
+      </section>
+
+      <section id="testing">
+        <h2>6. Test Properly Before Inviting Anyone</h2>
+        <p>Local browser testing proves layout and basic API behavior. It does not prove the mobile services that users depend on. Use an internal Android build first, then a Play closed test.</p>
+
+        <h3>5.1 Automated Release Gate</h3>
+        <ul class="checklist">
+          <li>Backend build passes.</li>
+          <li>Backend Jest suite passes.</li>
+          <li>Mobile TypeScript check passes.</li>
+          <li>Admin production build passes.</li>
+          <li>Prisma migration deploy is tested on a staging database.</li>
+          <li>Database backup and restore has been rehearsed.</li>
+          <li>Dependency/security update review is completed.</li>
+          <li>Secrets scan finds no credentials in Git or mobile build variables.</li>
+        </ul>
+
+        <h3>5.2 Physical Android Test Matrix</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Journey</th><th>What to verify</th><th>Expected result</th></tr></thead>
+            <tbody>
+              <tr><td>Install and first launch</td><td>New build from internal distribution, permissions denied/granted, low network, app background/foreground.</td><td>Clear recovery states, no crash, no user trapped on a loader.</td></tr>
+              <tr><td>Phone authentication</td><td>Firebase test number and at least two real carrier numbers; invalid/expired OTP; resend; airplane mode; app restart after successful sign-in.</td><td>Only Firebase-verified users receive a backend session; session restores from SecureStore; errors are understandable.</td></tr>
+              <tr><td>Onboarding</td><td>Username conflict, incomplete profile, explicit eligibility checkbox, interests/languages, profile photo selection.</td><td>Server validation is enforced and data reappears after restart.</td></tr>
+              <tr><td>Selfie verification</td><td>Camera/library selection, upload size/type failure, user cancels, Storage-denied request, pending state, admin hold/reject/approve.</td><td>Selfie is not publicly readable; member sees correct status; approval unlocks the join path.</td></tr>
+              <tr><td>Community access</td><td>Browse before verification, first guidelines acceptance, join a full activity, join/leave, host approves/declines, block host.</td><td>Backend permissions win over UI; unauthorized members cannot reach chat or approved-member details.</td></tr>
+              <tr><td>Realtime</td><td>Two approved devices in the same event/circle; message, join outcome, edit/cancellation, notification; reconnect after network loss.</td><td>Only authorized cohort receives the update; durable history remains correct after reload.</td></tr>
+              <tr><td>Notifications</td><td>Permission granted/denied, token registration, worker/manual dispatch, foreground/background/terminated app, notification tap.</td><td>Only opted-in users receive pushes and the tap routes to the intended screen.</td></tr>
+              <tr><td>Host/admin operations</td><td>Create/edit/cancel, attendance, feedback, private selfie view, admin role denial, audit history.</td><td>Every privileged action is authorized, creates the intended member notification, and has a traceable audit record.</td></tr>
+              <tr><td>Privacy/deletion</td><td>Export/delete request, user logout, revoked admin, expired signed selfie URL, Storage path access by a different user.</td><td>Requests are discoverable; denied accesses stay denied; no sensitive image appears in logs or UI.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>5.3 Closed-Beta Operational Test</h3>
+        <ol>
+          <li>Seed only enough real Bangalore activities for the first group. Avoid an empty app.</li>
+          <li>Invite 10 to 20 trusted testers internally before a broader closed test. Observe authentication delivery, upload failures, join conversion, event attendance, chat behavior, and moderation load.</li>
+          <li>Run at least one complete safety drill: selfie submitted, admin reviews it, user joins, host approves, event is cancelled, notification delivers, member requests help/deletion.</li>
+          <li>Review error/crash reports daily and identify whether failures are from mobile, Firebase, network, API, or operator process.</li>
+          <li>Only expand the cohort after the workflow, support responses, and data deletion handling are stable.</li>
+        </ol>
+      </section>
+
+      <section id="play">
+        <h2>7. Google Play Store Release Requirements</h2>
+        <p>Use Google Play testing tracks as part of the release process. A new app is uploaded as an Android App Bundle (AAB), not just an APK. EAS Build can produce the release artifact and manage signing credentials if chosen.</p>
+
+        <h3>6.1 Prepare The Android Build</h3>
+        <ol>
+          <li>Keep the already configured package name <code>com.niva.niva</code> unless a permanent rename is decided now. Package names are costly to change after publication.</li>
+          <li>Set a production <code>version</code> and incrementing Android <code>versionCode</code>. Configure EAS build profiles for internal, preview/closed-test, and production release builds.</li>
+          <li>Use a current Expo/React Native Android toolchain and verify the target SDK requirement shown in Play Console at submission time. Google Play blocks submissions that do not meet its current target API policy.</li>
+          <li>Configure release signing through EAS or a controlled upload-key process. Store upload-key recovery/access details securely and restrict account access.</li>
+          <li>Build the AAB, install it through the internal test track, and repeat the physical-device checks above before moving it to closed testing.</li>
+        </ol>
+
+        <h3>6.2 Complete Play Console App Content</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Play Console item</th><th>What Niva needs</th><th>Why it matters</th></tr></thead>
+            <tbody>
+              <tr><td>Store listing</td><td>App name, short/full descriptions, app icon, screenshots from the actual app, category, developer contact email, and support URL.</td><td>Users and reviewers need an accurate, non-misleading description of a women-centered, event/circle community.</td></tr>
+              <tr><td>Privacy policy</td><td>A publicly accessible, non-geofenced HTTPS web page, linked in the store and inside the app. It must name Niva/developer, cover phone/auth data, profile data, images/selfies, chats, notifications, storage/processors, retention, deletion, security, and contact.</td><td>Required by Google Play, especially because Niva handles personal and sensitive data.</td></tr>
+              <tr><td>Data safety</td><td>Accurately declare collected/processed data and all SDK/service behavior: phone number/authentication, profile details, photos, verification selfies, event/community content, device push token, and any analytics/error service added.</td><td>The declaration must match both code and the privacy policy.</td></tr>
+              <tr><td>Account deletion</td><td>An in-app, discoverable deletion request plus a public web deletion page URL. The flow must delete account data or clearly explain any narrow lawful retention exceptions.</td><td>Google Play requires this when users create accounts.</td></tr>
+              <tr><td>App access</td><td>Give Play reviewers working test credentials/instructions or a safe reviewer route that can reach the core experience without waiting for a real SMS/selfie decision.</td><td>Reviewers must be able to access and assess the app. Do not expose production admin secrets.</td></tr>
+              <tr><td>Target audience and content</td><td>Declare the actual adult audience, whether ads are present, and complete the content rating questionnaire honestly. Niva should not be positioned as a child-directed app.</td><td>Incorrect statements can cause rejection or policy action.</td></tr>
+              <tr><td>Permissions</td><td>Request camera/photo-library/notifications only at the moment of use, with clear purpose copy. Do not request unnecessary location, contacts, SMS, or call permissions.</td><td>Minimizes sensitive-data access and makes the disclosure defensible.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>6.3 Closed Test Before Production</h3>
+        <p>Use an internal track for the team, then a closed track for the actual beta cohort. For new personal developer accounts created after November 13, 2023, Google currently requires a closed test with at least 12 opted-in testers for 14 continuous days before production access can be requested. Check the account's Play Console dashboard because account type and policies can change.</p>
+        <div class="callout">
+          <p><strong>Recommended rollout:</strong> internal build for team and operators, closed test for 20 to 50 consenting Bangalore members, then production only after safety operations, deletion, report handling, and reliability metrics are proven. A closed test is the right first release for Niva; it is not a lesser version of the product.</p>
+        </div>
+      </section>
+
+      <section id="sequence">
+        <h2>8. Recommended Order, One Manageable Stage At A Time</h2>
+        <ol class="steps">
+          <li><div><strong>Secure the project and choose production ownership.</strong><span>Rotate/audit credentials, create an Expo account and Play Console organization/account, establish a support email, and decide who owns Firebase, the database, and Play Console. Do this before copying production values anywhere.</span></div></li>
+          <li><div><strong>Make Firebase real.</strong><span>Configure Firebase Auth, Android app records/signing fingerprints, Storage bucket and rules, backend Admin secrets, and production mobile variables. Disable local beta auth. Validate authentication and private image flow on one physical Android build.</span></div></li>
+          <li><div><strong>Deploy a staging environment.</strong><span>Deploy API, PostgreSQL, dashboard, and policy/support site to HTTPS. Apply migrations, enable backups/monitoring, configure WebSocket support and CORS, and give admins named accounts.</span></div></li>
+          <li><div><strong>Validate the completed release code.</strong><span>Apply the new migration, provision named admins, configure EAS/FCM, and test push registration, deletion, foreground location, policy pages, and admin queues against staging. Keep report UI held only while the beta is small enough for manual safety handling.</span></div></li>
+          <li><div><strong>Run internal device tests.</strong><span>Use a release-like Android build. Test real SMS, selfie upload/review, session restoration, chat, host flows, notifications, privacy denial paths, and admin permissions. Fix issues before inviting external people.</span></div></li>
+          <li><div><strong>Publish the legal and operating foundation.</strong><span>Publish privacy policy, terms, community guidelines, selfie consent/retention rules, support/deletion page, moderation playbook, escalation process, and data-safety inventory.</span></div></li>
+          <li><div><strong>Start a Play closed test.</strong><span>Upload an AAB to internal testing, then create the closed test. Invite the first cohort, monitor daily, run an incident drill, collect feedback, and meet any account-specific test duration requirement.</span></div></li>
+          <li><div><strong>Request production access only after proof.</strong><span>Complete the Play Console declarations, use accurate screenshots and reviewer instructions, confirm deletion/report operations, and roll out gradually. Keep the first public availability geographically and operationally constrained.</span></div></li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>9. Definition Of Done For The First Real Release</h2>
+        <ul class="checklist">
+          <li>Production Firebase Phone Auth works on physical Android devices.</li>
+          <li>Beta authentication mode is disabled outside local development.</li>
+          <li>Firebase Storage rules are deployed and independently tested.</li>
+          <li>Verification selfies are reviewed only through authorized, expiring links.</li>
+          <li>Production PostgreSQL has tested backups and migrations.</li>
+          <li>API, admin, and support/policy pages run on HTTPS domains.</li>
+          <li>Named admin login replaces the shared admin key.</li>
+          <li>Native push registration and Android FCM delivery work.</li>
+          <li>Account deletion is available in app and on the web.</li>
+          <li>Privacy policy, Data safety declaration, consent, and retention rules match reality.</li>
+          <li>Report and moderation workflow is enabled before broad public availability.</li>
+          <li>Internal and closed tests pass on real devices and real networks.</li>
+          <li>Play Store AAB, store listing, screenshots, reviewer instructions, ratings, and audience declarations are complete.</li>
+          <li>Operators can respond to verification, cancellation, support, safety, and deletion requests.</li>
+        </ul>
+      </section>
+
+      <section id="sources">
+        <h2>10. Official Release References</h2>
+        <p class="small">These sources support the external-platform requirements in this guide. Recheck them in Play Console and provider dashboards immediately before submitting because policies and SDK requirements change.</p>
+        <ul class="source-list">
+          <li><a href="https://firebase.google.com/docs/auth/android/phone-auth">Firebase: Phone number authentication on Android</a></li>
+          <li><a href="https://firebase.google.com/docs/reference/security/storage">Firebase: Cloud Storage Security Rules reference</a></li>
+          <li><a href="https://docs.expo.dev/build/">Expo: EAS Build</a></li>
+          <li><a href="https://docs.expo.dev/guides/using-push-notifications-services/">Expo: Push notification services</a></li>
+          <li><a href="https://docs.expo.dev/push-notifications/fcm-credentials/">Expo: FCM V1 credentials for Android notifications</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/14151465">Google Play: Testing requirements for new personal developer accounts</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/9845334">Google Play: Internal, closed, and open testing tracks</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/10144311">Google Play: User Data policy, privacy policy, Data safety, and account deletion</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/9859655">Google Play: Content rating and app content</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/16561298">Google Play: Target API level policy</a></li>
+          <li><a href="https://support.google.com/googleplay/android-developer/answer/9844679?hl=en-GB">Google Play: Android App Bundle requirement for new apps</a></li>
+        </ul>
+      </section>
+
+      <footer>
+        Repository references: <code>docs/mvp-feature-status.md</code>, <code>docs/closed-beta-implementation.md</code>, <code>docs/step-1-authentication.md</code>, <code>firebase/storage.rules</code>, <code>apps/mobile/app.json</code>, <code>apps/mobile/.env.example</code>, and <code>apps/backend/.env.example</code>.
+      </footer>
+    </main>
+  </body>
+</html>

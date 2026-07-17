@@ -3,7 +3,6 @@ import {
   CircleMinus,
   CirclePlus,
   LockKeyhole,
-  MapPin,
 } from 'lucide-react-native';
 import { ReactNode, useMemo, useState } from 'react';
 import {
@@ -17,14 +16,21 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import {
+  ActivityLocation,
+  LocationSelector,
+} from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
 
 export type CreateEventInput = {
   capacity: number;
+  city: string;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
   interests: string[];
   locationName: string;
+  latitude?: number;
+  longitude?: number;
   startsAt: string;
   title: string;
 };
@@ -49,7 +55,10 @@ export function CreateEventScreen({
 }: CreateEventScreenProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [locationName, setLocationName] = useState('');
+  const [location, setLocation] = useState<ActivityLocation>({
+    city: user.city,
+    locationName: '',
+  });
   const [startsAt, setStartsAt] = useState(defaultStartTime);
   const [capacity, setCapacity] = useState(6);
   const [difficulty, setDifficulty] =
@@ -78,7 +87,7 @@ export function CreateEventScreen({
   };
 
   const submit = async () => {
-    if (!title.trim() || !description.trim() || !locationName.trim()) {
+    if (!title.trim() || !description.trim() || !location.locationName.trim()) {
       setError('Add a title, description, and specific meeting location.');
       return;
     }
@@ -98,10 +107,13 @@ export function CreateEventScreen({
     try {
       await onCreate({
         capacity,
+        city: location.city,
         description: description.trim(),
         difficulty,
         interests: selectedInterests,
-        locationName: locationName.trim(),
+        latitude: location.latitude,
+        locationName: location.locationName.trim(),
+        longitude: location.longitude,
         startsAt: startsAt.toISOString(),
         title: title.trim(),
       });
@@ -164,16 +176,7 @@ export function CreateEventScreen({
             />
           </Field>
           <Field label="Meeting location">
-            <View style={styles.locationInput}>
-              <MapPin color={colors.secondary} size={19} strokeWidth={2.3} />
-              <TextInput
-                onChangeText={setLocationName}
-                placeholder="Venue or public meeting point"
-                placeholderTextColor={colors.muted}
-                style={styles.locationTextInput}
-                value={locationName}
-              />
-            </View>
+            <LocationSelector onChange={setLocation} value={location} />
           </Field>
           <DateTimeSelector
             minimumDate={new Date()}

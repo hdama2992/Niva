@@ -181,10 +181,10 @@ All app notifications go through `NotificationService`:
 can call `POST /admin/notification-deliveries/dispatch`; it sends pending rows
 to Expo Push, persists `SENT` or `FAILED`, and audits the dispatch action.
 
-The queue and dispatch code are implemented. Actual phone delivery is still
-pending because the Expo app does not yet include `expo-notifications` or
-register native push tokens; FCM/APNs credentials and native builds are also
-required.
+The full repository path is implemented: the Expo app requests permission,
+registers its Expo token, and creates the Android channel; dispatch validates
+Expo tickets and deactivates devices reported as unregistered. Actual phone
+delivery still requires EAS/FCM/APNs credentials and physical native builds.
 
 Membership decisions, attendance changes, activity edits, and cancellations
 also produce scoped realtime events. The signed-in mobile client refreshes its
@@ -208,9 +208,10 @@ supports named administrators:
    and notification-dispatch actions all create `AdminAuditLog` rows with the
    actor identity.
 
-The dashboard still enters the shared key because it does not yet have a
-Firebase browser sign-in screen. Before public launch, switch the dashboard to
-Bearer tokens and remove the key fallback.
+The dashboard now signs in through Firebase email/password and sends Bearer
+tokens for every operator request. The shared key remains only as the
+bootstrap/recovery path for granting the first named administrator and should
+be removed after production provisioning is proven.
 
 The dashboard now also supports member lookup, activity/city filtering, and
 an audited event/circle location correction. A location correction creates
@@ -265,18 +266,17 @@ GET   /admin/analytics/summary
 
 ## Remaining Before Public Launch
 
-1. Add `expo-notifications`, native device-token registration, and FCM/APNs
-   setup; schedule delivery with a worker or Cloud Function rather than the
-   manual admin endpoint.
-2. Add Firebase sign-in to the admin dashboard, enforce permissions per
-   `AdminRole`, and retire the shared-key fallback.
-3. Add a validated map/location picker and replace the compact date/time stepper
-   with platform-native date/time controls once the native dependency can be
-   added to the Expo build. Decide whether feedback should ever affect trust;
-   it currently does not.
+1. Configure EAS/FCM/APNs and prove native notification delivery on physical
+   devices; the registration, queue worker, and ticket handling are implemented.
+2. Provision named administrators and retire the shared-key fallback after
+   recovery access is documented and tested.
+3. Validate the implemented foreground location selector, reverse geocoding,
+   persisted coordinates, and map directions on physical devices. Add provider
+   autocomplete/pin search only if host testing requires it.
 4. Decide whether to re-enable the held reporting flow with moderation
    operations in place.
 5. Test real Firebase Phone Auth, Storage rules, and selfie upload/review on
    physical iOS and Android builds.
-6. Add privacy, retention/deletion, legal consent, and operator escalation
-   procedures.
+6. Obtain legal review for the privacy/terms drafts and finalize retention,
+   consent, and operator escalation procedures. Deletion code and queues are
+   implemented but still require staging proof.

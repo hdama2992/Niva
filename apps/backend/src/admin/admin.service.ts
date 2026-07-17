@@ -264,6 +264,15 @@ export class AdminService {
                 },
               },
               {
+                email: {
+                  contains: normalizedQuery,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+              {
+                phone: { contains: normalizedQuery },
+              },
+              {
                 profile: {
                   is: {
                     city: {
@@ -290,6 +299,7 @@ export class AdminService {
       select: {
         createdAt: true,
         displayName: true,
+        email: true,
         id: true,
         profile: {
           select: {
@@ -303,6 +313,7 @@ export class AdminService {
           select: { score: true, tier: true, verificationStatus: true },
         },
         username: true,
+        phone: true,
       },
       take,
     });
@@ -345,6 +356,64 @@ export class AdminService {
         (attendanceCount) => attendanceCount > 1,
       ).length,
     };
+  }
+
+  async listAccountDeletionRequests(status = 'PENDING') {
+    return this.prisma.accountDeletionRequest.findMany({
+      where: status === 'ALL' ? undefined : { status },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+  }
+
+  async listBetaAccessRequests(status = 'PENDING') {
+    return this.prisma.betaAccessRequest.findMany({
+      where: status === 'ALL' ? undefined : { status },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+  }
+
+  async reviewBetaAccessRequest(
+    requestId: string,
+    status: 'DECLINED' | 'INVITED',
+  ) {
+    const updated = await this.prisma.betaAccessRequest.updateMany({
+      where: { id: requestId },
+      data: { status },
+    });
+    if (updated.count !== 1) {
+      throw new NotFoundException('Beta access request not found.');
+    }
+    return this.prisma.betaAccessRequest.findUnique({
+      where: { id: requestId },
+    });
+  }
+
+  async reviewAccountDeletionRequest(
+    actor: AdminActor,
+    requestId: string,
+    status: 'IN_REVIEW' | 'COMPLETED' | 'REJECTED',
+  ) {
+    const request = await this.prisma.accountDeletionRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request) {
+      throw new NotFoundException('Account deletion request not found.');
+    }
+
+    const updated = await this.prisma.accountDeletionRequest.update({
+      where: { id: requestId },
+      data: { status },
+    });
+    await this.audit(
+      actor,
+      AdminAuditAction.ACCOUNT_DELETION_REQUEST_UPDATED,
+      'accountDeletionRequest',
+      requestId,
+      { identifier: request.identifier, status },
+    );
+    return updated;
   }
 
   async cancelEvent(actor: AdminActor, eventId: string, reason: string) {
@@ -408,6 +477,8 @@ export class AdminService {
       data: {
         city: input.city?.trim() || event.city,
         locationName: input.locationName.trim(),
+        latitude: input.latitude,
+        longitude: input.longitude,
       },
     });
     await this.notifyEventLocationUpdate(
@@ -492,6 +563,8 @@ export class AdminService {
       data: {
         city: input.city?.trim() || circle.city,
         locationName: input.locationName.trim(),
+        latitude: input.latitude,
+        longitude: input.longitude,
       },
     });
     await this.notifyCircleLocationUpdate(

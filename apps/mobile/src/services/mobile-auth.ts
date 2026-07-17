@@ -8,7 +8,11 @@ import {
 } from 'firebase/auth';
 import { Platform } from 'react-native';
 
-import { firebaseConfig, firebaseIsConfigured, getFirebaseAuth } from './firebase';
+import {
+  firebaseConfig,
+  firebaseIsConfigured,
+  getFirebaseAuth,
+} from './firebase';
 import NivaPhoneNumberVerification from '../../modules/niva-phone-number-verification';
 
 export type MobileAuthMode = 'beta' | 'firebase';
@@ -80,21 +84,31 @@ export async function sendPhoneCode(
 
 export async function getPhoneNumberVerificationAvailability(): Promise<PhoneNumberVerificationAvailability> {
   if (getMobileAuthMode() !== 'firebase') {
-    return { available: false, reason: 'Firebase authentication is not active.' };
+    return {
+      available: false,
+      reason: 'Firebase authentication is not active.',
+    };
   }
 
   if (Platform.OS !== 'android') {
-    return { available: false, reason: 'Firebase PNV is currently Android-only.' };
+    return {
+      available: false,
+      reason: 'Firebase PNV is currently Android-only.',
+    };
   }
 
   if (process.env.EXPO_PUBLIC_FIREBASE_PNV_ENABLED !== 'true') {
-    return { available: false, reason: 'Firebase PNV is disabled for this build.' };
+    return {
+      available: false,
+      reason: 'Firebase PNV is disabled for this build.',
+    };
   }
 
   if (!NivaPhoneNumberVerification) {
     return {
       available: false,
-      reason: 'Install an Android development or production build to use Firebase PNV.',
+      reason:
+        'Install an Android development or production build to use Firebase PNV.',
     };
   }
 
@@ -129,11 +143,16 @@ export async function signInWithPnvCustomToken(
     throw new Error('Firebase PNV is unavailable in beta authentication mode.');
   }
 
-  const credential = await signInWithCustomToken(getFirebaseAuth(), customToken);
+  const credential = await signInWithCustomToken(
+    getFirebaseAuth(),
+    customToken,
+  );
   return persistFirebaseSession(credential.user);
 }
 
-export async function verifyPhoneCode(code: string): Promise<string | undefined> {
+export async function verifyPhoneCode(
+  code: string,
+): Promise<string | undefined> {
   if (getMobileAuthMode() === 'beta') {
     return undefined;
   }
@@ -199,8 +218,7 @@ export async function restoreFirebaseIdToken(): Promise<string | undefined> {
     refresh_token: string;
   };
 
-  await SecureStore.setItemAsync(
-    firebaseSessionKey,
+  await writeStoredSession(
     JSON.stringify({
       idToken: refreshed.id_token,
       refreshToken: refreshed.refresh_token,
@@ -212,10 +230,7 @@ export async function restoreFirebaseIdToken(): Promise<string | undefined> {
 
 export async function logoutMobileUser() {
   if (getMobileAuthMode() === 'firebase') {
-    await Promise.all([
-      clearStoredSession(),
-      signOut(getFirebaseAuth()),
-    ]);
+    await Promise.all([clearStoredSession(), signOut(getFirebaseAuth())]);
   }
 }
 
@@ -226,7 +241,10 @@ async function persistFirebaseSession(user: {
   const idToken = await user.getIdToken();
 
   await writeStoredSession(
-    JSON.stringify({ idToken, refreshToken: user.refreshToken } satisfies StoredFirebaseSession),
+    JSON.stringify({
+      idToken,
+      refreshToken: user.refreshToken,
+    } satisfies StoredFirebaseSession),
   );
 
   return idToken;
@@ -235,11 +253,7 @@ async function persistFirebaseSession(user: {
 async function enablePnvTestSessionIfConfigured() {
   const testToken = process.env.EXPO_PUBLIC_FIREBASE_PNV_TEST_TOKEN;
 
-  if (
-    !testToken ||
-    pnvTestSessionEnabled ||
-    !NivaPhoneNumberVerification
-  ) {
+  if (!testToken || pnvTestSessionEnabled || !NivaPhoneNumberVerification) {
     return;
   }
 
@@ -292,5 +306,7 @@ function isLocalWebPhoneAuth() {
   const hostname = (globalThis as { location?: { hostname?: string } }).location
     ?.hostname;
 
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  return (
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+  );
 }

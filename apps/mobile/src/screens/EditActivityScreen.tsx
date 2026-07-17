@@ -1,9 +1,4 @@
-import {
-  ArrowLeft,
-  CircleMinus,
-  CirclePlus,
-  MapPin,
-} from 'lucide-react-native';
+import { ArrowLeft, CircleMinus, CirclePlus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Pressable,
@@ -16,16 +11,23 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import {
+  ActivityLocation,
+  LocationSelector,
+} from '../components/LocationSelector';
 import { DiscoveryItem } from '../data/discovery';
 import { NivaUser } from '../types/niva';
 
 export type ActivityEditInput = {
   capacity: number;
+  city: string;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
   durationWeeks?: number;
   interests: string[];
   locationName: string;
+  latitude?: number;
+  longitude?: number;
   schedule?: string;
   startsAt: string;
   title: string;
@@ -56,7 +58,12 @@ export function EditActivityScreen({
   const isCircle = activity.category === 'circle';
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.summary);
-  const [locationName, setLocationName] = useState(activity.location);
+  const [location, setLocation] = useState<ActivityLocation>({
+    city: activity.city ?? user.city,
+    latitude: activity.latitude,
+    locationName: activity.location,
+    longitude: activity.longitude,
+  });
   const [startsAt, setStartsAt] = useState(
     activity.startsAt ? new Date(activity.startsAt) : new Date(),
   );
@@ -83,7 +90,7 @@ export function EditActivityScreen({
   };
 
   const save = async () => {
-    if (!title.trim() || !description.trim() || !locationName.trim()) {
+    if (!title.trim() || !description.trim() || !location.locationName.trim()) {
       setError('Add a title, description, and clear meeting location.');
       return;
     }
@@ -101,11 +108,14 @@ export function EditActivityScreen({
       setError(undefined);
       await onSave({
         capacity,
+        city: location.city,
         description: description.trim(),
         difficulty,
         durationWeeks: isCircle ? durationWeeks : undefined,
         interests,
-        locationName: locationName.trim(),
+        latitude: location.latitude,
+        locationName: location.locationName.trim(),
+        longitude: location.longitude,
         schedule: isCircle ? schedule.trim() : undefined,
         startsAt: startsAt.toISOString(),
         title: title.trim(),
@@ -185,14 +195,7 @@ export function EditActivityScreen({
           />
         </Field>
         <Field label="Meeting location">
-          <View style={styles.locationInput}>
-            <MapPin color={colors.secondary} size={19} strokeWidth={2.3} />
-            <TextInput
-              onChangeText={setLocationName}
-              style={styles.locationTextInput}
-              value={locationName}
-            />
-          </View>
+          <LocationSelector onChange={setLocation} value={location} />
         </Field>
         <DateTimeSelector
           minimumDate={new Date()}

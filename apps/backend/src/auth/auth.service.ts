@@ -16,9 +16,9 @@ export class AuthService {
   async createSession(idToken: string): Promise<PublicUser> {
     const firebaseUser = await this.firebaseAdminService.verifyIdToken(idToken);
 
-    if (!firebaseUser.phone_number) {
+    if (!firebaseUser.phone_number && !firebaseUser.email) {
       throw new UnauthorizedException(
-        'The Firebase token is not associated with a phone number.',
+        'The Firebase token does not contain a supported identity.',
       );
     }
 

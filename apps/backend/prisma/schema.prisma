@@ -130,6 +130,7 @@ enum AdminRole {
 
 enum AdminAuditAction {
   ADMIN_ACCESS_GRANTED
+  ACCOUNT_DELETION_REQUEST_UPDATED
   VERIFICATION_REVIEWED
   REPORT_STATUS_CHANGED
   HOST_APPROVAL_CHANGED
@@ -196,6 +197,24 @@ model User {
   adminAccess               AdminAccess?
   adminAuditLogs            AdminAuditLog[]     @relation("AdminAuditActor")
   devicePushTokens          DevicePushToken[]
+}
+
+model BetaAccessRequest {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  city      String
+  interest  String
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AccountDeletionRequest {
+  id         String   @id @default(cuid())
+  identifier String   @unique
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model UsernameReservation {
@@ -285,6 +304,8 @@ model Event {
   description          String
   city                 String
   locationName         String
+  latitude             Float?
+  longitude            Float?
   startsAt             DateTime
   endsAt               DateTime?
   capacity             Int
@@ -315,6 +336,8 @@ model Circle {
   description          String
   city                 String
   locationName         String
+  latitude             Float?
+  longitude            Float?
   startsAt             DateTime
   schedule             String
   durationWeeks        Int                @default(6)

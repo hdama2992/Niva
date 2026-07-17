@@ -18,6 +18,7 @@ import {
   ApiUser,
   createBetaSession,
   createSession,
+  deleteAccount,
   exchangePnvToken,
   setUsername,
   submitSelfie,
@@ -258,9 +259,7 @@ export default function App() {
           <SelfieUploadScreen
             displayName={route.user.displayName}
             joiningTitle={route.joiningTitle}
-            onSubmit={(image) =>
-              handleSelfie(route.idToken, route.user, image)
-            }
+            onSubmit={(image) => handleSelfie(route.idToken, route.user, image)}
           />
         );
       case 'pending':
@@ -279,6 +278,11 @@ export default function App() {
       case 'home':
         return (
           <HomeScreen
+            onDeleteAccount={async () => {
+              await deleteAccount(route.idToken);
+              await logoutMobileUser();
+              setRoute({ name: 'login' });
+            }}
             onLogout={() =>
               withApiErrors(async () => {
                 await logoutMobileUser();

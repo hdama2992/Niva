@@ -102,6 +102,37 @@ export class FirebaseAdminService {
     return url;
   }
 
+  async deleteUserIdentityAndMedia(firebaseUid: string): Promise<void> {
+    if (firebaseUid.startsWith('beta:')) {
+      return;
+    }
+
+    if (!this.app) {
+      throw new ServiceUnavailableException(
+        'Firebase Admin is required to delete a production account.',
+      );
+    }
+
+    const bucketName = this.configService.get<string>(
+      'FIREBASE_STORAGE_BUCKET',
+    );
+    if (bucketName) {
+      const bucket = getStorage(this.app).bucket(bucketName);
+      await Promise.all([
+        bucket.deleteFiles({ prefix: `profile-photos/${firebaseUid}/` }),
+        bucket.deleteFiles({ prefix: `verification-selfies/${firebaseUid}/` }),
+      ]);
+    }
+
+    try {
+      await getAuth(this.app).deleteUser(firebaseUid);
+    } catch (error) {
+      if (getFirebaseErrorCode(error) !== 'auth/user-not-found') {
+        throw error;
+      }
+    }
+  }
+
   async createCustomTokenFromPnvToken(pnvToken: string): Promise<string> {
     if (
       this.configService.get<string>('FIREBASE_PNV_ENABLED') !== 'true' ||

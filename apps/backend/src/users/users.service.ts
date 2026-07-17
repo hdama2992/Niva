@@ -213,6 +213,16 @@ export class UsersService {
     return user;
   }
 
+  async deleteAccountData(userId: string): Promise<void> {
+    const deleted = await this.prisma.user.deleteMany({
+      where: { id: userId },
+    });
+
+    if (deleted.count !== 1) {
+      throw new NotFoundException('User not found.');
+    }
+  }
+
   async setUsername(userId: string, username: string): Promise<PublicUser> {
     const normalizedUsername = username.trim();
 

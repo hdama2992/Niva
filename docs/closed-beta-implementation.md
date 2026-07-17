@@ -94,31 +94,31 @@ before the shared-key fallback can be removed for public launch.
 
 ## Implemented Data Ownership
 
-| Concern | System of record | Mobile behavior |
-| --- | --- | --- |
-| Authentication identity | Firebase Auth | SMS authentication and protected token refresh |
-| User/profile/trust | PostgreSQL via NestJS | API reads and writes |
-| Profile photos/selfies | Firebase Storage | Camera/library selection and direct authenticated upload |
-| Verification review | PostgreSQL via NestJS | Pending state in the app; live admin decision queue |
-| Events, circles, memberships, feedback | PostgreSQL via NestJS | API-backed discovery, joining, activity, feedback |
-| Activity lifecycle | PostgreSQL via NestJS | Host/admin edits and cancellation reasons; affected members receive persisted alerts |
-| In-app notifications | PostgreSQL via NestJS | API-backed list plus push-delivery queue |
-| Cohort chat | PostgreSQL via NestJS | Approved event/circle members only; 12-second refresh |
-| Held reporting model | PostgreSQL via NestJS | Backend model retained; member and admin UI intentionally disabled |
+| Concern                                | System of record      | Mobile behavior                                                                      |
+| -------------------------------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| Authentication identity                | Firebase Auth         | SMS authentication and protected token refresh                                       |
+| User/profile/trust                     | PostgreSQL via NestJS | API reads and writes                                                                 |
+| Profile photos/selfies                 | Firebase Storage      | Camera/library selection and direct authenticated upload                             |
+| Verification review                    | PostgreSQL via NestJS | Pending state in the app; live admin decision queue                                  |
+| Events, circles, memberships, feedback | PostgreSQL via NestJS | API-backed discovery, joining, activity, feedback                                    |
+| Activity lifecycle                     | PostgreSQL via NestJS | Host/admin edits and cancellation reasons; affected members receive persisted alerts |
+| In-app notifications                   | PostgreSQL via NestJS | API-backed list plus push-delivery queue                                             |
+| Cohort chat                            | PostgreSQL via NestJS | Approved event/circle members only; 12-second refresh                                |
+| Held reporting model                   | PostgreSQL via NestJS | Backend model retained; member and admin UI intentionally disabled                   |
 
 ## Still Required Before Inviting Users
 
 - Apply real Firebase credentials and disable beta auth.
 - Apply Firebase Storage rules and confirm that staff cannot access selfies
   outside the verification workflow.
-- Add Firebase sign-in to the admin dashboard and remove its shared-key
-  fallback; backend named-admin access and audit history already exist.
-- Add Expo device token registration plus FCM/APNs configuration. The backend
-  queue and manual Expo dispatch route already exist.
-- Add a validated map/location picker and platform-native date/time picker.
-  Current host controls use a controlled day/time stepper and persisted edits.
+- Provision and test the implemented named Firebase admin dashboard; retain the
+  shared key only as a documented bootstrap/recovery path until production
+  access is proven.
+- Configure EAS/FCM/APNs and test the implemented Expo device-token registration
+  and provider-ticket handling on physical devices.
+- Test the implemented foreground location selector, reverse geocoding,
+  persisted coordinates, map directions, and platform-native date/time pickers.
 - Decide and staff the moderation process before re-enabling report submission
   and the admin report queue.
-- Add privacy policy, selfie consent, retention/deletion rules, and operator
-  escalation procedures.
-- Complete privacy, retention/deletion, and operator escalation policies.
+- Obtain legal review for the implemented privacy/terms/deletion pages and
+  finalize selfie consent, retention exceptions, and operator escalation.

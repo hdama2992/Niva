@@ -11,6 +11,9 @@ export type DiscoveryItem = {
   startsAt?: string;
   title: string;
   location: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
   time: string;
   seats?: number;
   duration?: string;

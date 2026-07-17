@@ -114,20 +114,32 @@ export class NotificationService {
           method: 'POST',
         });
         const responseBody = await response.text();
+        const ticket = parseExpoPushTicket(responseBody);
+        const delivered = response.ok && ticket?.status === 'ok';
+        const deviceNotRegistered =
+          ticket?.status === 'error' &&
+          ticket.details?.error === 'DeviceNotRegistered';
+
+        if (deviceNotRegistered) {
+          await this.prisma.devicePushToken.update({
+            where: { id: delivery.devicePushTokenId },
+            data: { active: false },
+          });
+        }
 
         await this.prisma.notificationDelivery.update({
           where: { id: delivery.id },
           data: {
             attempts: { increment: 1 },
-            status: response.ok
+            status: delivered
               ? NotificationDeliveryStatus.SENT
               : NotificationDeliveryStatus.FAILED,
-            sentAt: response.ok ? new Date() : null,
-            providerResponse: { body: responseBody.slice(0, 2000) },
+            sentAt: delivered ? new Date() : null,
+            providerResponse: ticket ?? { body: responseBody.slice(0, 2000) },
           },
         });
 
-        if (response.ok) {
+        if (delivered) {
           result.sent += 1;
         } else {
           result.failed += 1;
@@ -148,5 +160,21 @@ export class NotificationService {
     }
 
     return result;
+  }
+}
+
+type ExpoPushTicket = {
+  details?: { error?: string };
+  id?: string;
+  message?: string;
+  status: 'error' | 'ok';
+};
+
+function parseExpoPushTicket(body: string): ExpoPushTicket | undefined {
+  try {
+    const payload = JSON.parse(body) as { data?: ExpoPushTicket };
+    return payload.data;
+  } catch {
+    return undefined;
   }
 }

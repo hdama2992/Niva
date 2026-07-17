@@ -174,12 +174,21 @@ Community: event chats and circle chats only
 - Trust tier fields that can later unlock host tools.
 - Product/MVP analysis document.
 - Live admin verification and host-approval queues.
+- Foreground-only host location selection with reverse geocoding, persisted
+  coordinates, and map directions from activity details.
+- Expo notification permission, token registration, Android channel setup,
+  provider-ticket validation, and stale-device deactivation.
+- Named Firebase email/password admin dashboard sessions with backend role
+  enforcement.
+- In-app account deletion, Firebase identity/media cleanup, cascaded product
+  data deletion, a public deletion-request page, and an admin processing queue.
+- Public privacy, beta terms, and account-deletion pages.
+- Backend-persisted website beta access requests.
 
 ## Pending
 
 ### Product And UX
 
-- Location-map integration for host creation/editing.
 - Final visual and responsive QA across supported phone sizes.
 
 ### Mobile Integration
@@ -188,12 +197,13 @@ Community: event chats and circle chats only
   on physical iOS/Android devices.
 - Complete Firebase PNV billing, OAuth brand verification, carrier testing, and
   Android development-build testing before enabling the one-tap PNV path.
-- Google sign-in in the Expo app.
+- Google/Facebook sign-in remain deliberately excluded from the phone-first
+  closed beta; add them only after account-linking and trust policy are defined.
 - Verify session restoration with real Firebase credentials on physical devices.
 - Apply and verify production Firebase Storage security rules with real
   credentials and physical-device uploads.
-- Expo native push-token registration and FCM/APNs provider configuration. The
-  backend queue and manual dispatch API are implemented.
+- Configure EAS/FCM/APNs credentials and verify the implemented native push
+  registration/delivery path on physical devices.
 
 ### Backend And Data
 
@@ -201,18 +211,13 @@ Community: event chats and circle chats only
   completion workflows. Current continuity is opt-in recommendation logic,
   not a social graph or direct messaging feature.
 
-### Admin
-
-- Switch the dashboard from its beta key field to named Firebase admin login.
-
 ### Legal, Privacy, And Safety
 
-- Privacy policy.
-- Terms and formal community-guideline policy.
-- Consent copy for selfie and profile data.
-- Data retention policy for selfies.
-- Deletion request flow.
-- Remove the shared bootstrap key after named dashboard login is deployed.
+- Obtain legal review for the implemented privacy/terms drafts and formal
+  community-guideline policy.
+- Finalize consent and retention policy for selfie and profile data.
+- Restrict the shared bootstrap key to recovery, then remove it after named
+  administrator provisioning is proven in production.
 - Abuse escalation process.
 - Moderation safety playbook, then re-enable report submission and review UI.
 
@@ -227,12 +232,13 @@ These are the minimum items needed before inviting real users.
 5. Real join request persistence.
 6. Deploy the checked-in Storage rules and complete join-time selfie
    upload/review testing with real Firebase credentials.
-7. Configure named Firebase admin login in the dashboard and retire the
-   bootstrap-key fallback.
-8. Add Expo/FCM/APNs device notification registration and automatic dispatch.
+7. Provision and test named Firebase administrators, then restrict the
+   bootstrap-key fallback to documented recovery.
+8. Configure EAS/FCM/APNs and prove the implemented device registration and
+   automatic dispatch path on physical devices.
 9. Deploy Firebase Storage rules and complete physical-device selfie testing.
-10. Privacy policy, selfie consent, retention/deletion, and operator safety
-    procedures.
+10. Legal review and publication of privacy, selfie consent, retention, and
+    operator safety procedures; deletion code and public drafts are implemented.
 11. Closed beta operating process:
     - who reviews selfies
     - who approves hosts
@@ -257,6 +263,6 @@ Sprint 1-4 now gives Niva a closed-beta MVP with real local PostgreSQL-backed
 onboarding, discovery, verification-gated joins, host decisions, circle
 management, cohort chat, attendance, post-event feedback, and in-app
 notifications. The reporting model is held from the active UI. Physical-device
-Firebase/Storage testing, native push registration, named dashboard sign-in,
-and privacy/operations are the next launch blockers. See
+Firebase/Storage/push testing, production admin provisioning, legal review,
+and safety operations are the next launch blockers. See
 `docs/community-completion.md` for end-to-end behavior.

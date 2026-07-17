@@ -33,6 +33,8 @@ import { ReviewHostApprovalDto } from './dto/review-host-approval.dto';
 import { ReviewReportDto } from './dto/review-report.dto';
 import { ReviewVerificationDto } from './dto/review-verification.dto';
 import { UpdateActivityLocationDto } from './dto/update-activity-location.dto';
+import { ReviewAccountDeletionDto } from './dto/review-account-deletion.dto';
+import { ReviewBetaAccessDto } from './dto/review-beta-access.dto';
 
 @Controller('admin')
 @UseGuards(AdminAccessGuard, AdminRoleGuard)
@@ -127,6 +129,52 @@ export class AdminController {
   @AdminRoles(AdminRole.MODERATOR, AdminRole.COMMUNITY_MANAGER)
   async listReports(@Query('status') status?: ReportStatus) {
     return { reports: await this.adminService.listReports(status) };
+  }
+
+  @Get('account-deletion-requests')
+  @AdminRoles(AdminRole.MODERATOR, AdminRole.COMMUNITY_MANAGER)
+  async listAccountDeletionRequests(@Query('status') status?: string) {
+    return {
+      requests: await this.adminService.listAccountDeletionRequests(status),
+    };
+  }
+
+  @Get('beta-access-requests')
+  @AdminRoles(AdminRole.COMMUNITY_MANAGER)
+  async listBetaAccessRequests(@Query('status') status?: string) {
+    return {
+      requests: await this.adminService.listBetaAccessRequests(status),
+    };
+  }
+
+  @Patch('beta-access-requests/:requestId')
+  @AdminRoles(AdminRole.COMMUNITY_MANAGER)
+  async reviewBetaAccessRequest(
+    @Param('requestId') requestId: string,
+    @Body() body: ReviewBetaAccessDto,
+  ) {
+    return {
+      request: await this.adminService.reviewBetaAccessRequest(
+        requestId,
+        body.status,
+      ),
+    };
+  }
+
+  @Patch('account-deletion-requests/:requestId')
+  @AdminRoles(AdminRole.MODERATOR, AdminRole.COMMUNITY_MANAGER)
+  async reviewAccountDeletionRequest(
+    @Req() request: RequestWithAdminActor,
+    @Param('requestId') requestId: string,
+    @Body() body: ReviewAccountDeletionDto,
+  ) {
+    return {
+      request: await this.adminService.reviewAccountDeletionRequest(
+        request.adminActor,
+        requestId,
+        body.status,
+      ),
+    };
   }
 
   @Patch('reports/:reportId')

@@ -10,7 +10,14 @@ import {
   UsersRound,
 } from 'lucide-react-native';
 import { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
@@ -152,6 +159,21 @@ export function ActivityDetailScreen({
             value={item.duration ?? item.difficulty ?? 'Social'}
           />
         </View>
+
+        {item.latitude !== undefined && item.longitude !== undefined ? (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() =>
+              void Linking.openURL(
+                `https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`,
+              )
+            }
+            style={styles.directionsAction}
+          >
+            <MapPin color={colors.secondary} size={18} strokeWidth={2.4} />
+            <Text style={styles.directionsText}>Open directions</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Designed around</Text>
@@ -297,6 +319,19 @@ function formatMembershipStatus(status: DiscoveryItem['membershipStatus']) {
 }
 
 const styles = StyleSheet.create({
+  directionsAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    minHeight: 40,
+  },
+  directionsText: {
+    color: colors.secondary,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
   blockAction: {
     alignItems: 'center',
     alignSelf: 'flex-start',

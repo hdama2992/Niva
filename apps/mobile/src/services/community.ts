@@ -37,7 +37,9 @@ export type CommunityActivity = {
   host?: { displayName: string | null; id: string; username: string | null };
   id: string;
   interests: string[];
+  latitude?: number | null;
   locationName: string;
+  longitude?: number | null;
   status?: 'CANCELLED' | 'COMPLETED' | 'DRAFT' | 'PUBLISHED';
   schedule?: string;
   startsAt: string;
@@ -168,7 +170,9 @@ export function createEvent(
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     interests: string[];
+    latitude?: number;
     locationName: string;
+    longitude?: number;
     startsAt: string;
     title: string;
   },
@@ -188,7 +192,9 @@ export function createCircle(
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     durationWeeks: number;
     interests: string[];
+    latitude?: number;
     locationName: string;
+    longitude?: number;
     schedule: string;
     startsAt: string;
     title: string;
@@ -209,7 +215,9 @@ export function updateEvent(
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     interests: string[];
+    latitude?: number;
     locationName: string;
+    longitude?: number;
     startsAt: string;
     title: string;
   }>,
@@ -234,7 +242,9 @@ export function updateCircle(
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     durationWeeks: number;
     interests: string[];
+    latitude?: number;
     locationName: string;
+    longitude?: number;
     schedule: string;
     startsAt: string;
     title: string;
@@ -321,6 +331,21 @@ export function markNotificationRead(idToken: string, notificationId: string) {
     `/community/notifications/${notificationId}/read`,
     idToken,
     { method: 'PATCH' },
+  );
+}
+
+export function registerPushToken(
+  idToken: string,
+  token: string,
+  platform: string,
+) {
+  return request<{ pushToken: { id: string; token: string } }>(
+    '/community/push-tokens',
+    idToken,
+    {
+      body: { platform, token },
+      method: 'POST',
+    },
   );
 }
 

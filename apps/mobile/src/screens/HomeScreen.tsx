@@ -87,12 +87,17 @@ import {
   disconnectRealtime,
   subscribeToMemberRealtime,
 } from '../services/realtime';
+import {
+  registerForPushNotifications,
+  subscribeToPushNotificationResponses,
+} from '../services/push-notifications';
 import { NivaUser } from '../types/niva';
 
 type HomeScreenProps = {
   idToken: string;
   user: NivaUser;
   onLogout: () => void;
+  onDeleteAccount: () => Promise<void>;
   onStartVerification: (joiningTitle?: string) => void;
 };
 
@@ -124,6 +129,7 @@ export function HomeScreen({
   idToken,
   user,
   onLogout,
+  onDeleteAccount,
   onStartVerification,
 }: HomeScreenProps) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -192,6 +198,28 @@ export function HomeScreen({
   useEffect(() => {
     void loadCommunityData();
   }, [idToken, user.city]);
+
+  useEffect(() => {
+    if (!settings?.notificationsEnabled) {
+      return;
+    }
+
+    void registerForPushNotifications(idToken).catch((error) => {
+      console.warn(
+        'Unable to register this device for push notifications.',
+        error,
+      );
+    });
+  }, [idToken, settings?.notificationsEnabled]);
+
+  useEffect(
+    () =>
+      subscribeToPushNotificationResponses(() => {
+        setSecondaryScreen('notifications');
+        void loadCommunityData();
+      }),
+    [idToken],
+  );
 
   const loadCommunityData = async () => {
     try {
@@ -365,11 +393,13 @@ export function HomeScreen({
     try {
       await createCommunityEvent(idToken, {
         capacity: input.capacity,
-        city: user.city,
+        city: input.city,
         description: input.description,
         difficulty: input.difficulty,
         interests: input.interests,
+        latitude: input.latitude,
         locationName: input.locationName,
+        longitude: input.longitude,
         startsAt: input.startsAt,
         title: input.title,
       });
@@ -387,12 +417,14 @@ export function HomeScreen({
     try {
       await createCommunityCircle(idToken, {
         capacity: input.capacity,
-        city: user.city,
+        city: input.city,
         description: input.description,
         difficulty: input.difficulty,
         durationWeeks: input.durationWeeks,
         interests: input.interests,
+        latitude: input.latitude,
         locationName: input.locationName,
+        longitude: input.longitude,
         schedule: input.schedule,
         startsAt: input.startsAt,
         title: input.title,
@@ -454,12 +486,14 @@ export function HomeScreen({
     if (editingActivity.category === 'circle') {
       await updateCircle(idToken, activityId, {
         capacity: input.capacity,
-        city: user.city,
+        city: input.city,
         description: input.description,
         difficulty: input.difficulty,
         durationWeeks: input.durationWeeks,
         interests: input.interests,
+        latitude: input.latitude,
         locationName: input.locationName,
+        longitude: input.longitude,
         schedule: input.schedule,
         startsAt: input.startsAt,
         title: input.title,
@@ -467,11 +501,13 @@ export function HomeScreen({
     } else {
       await updateEvent(idToken, activityId, {
         capacity: input.capacity,
-        city: user.city,
+        city: input.city,
         description: input.description,
         difficulty: input.difficulty,
         interests: input.interests,
+        latitude: input.latitude,
         locationName: input.locationName,
+        longitude: input.longitude,
         startsAt: input.startsAt,
         title: input.title,
       });
@@ -740,6 +776,7 @@ export function HomeScreen({
         blockedUsers={blockedUsers}
         onBack={() => setSecondaryScreen(undefined)}
         onChange={(nextSettings) => void updateMemberSettings(nextSettings)}
+        onDeleteAccount={onDeleteAccount}
         onUnblock={(blockedUserId) => void unblockMember(blockedUserId)}
         settings={settings ?? defaultSettings}
       />
@@ -1551,6 +1588,9 @@ function activityToDiscoveryItem(
     category,
     title: activity.title,
     location: activity.locationName,
+    city: activity.city,
+    latitude: activity.latitude ?? undefined,
+    longitude: activity.longitude ?? undefined,
     time:
       category === 'circle' && activity.schedule
         ? activity.schedule

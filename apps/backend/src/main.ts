@@ -8,6 +8,7 @@ async function bootstrap() {
     process.env.ADMIN_ORIGIN ?? 'http://localhost:3000',
     process.env.MOBILE_ORIGIN ?? 'http://localhost:8081',
     process.env.DOCS_ORIGIN ?? 'http://localhost:3002',
+    process.env.WEBSITE_ORIGIN ?? 'http://localhost:3003',
   ];
 
   app.enableCors({

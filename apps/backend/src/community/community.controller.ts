@@ -509,9 +509,9 @@ export class CommunityController {
   }
 
   private async currentUserId(request: RequestWithFirebaseUser) {
-    if (!request.firebaseUser.phone_number) {
+    if (!request.firebaseUser.phone_number && !request.firebaseUser.email) {
       throw new UnauthorizedException(
-        'The Firebase token is not associated with a phone number.',
+        'The Firebase token does not contain a supported identity.',
       );
     }
 

@@ -8,10 +8,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "buildNumber": "1",
       "supportsTablet": true,
       "bundleIdentifier": "com.niva.niva"
     },
     "android": {
+      "versionCode": 1,
       "package": "com.niva.niva",
       "adaptiveIcon": {
         "backgroundColor": "#FFF8F8",
@@ -21,6 +23,20 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#A43754"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Niva to use your location when a host chooses the meeting place."
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }

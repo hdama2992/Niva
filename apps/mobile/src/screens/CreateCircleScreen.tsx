@@ -1,9 +1,4 @@
-import {
-  ArrowLeft,
-  CircleMinus,
-  CirclePlus,
-  MapPin,
-} from 'lucide-react-native';
+import { ArrowLeft, CircleMinus, CirclePlus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Pressable,
@@ -16,15 +11,22 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import {
+  ActivityLocation,
+  LocationSelector,
+} from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
 
 export type CreateCircleInput = {
   capacity: number;
+  city: string;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
   durationWeeks: number;
   interests: string[];
   locationName: string;
+  latitude?: number;
+  longitude?: number;
   schedule: string;
   startsAt: string;
   title: string;
@@ -50,7 +52,10 @@ export function CreateCircleScreen({
 }: CreateCircleScreenProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [locationName, setLocationName] = useState('');
+  const [location, setLocation] = useState<ActivityLocation>({
+    city: user.city,
+    locationName: '',
+  });
   const [startsAt, setStartsAt] = useState(defaultStartTime);
   const [schedule, setSchedule] = useState('Every Saturday, 10:00 AM');
   const [durationWeeks, setDurationWeeks] = useState(6);
@@ -70,7 +75,7 @@ export function CreateCircleScreen({
   };
 
   const submit = async () => {
-    if (!title.trim() || !description.trim() || !locationName.trim()) {
+    if (!title.trim() || !description.trim() || !location.locationName.trim()) {
       setError('Add a title, description, and specific meeting location.');
       return;
     }
@@ -88,11 +93,14 @@ export function CreateCircleScreen({
       setError(undefined);
       await onCreate({
         capacity,
+        city: location.city,
         description: description.trim(),
         difficulty,
         durationWeeks,
         interests,
-        locationName: locationName.trim(),
+        latitude: location.latitude,
+        locationName: location.locationName.trim(),
+        longitude: location.longitude,
         schedule: schedule.trim(),
         startsAt: startsAt.toISOString(),
         title: title.trim(),
@@ -153,16 +161,7 @@ export function CreateCircleScreen({
           />
         </Field>
         <Field label="Meeting location">
-          <View style={styles.locationInput}>
-            <MapPin color={colors.secondary} size={19} strokeWidth={2.3} />
-            <TextInput
-              onChangeText={setLocationName}
-              placeholder="Venue or public meeting point"
-              placeholderTextColor={colors.muted}
-              style={styles.locationTextInput}
-              value={locationName}
-            />
-          </View>
+          <LocationSelector onChange={setLocation} value={location} />
         </Field>
         <DateTimeSelector
           minimumDate={new Date()}

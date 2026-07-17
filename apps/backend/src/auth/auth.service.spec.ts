@@ -82,6 +82,32 @@ describe('AuthService', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
+  it('creates a session for a supported Firebase email identity', async () => {
+    const user = { id: 'user_email' };
+    verifyIdToken.mockResolvedValue({
+      email: 'member@example.com',
+      email_verified: true,
+      firebase: {
+        identities: { email: ['member@example.com'] },
+        sign_in_provider: 'password',
+      },
+      uid: 'firebase_email_1',
+    });
+    upsertFromFirebase.mockResolvedValue(user);
+
+    await expect(authService.createSession('email-token')).resolves.toEqual(
+      user,
+    );
+    expect(upsertFromFirebase).toHaveBeenCalledWith({
+      authProviders: ['email', 'password'],
+      email: 'member@example.com',
+      firebaseUid: 'firebase_email_1',
+      googleVerified: false,
+      phone: undefined,
+      phoneVerified: false,
+    });
+  });
+
   it('delegates Firebase PNV token exchange to the Firebase Admin service', async () => {
     createCustomTokenFromPnvToken.mockResolvedValue('firebase-custom-token');
 

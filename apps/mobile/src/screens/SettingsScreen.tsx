@@ -5,10 +5,13 @@ import {
   Eye,
   HeartHandshake,
   ShieldCheck,
+  Trash2,
   UsersRound,
 } from 'lucide-react-native';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import {
+  ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +27,7 @@ type SettingsScreenProps = {
   blockedUsers: BlockedUser[];
   onBack: () => void;
   onChange: (settings: CommunitySettings) => void;
+  onDeleteAccount: () => Promise<void>;
   onUnblock: (blockedUserId: string) => void;
   settings: CommunitySettings;
 };
@@ -32,9 +36,29 @@ export function SettingsScreen({
   blockedUsers,
   onBack,
   onChange,
+  onDeleteAccount,
   onUnblock,
   settings,
 }: SettingsScreenProps) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(undefined);
+    try {
+      await onDeleteAccount();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete this account.',
+      );
+      setDeleting(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
@@ -152,7 +176,70 @@ export function SettingsScreen({
             </Text>
           </View>
         )}
+
+        <Text style={styles.sectionLabel}>Account</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setDeleteOpen(true)}
+          style={styles.deleteButton}
+        >
+          <Trash2 color={colors.primaryDark} size={19} strokeWidth={2.4} />
+          <View style={styles.deleteCopy}>
+            <Text style={styles.deleteTitle}>Delete account</Text>
+            <Text style={styles.deleteText}>
+              Permanently remove your profile, memberships, messages, and
+              private images.
+            </Text>
+          </View>
+        </Pressable>
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => !deleting && setDeleteOpen(false)}
+        transparent
+        visible={deleteOpen}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.deleteModal}>
+            <View style={styles.deleteModalIcon}>
+              <Trash2 color={colors.primaryDark} size={24} strokeWidth={2.4} />
+            </View>
+            <Text style={styles.deleteModalTitle}>
+              Delete your Niva account?
+            </Text>
+            <Text style={styles.deleteModalText}>
+              This cannot be undone. Your sign-in identity, profile, activity
+              data, messages, and uploaded photos will be removed.
+            </Text>
+            {deleteError ? (
+              <Text style={styles.deleteError}>{deleteError}</Text>
+            ) : null}
+            <View style={styles.deleteActions}>
+              <Pressable
+                disabled={deleting}
+                onPress={() => setDeleteOpen(false)}
+                style={styles.cancelDeleteButton}
+              >
+                <Text style={styles.cancelDeleteText}>Keep account</Text>
+              </Pressable>
+              <Pressable
+                disabled={deleting}
+                onPress={() => void confirmDelete()}
+                style={styles.confirmDeleteButton}
+              >
+                {deleting ? (
+                  <ActivityIndicator color={colors.surface} />
+                ) : (
+                  <Text style={styles.confirmDeleteText}>
+                    Delete permanently
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -189,6 +276,101 @@ function SettingToggle({
 }
 
 const styles = StyleSheet.create({
+  cancelDeleteButton: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  cancelDeleteText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  confirmDeleteButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.md,
+    flex: 1.2,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: spacing.sm,
+  },
+  confirmDeleteText: {
+    color: colors.surface,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  deleteActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  deleteButton: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  deleteCopy: { flex: 1 },
+  deleteError: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: spacing.md,
+  },
+  deleteModal: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    marginHorizontal: spacing.lg,
+    maxWidth: 460,
+    padding: spacing.lg,
+    width: '90%',
+  },
+  deleteModalIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    height: 48,
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    width: 48,
+  },
+  deleteModalText: {
+    color: colors.muted,
+    fontSize: typography.body,
+    lineHeight: 23,
+    marginTop: spacing.sm,
+  },
+  deleteModalTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '800',
+  },
+  deleteText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  deleteTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(36, 23, 28, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+  },
   blockCopy: {
     flex: 1,
   },

@@ -1,6 +1,12 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { getAdminFirebaseAuth } from '../lib/firebase';
 
 type ReviewStatus = 'APPROVED' | 'NEEDS_REVIEW' | 'PENDING' | 'REJECTED';
 
@@ -58,6 +64,7 @@ type AnalyticsSummary = {
 type AdminMember = {
   createdAt: string;
   displayName: string | null;
+  email: string | null;
   id: string;
   profile: {
     city: string;
@@ -71,12 +78,31 @@ type AdminMember = {
     verificationStatus: string;
   } | null;
   username: string | null;
+  phone: string | null;
+};
+
+type AccountDeletionRequest = {
+  createdAt: string;
+  id: string;
+  identifier: string;
+  status: 'COMPLETED' | 'IN_REVIEW' | 'PENDING' | 'REJECTED';
+};
+
+type BetaAccessRequest = {
+  city: string;
+  createdAt: string;
+  email: string;
+  id: string;
+  interest: string;
+  status: 'DECLINED' | 'INVITED' | 'PENDING';
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function Home() {
-  const [adminKey, setAdminKey] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [idToken, setIdToken] = useState('');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState<VerificationReview[]>([]);
@@ -86,6 +112,12 @@ export default function Home() {
   const [activityCity, setActivityCity] = useState('');
   const [activityQuery, setActivityQuery] = useState('');
   const [members, setMembers] = useState<AdminMember[]>([]);
+  const [deletionRequests, setDeletionRequests] = useState<
+    AccountDeletionRequest[]
+  >([]);
+  const [updatingDeletionId, setUpdatingDeletionId] = useState<string>();
+  const [betaRequests, setBetaRequests] = useState<BetaAccessRequest[]>([]);
+  const [updatingBetaId, setUpdatingBetaId] = useState<string>();
   const [memberCity, setMemberCity] = useState('');
   const [memberQuery, setMemberQuery] = useState('');
   const [reviewingUserId, setReviewingUserId] = useState<string>();
@@ -107,42 +139,107 @@ export default function Home() {
     [reviews],
   );
 
-  const loadReviews = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const key = adminKey.trim();
+  useEffect(() => {
+    let unsubscribe: () => void = () => {};
+    try {
+      unsubscribe = onAuthStateChanged(getAdminFirebaseAuth(), async (user) => {
+        setIdToken(user ? await user.getIdToken() : '');
+        if (!user) {
+          setLoaded(false);
+          setReviews([]);
+          setApprovals([]);
+          setActivities([]);
+          setMembers([]);
+          setDeletionRequests([]);
+          setBetaRequests([]);
+        }
+      });
+    } catch (configurationError) {
+      setError(
+        configurationError instanceof Error
+          ? configurationError.message
+          : 'Firebase admin sign-in is not configured.',
+      );
+    }
+    return unsubscribe;
+  }, []);
 
-    if (!key) {
-      setError('Enter the admin key to load the verification queue.');
+  const authorizationHeaders = (token = idToken) => ({
+    Authorization: `Bearer ${token}`,
+  });
+
+  const signInAdmin = async (event: FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(undefined);
+    try {
+      const credential = await signInWithEmailAndPassword(
+        getAdminFirebaseAuth(),
+        adminEmail.trim(),
+        adminPassword,
+      );
+      const token = await credential.user.getIdToken();
+      setIdToken(token);
+      setAdminPassword('');
+      await loadReviews(undefined, token);
+    } catch (signInError) {
+      setError(
+        signInError instanceof Error
+          ? signInError.message
+          : 'Unable to sign in to Niva Admin.',
+      );
+      setLoading(false);
+    }
+  };
+
+  const loadReviews = async (event?: FormEvent, tokenOverride?: string) => {
+    event?.preventDefault();
+    const token = tokenOverride ?? idToken;
+
+    if (!token) {
+      setError('Sign in with an approved Niva administrator account.');
       return;
     }
 
     setLoading(true);
     setError(undefined);
     try {
-      const headers = { 'x-niva-admin-key': key };
+      const headers = authorizationHeaders(token);
       const [
         reviewsResponse,
         approvalsResponse,
         activitiesResponse,
         analyticsResponse,
+        deletionRequestsResponse,
+        betaRequestsResponse,
       ] = await Promise.all([
         fetch(`${apiUrl}/admin/verification-reviews`, { headers }),
         fetch(`${apiUrl}/admin/host-approvals?status=PENDING`, { headers }),
         fetch(`${apiUrl}/admin/activities?status=PUBLISHED`, { headers }),
         fetch(`${apiUrl}/admin/analytics/summary`, { headers }),
+        fetch(`${apiUrl}/admin/account-deletion-requests?status=PENDING`, {
+          headers,
+        }),
+        fetch(`${apiUrl}/admin/beta-access-requests?status=PENDING`, {
+          headers,
+        }),
       ]);
 
       if (
         !reviewsResponse.ok ||
         !approvalsResponse.ok ||
         !activitiesResponse.ok ||
-        !analyticsResponse.ok
+        !analyticsResponse.ok ||
+        !deletionRequestsResponse.ok ||
+        !betaRequestsResponse.ok
       ) {
         const failedResponse = [
           reviewsResponse,
           approvalsResponse,
           activitiesResponse,
           analyticsResponse,
+          deletionRequestsResponse,
+          betaRequestsResponse,
         ].find((response) => !response.ok);
         throw new Error(
           (await failedResponse?.text()) || 'Unable to load admin queues.',
@@ -154,11 +251,15 @@ export default function Home() {
         approvalsPayload,
         activitiesPayload,
         analyticsPayload,
+        deletionRequestsPayload,
+        betaRequestsPayload,
       ] = (await Promise.all([
         reviewsResponse.json(),
         approvalsResponse.json(),
         activitiesResponse.json(),
         analyticsResponse.json(),
+        deletionRequestsResponse.json(),
+        betaRequestsResponse.json(),
       ])) as [
         { reviews: VerificationReview[] },
         { approvals: HostApproval[] },
@@ -167,6 +268,8 @@ export default function Home() {
           events: Omit<AdminActivity, 'type'>[];
         },
         { analytics: AnalyticsSummary },
+        { requests: AccountDeletionRequest[] },
+        { requests: BetaAccessRequest[] },
       ];
       setReviews(reviewsPayload.reviews);
       setApprovals(approvalsPayload.approvals);
@@ -181,6 +284,8 @@ export default function Home() {
         })),
       ]);
       setAnalytics(analyticsPayload.analytics);
+      setDeletionRequests(deletionRequestsPayload.requests);
+      setBetaRequests(betaRequestsPayload.requests);
       setLoaded(true);
     } catch (loadError) {
       setError(
@@ -206,7 +311,7 @@ export default function Home() {
           body: JSON.stringify({ status }),
           headers: {
             'Content-Type': 'application/json',
-            'x-niva-admin-key': adminKey.trim(),
+            ...authorizationHeaders(),
           },
           method: 'PATCH',
         },
@@ -240,7 +345,7 @@ export default function Home() {
         body: JSON.stringify({ reason }),
         headers: {
           'Content-Type': 'application/json',
-          'x-niva-admin-key': adminKey.trim(),
+          ...authorizationHeaders(),
         },
         method: 'POST',
       });
@@ -279,7 +384,7 @@ export default function Home() {
           }),
           headers: {
             'Content-Type': 'application/json',
-            'x-niva-admin-key': adminKey.trim(),
+            ...authorizationHeaders(),
           },
           method: 'PATCH',
         },
@@ -320,7 +425,7 @@ export default function Home() {
     try {
       const response = await fetch(
         `${apiUrl}/admin/verification-reviews/${review.userId}/selfie`,
-        { headers: { 'x-niva-admin-key': adminKey.trim() } },
+        { headers: authorizationHeaders() },
       );
 
       if (!response.ok) {
@@ -349,7 +454,7 @@ export default function Home() {
       if (activityQuery.trim()) params.set('q', activityQuery.trim());
       if (activityCity.trim()) params.set('city', activityCity.trim());
       const response = await fetch(`${apiUrl}/admin/activities?${params}`, {
-        headers: { 'x-niva-admin-key': adminKey.trim() },
+        headers: authorizationHeaders(),
       });
       if (!response.ok) throw new Error(await response.text());
       const payload = (await response.json()) as {
@@ -386,7 +491,7 @@ export default function Home() {
       if (memberQuery.trim()) params.set('q', memberQuery.trim());
       if (memberCity.trim()) params.set('city', memberCity.trim());
       const response = await fetch(`${apiUrl}/admin/members?${params}`, {
-        headers: { 'x-niva-admin-key': adminKey.trim() },
+        headers: authorizationHeaders(),
       });
       if (!response.ok) throw new Error(await response.text());
       const payload = (await response.json()) as { members: AdminMember[] };
@@ -418,7 +523,7 @@ export default function Home() {
         body: JSON.stringify({ city, locationName }),
         headers: {
           'Content-Type': 'application/json',
-          'x-niva-admin-key': adminKey.trim(),
+          ...authorizationHeaders(),
         },
         method: 'PATCH',
       });
@@ -438,6 +543,72 @@ export default function Home() {
       );
     } finally {
       setUpdatingLocationId(undefined);
+    }
+  };
+
+  const updateDeletionRequest = async (
+    requestId: string,
+    status: 'COMPLETED' | 'IN_REVIEW' | 'REJECTED',
+  ) => {
+    setUpdatingDeletionId(requestId);
+    setError(undefined);
+    try {
+      const response = await fetch(
+        `${apiUrl}/admin/account-deletion-requests/${requestId}`,
+        {
+          body: JSON.stringify({ status }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...authorizationHeaders(),
+          },
+          method: 'PATCH',
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      setDeletionRequests((current) =>
+        current.filter((request) => request.id !== requestId),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : 'Unable to update this deletion request.',
+      );
+    } finally {
+      setUpdatingDeletionId(undefined);
+    }
+  };
+
+  const updateBetaRequest = async (
+    requestId: string,
+    status: 'DECLINED' | 'INVITED',
+  ) => {
+    setUpdatingBetaId(requestId);
+    setError(undefined);
+    try {
+      const response = await fetch(
+        `${apiUrl}/admin/beta-access-requests/${requestId}`,
+        {
+          body: JSON.stringify({ status }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...authorizationHeaders(),
+          },
+          method: 'PATCH',
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      setBetaRequests((current) =>
+        current.filter((request) => request.id !== requestId),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : 'Unable to update this beta request.',
+      );
+    } finally {
+      setUpdatingBetaId(undefined);
     }
   };
 
@@ -467,26 +638,52 @@ export default function Home() {
 
         <form
           className="flex flex-col gap-3 rounded-lg border border-stone-200 bg-white p-5 shadow-sm md:flex-row md:items-end"
-          onSubmit={(event) => void loadReviews(event)}
+          onSubmit={
+            idToken
+              ? (event) => void loadReviews(event)
+              : (event) => void signInAdmin(event)
+          }
         >
           <label className="flex flex-1 flex-col gap-2 text-sm font-semibold text-stone-800">
-            Admin key
+            Admin email
             <input
-              autoComplete="current-password"
+              autoComplete="email"
               className="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-base font-normal outline-none ring-rose-300 focus:ring-2"
-              onChange={(event) => setAdminKey(event.target.value)}
-              placeholder="NIVA_ADMIN_KEY"
-              type="password"
-              value={adminKey}
+              disabled={Boolean(idToken)}
+              onChange={(event) => setAdminEmail(event.target.value)}
+              placeholder="admin@niva.app"
+              type="email"
+              value={adminEmail}
             />
           </label>
+          {!idToken ? (
+            <label className="flex flex-1 flex-col gap-2 text-sm font-semibold text-stone-800">
+              Password
+              <input
+                autoComplete="current-password"
+                className="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-base font-normal outline-none ring-rose-300 focus:ring-2"
+                onChange={(event) => setAdminPassword(event.target.value)}
+                type="password"
+                value={adminPassword}
+              />
+            </label>
+          ) : null}
           <button
             className="min-h-11 rounded-md bg-teal-700 px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={loading}
             type="submit"
           >
-            {loading ? 'Loading...' : 'Load queue'}
+            {loading ? 'Loading...' : idToken ? 'Refresh dashboard' : 'Sign in'}
           </button>
+          {idToken ? (
+            <button
+              className="min-h-11 rounded-md border border-stone-300 px-4 text-sm font-bold text-stone-700"
+              onClick={() => void signOut(getAdminFirebaseAuth())}
+              type="button"
+            >
+              Sign out
+            </button>
+          ) : null}
         </form>
 
         {error ? (
@@ -512,8 +709,7 @@ export default function Home() {
           <section className="border-y border-stone-200 py-12 text-center">
             <h2 className="text-lg font-bold">Load the review queue</h2>
             <p className="mt-2 text-sm text-stone-600">
-              Enter the backend&apos;s `NIVA_ADMIN_KEY` above. No admin
-              credential is stored in this dashboard.
+              Sign in with a Firebase account that has active Niva admin access.
             </p>
           </section>
         )}
@@ -562,6 +758,126 @@ export default function Home() {
               <p className="border-y border-stone-200 py-5 text-sm text-stone-600">
                 Search members when you need context for verification or host
                 review.
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {loaded ? (
+          <section className="grid gap-4 border-t border-stone-200 pt-6">
+            <div>
+              <p className="text-sm font-semibold text-teal-700">
+                Website waitlist
+              </p>
+              <h2 className="mt-1 text-2xl font-bold">Beta access requests</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+                Requests submitted on the Niva website are persisted here for
+                measured invitations.
+              </p>
+            </div>
+            {betaRequests.length ? (
+              <div className="grid gap-3">
+                {betaRequests.map((request) => (
+                  <article
+                    className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-4 md:flex-row md:items-center"
+                    key={request.id}
+                  >
+                    <div className="flex-1">
+                      <p className="font-semibold text-stone-900">
+                        {request.email}
+                      </p>
+                      <p className="mt-1 text-sm text-stone-500">
+                        {request.city} · {request.interest}
+                      </p>
+                    </div>
+                    <button
+                      className="min-h-10 rounded-md bg-teal-700 px-3 text-sm font-bold text-white disabled:opacity-60"
+                      disabled={updatingBetaId === request.id}
+                      onClick={() =>
+                        void updateBetaRequest(request.id, 'INVITED')
+                      }
+                      type="button"
+                    >
+                      Mark invited
+                    </button>
+                    <button
+                      className="min-h-10 rounded-md border border-stone-300 px-3 text-sm font-bold text-stone-700 disabled:opacity-60"
+                      disabled={updatingBetaId === request.id}
+                      onClick={() =>
+                        void updateBetaRequest(request.id, 'DECLINED')
+                      }
+                      type="button"
+                    >
+                      Decline
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="border-y border-stone-200 py-6 text-sm text-stone-600">
+                No pending beta requests.
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {loaded ? (
+          <section className="grid gap-4 border-t border-stone-200 pt-6">
+            <div>
+              <p className="text-sm font-semibold text-rose-700">
+                Privacy operations
+              </p>
+              <h2 className="mt-1 text-2xl font-bold">
+                Account deletion requests
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
+                Verify ownership using the account contact method before
+                deleting any account. Completing this queue item records the
+                operational decision; signed-in members can delete immediately
+                from the app.
+              </p>
+            </div>
+            {deletionRequests.length ? (
+              <div className="grid gap-3">
+                {deletionRequests.map((request) => (
+                  <article
+                    className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-4 md:flex-row md:items-center"
+                    key={request.id}
+                  >
+                    <div className="flex-1">
+                      <p className="font-semibold text-stone-900">
+                        {request.identifier}
+                      </p>
+                      <p className="mt-1 text-sm text-stone-500">
+                        Requested {new Date(request.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      className="min-h-10 rounded-md border border-amber-600 px-3 text-sm font-bold text-amber-800 disabled:opacity-60"
+                      disabled={updatingDeletionId === request.id}
+                      onClick={() =>
+                        void updateDeletionRequest(request.id, 'IN_REVIEW')
+                      }
+                      type="button"
+                    >
+                      Start review
+                    </button>
+                    <button
+                      className="min-h-10 rounded-md bg-teal-700 px-3 text-sm font-bold text-white disabled:opacity-60"
+                      disabled={updatingDeletionId === request.id}
+                      onClick={() =>
+                        void updateDeletionRequest(request.id, 'COMPLETED')
+                      }
+                      type="button"
+                    >
+                      Mark completed
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="border-y border-stone-200 py-6 text-sm text-stone-600">
+                No pending account deletion requests.
               </p>
             )}
           </section>
@@ -708,11 +1024,11 @@ export default function Home() {
 
         <section className="grid gap-4 border-t border-stone-200 pt-6 md:grid-cols-2">
           <div>
-            <h2 className="text-xl font-bold">What the admin key means</h2>
+            <h2 className="text-xl font-bold">Named administrator access</h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              `NIVA_ADMIN_KEY` is a beta-only shared credential sent as
-              `x-niva-admin-key`. The backend rejects queue reads and review
-              actions without it.
+              Every dashboard request carries the signed-in administrator&apos;s
+              Firebase ID token. The backend checks that identity against its
+              active admin role before allowing any queue read or action.
             </p>
           </div>
           <div>
@@ -891,6 +1207,11 @@ function MemberCard({ member }: { member: AdminMember }) {
         Verification: {member.selfieVerification?.status ?? 'NOT_STARTED'} ·
         Profile: {member.profile?.profileCompleteness ?? 0}%
       </p>
+      {member.email || member.phone ? (
+        <p className="mt-2 text-sm text-stone-600">
+          {[member.email, member.phone].filter(Boolean).join(' · ')}
+        </p>
+      ) : null}
       {member.profile?.interests.length ? (
         <p className="mt-2 text-sm text-stone-600">
           {member.profile.interests.join(' · ')}
