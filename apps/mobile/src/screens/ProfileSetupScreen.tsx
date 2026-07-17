@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Camera,
-  MapPin,
   Minus,
   Plus,
   Save,
@@ -244,7 +243,7 @@ export function ProfileSetupScreen({
             <Text style={styles.profilePhotoMeta}>
               {mode === 'edit'
                 ? 'Your current photo remains unless you choose a new one.'
-                : 'Add a clear photo so approved members can recognise you.'}
+                : 'Add a clear photo so members and hosts can recognise you at activities.'}
             </Text>
           </View>
         </Pressable>
@@ -267,17 +266,6 @@ export function ProfileSetupScreen({
             placeholder="Himaja"
             value={displayName}
           />
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>City *</Text>
-            <View style={styles.fixedField}>
-              <MapPin color={colors.secondary} size={21} strokeWidth={2.4} />
-              <View>
-                <Text style={styles.fixedFieldValue}>{betaCity}</Text>
-                <Text style={styles.fixedFieldMeta}>Closed beta city</Text>
-              </View>
-            </View>
-          </View>
 
           <AgeField
             age={age}
@@ -337,10 +325,11 @@ export function ProfileSetupScreen({
           />
 
           <TextField
-            label="Bio (optional)"
+            helperText="Share what you enjoy and the kinds of activities or friendships you are looking for."
+            label="About you"
             multiline
             onChangeText={setBio}
-            placeholder="New to the city, looking for weekend activities."
+            placeholder="I enjoy weekend badminton, books, and trying new workshops."
             style={styles.bioInput}
             value={bio}
           />
@@ -554,27 +543,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typography.small,
     lineHeight: 18,
-  },
-  fixedField: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 56,
-    paddingHorizontal: spacing.md,
-  },
-  fixedFieldMeta: {
-    color: colors.muted,
-    fontSize: typography.small,
-    marginTop: 2,
-  },
-  fixedFieldValue: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
   },
   invalidField: {
     borderColor: colors.primaryDark,

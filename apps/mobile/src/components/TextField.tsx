@@ -1,17 +1,32 @@
-import { KeyboardTypeOptions, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import {
+  KeyboardTypeOptions,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+} from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 
 type TextFieldProps = TextInputProps & {
   error?: string;
+  helperText?: string;
   keyboardType?: KeyboardTypeOptions;
   label: string;
 };
 
-export function TextField({ error, label, style, ...props }: TextFieldProps) {
+export function TextField({
+  error,
+  helperText,
+  label,
+  style,
+  ...props
+}: TextFieldProps) {
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
+      {helperText ? <Text style={styles.helper}>{helperText}</Text> : null}
       <TextInput
         placeholderTextColor={colors.muted}
         selectionColor={colors.primary}
@@ -33,6 +48,11 @@ const styles = StyleSheet.create({
   group: {
     gap: spacing.xs,
     width: '100%',
+  },
+  helper: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: colors.surface,
