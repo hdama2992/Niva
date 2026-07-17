@@ -1,9 +1,11 @@
 import {
+  ArrowLeft,
   ArrowRight,
   Camera,
   MapPin,
   Minus,
   Plus,
+  Save,
   Sparkles,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
@@ -26,8 +28,12 @@ import { pickProfilePhoto } from '../services/media';
 import { ProfileDraft, SelectedProfilePhoto } from '../types/niva';
 
 type ProfileSetupScreenProps = {
+  initialProfile?: ProfileDraft;
+  initialProfilePhotoUrl?: string;
+  mode?: 'create' | 'edit';
+  onBack?: () => void;
   username: string;
-  onComplete: (profile: ProfileDraft) => void;
+  onComplete: (profile: ProfileDraft) => Promise<void> | void;
 };
 
 const interestOptions = [
@@ -59,19 +65,48 @@ const languageOptions = [
 const betaCity = 'Bangalore';
 
 export function ProfileSetupScreen({
+  initialProfile,
+  initialProfilePhotoUrl,
+  mode = 'create',
+  onBack,
   username,
   onComplete,
 }: ProfileSetupScreenProps) {
-  const [displayName, setDisplayName] = useState(username);
-  const [age, setAge] = useState<number>();
-  const [bio, setBio] = useState('');
-  const [languages, setLanguages] = useState<string[]>([]);
-  const [occupation, setOccupation] = useState('');
-  const [interests, setInterests] = useState<string[]>([]);
+  const [displayName, setDisplayName] = useState(
+    initialProfile?.displayName ?? username,
+  );
+  const [age, setAge] = useState<number | undefined>(initialProfile?.age);
+  const [bio, setBio] = useState(initialProfile?.bio ?? '');
+  const [languages, setLanguages] = useState<string[]>(
+    initialProfile?.languages ?? [],
+  );
+  const [occupation, setOccupation] = useState(
+    initialProfile?.occupation ?? '',
+  );
+  const [interests, setInterests] = useState<string[]>(
+    initialProfile?.interests ?? [],
+  );
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
   const [error, setError] = useState<string>();
+  const [attempted, setAttempted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const selectedEnoughInterests = interests.length >= 3;
+  const hasProfilePhoto = Boolean(profilePhoto || initialProfilePhotoUrl);
+  const availableLanguages = useMemo(
+    () =>
+      Array.from(
+        new Set([...languageOptions, ...(initialProfile?.languages ?? [])]),
+      ),
+    [initialProfile?.languages],
+  );
+  const availableInterests = useMemo(
+    () =>
+      Array.from(
+        new Set([...interestOptions, ...(initialProfile?.interests ?? [])]),
+      ),
+    [initialProfile?.interests],
+  );
   const canContinue = useMemo(
     () =>
       displayName.trim().length >= 2 &&
@@ -79,9 +114,9 @@ export function ProfileSetupScreen({
       age >= 18 &&
       age <= 100 &&
       languages.length > 0 &&
-      Boolean(profilePhoto) &&
+      hasProfilePhoto &&
       selectedEnoughInterests,
-    [age, displayName, languages, profilePhoto, selectedEnoughInterests],
+    [age, displayName, hasProfilePhoto, languages, selectedEnoughInterests],
   );
 
   const toggleInterest = (interest: string) => {
@@ -102,30 +137,36 @@ export function ProfileSetupScreen({
     setError(undefined);
   };
 
-  const continueToDeclaration = () => {
+  const continueToDeclaration = async () => {
+    setAttempted(true);
+
     if (!canContinue) {
-      setError(
-        'Add a profile photo and complete every required field before continuing.',
-      );
       return;
     }
 
-    onComplete({
-      displayName: displayName.trim(),
-      city: betaCity,
-      bio: bio.trim() || undefined,
-      age,
-      languages,
-      occupation: occupation.trim() || undefined,
-      profilePhoto,
-      interests,
-    });
+    setSubmitting(true);
+    try {
+      await onComplete({
+        displayName: displayName.trim(),
+        city: betaCity,
+        bio: bio.trim() || undefined,
+        age,
+        languages,
+        occupation: occupation.trim() || undefined,
+        profilePhoto,
+        interests,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const chooseProfilePhoto = async () => {
     try {
       const photo = await pickProfilePhoto();
-      setProfilePhoto(photo);
+      if (photo) {
+        setProfilePhoto(photo);
+      }
       setError(undefined);
     } catch (photoError) {
       setError(
@@ -141,18 +182,39 @@ export function ProfileSetupScreen({
       behavior={Platform.select({ ios: 'padding', android: undefined })}
       style={styles.container}
     >
+      {mode === 'edit' ? (
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            hitSlop={10}
+            onPress={onBack}
+            style={styles.backButton}
+          >
+            <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
+          </Pressable>
+          <Text style={styles.topBarTitle}>Profile</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+      ) : null}
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <View style={styles.iconPlate}>
-            <Sparkles color={colors.secondary} size={34} strokeWidth={2.2} />
-          </View>
+          {mode === 'create' ? (
+            <View style={styles.iconPlate}>
+              <Sparkles color={colors.secondary} size={34} strokeWidth={2.2} />
+            </View>
+          ) : null}
           <Text style={styles.eyebrow}>@{username}</Text>
-          <Text style={styles.title}>Complete your profile</Text>
+          <Text style={styles.title}>
+            {mode === 'edit' ? 'Edit your profile' : 'Complete your profile'}
+          </Text>
           <Text style={styles.subtitle}>
-            Niva uses interests and city to recommend small recurring groups.
+            {mode === 'edit'
+              ? 'Keep your details current for the groups you join.'
+              : 'Niva uses interests and city to recommend small recurring groups.'}
           </Text>
           <Text style={styles.requiredNote}>* Required</Text>
         </View>
@@ -160,11 +222,14 @@ export function ProfileSetupScreen({
         <Pressable
           accessibilityRole="button"
           onPress={() => void chooseProfilePhoto()}
-          style={styles.profilePhotoPicker}
+          style={[
+            styles.profilePhotoPicker,
+            attempted && !hasProfilePhoto && styles.invalidField,
+          ]}
         >
-          {profilePhoto ? (
+          {profilePhoto || initialProfilePhotoUrl ? (
             <Image
-              source={{ uri: profilePhoto.uri }}
+              source={{ uri: profilePhoto?.uri ?? initialProfilePhotoUrl }}
               style={styles.profilePhoto}
             />
           ) : (
@@ -173,15 +238,27 @@ export function ProfileSetupScreen({
             </View>
           )}
           <View style={styles.profilePhotoCopy}>
-            <Text style={styles.profilePhotoTitle}>Profile photo *</Text>
+            <Text style={styles.profilePhotoTitle}>
+              {mode === 'edit' ? 'Change profile photo' : 'Profile photo *'}
+            </Text>
             <Text style={styles.profilePhotoMeta}>
-              Add a clear photo so approved members can recognise you.
+              {mode === 'edit'
+                ? 'Your current photo remains unless you choose a new one.'
+                : 'Add a clear photo so approved members can recognise you.'}
             </Text>
           </View>
         </Pressable>
+        {attempted && !hasProfilePhoto ? (
+          <Text style={styles.fieldError}>Add a profile photo.</Text>
+        ) : null}
 
         <View style={styles.form}>
           <TextField
+            error={
+              attempted && displayName.trim().length < 2
+                ? 'Enter at least two characters.'
+                : undefined
+            }
             label="Display name *"
             onChangeText={(value) => {
               setDisplayName(value);
@@ -204,6 +281,11 @@ export function ProfileSetupScreen({
 
           <AgeField
             age={age}
+            error={
+              attempted && (age === undefined || age < 18 || age > 100)
+                ? 'Enter an age between 18 and 100.'
+                : undefined
+            }
             onChange={(value) => {
               setAge(value);
               setError(undefined);
@@ -214,7 +296,7 @@ export function ProfileSetupScreen({
             <Text style={styles.fieldLabel}>Languages *</Text>
             <Text style={styles.fieldMeta}>Select every language you use.</Text>
             <View style={styles.choiceList}>
-              {languageOptions.map((language) => {
+              {availableLanguages.map((language) => {
                 const selected = languages.includes(language);
 
                 return (
@@ -240,6 +322,11 @@ export function ProfileSetupScreen({
                 );
               })}
             </View>
+            {attempted && languages.length === 0 ? (
+              <Text style={styles.fieldError}>
+                Select at least one language.
+              </Text>
+            ) : null}
           </View>
 
           <TextField
@@ -267,7 +354,7 @@ export function ProfileSetupScreen({
         </View>
 
         <View style={styles.interests}>
-          {interestOptions.map((interest) => {
+          {availableInterests.map((interest) => {
             const selected = interests.includes(interest);
 
             return (
@@ -293,14 +380,31 @@ export function ProfileSetupScreen({
           })}
         </View>
 
+        {attempted && !selectedEnoughInterests ? (
+          <Text style={styles.fieldError}>
+            Select at least three interests.
+          </Text>
+        ) : null}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton
+          disabled={submitting}
           icon={
-            <ArrowRight color={colors.surface} size={20} strokeWidth={2.4} />
+            mode === 'edit' ? (
+              <Save color={colors.surface} size={20} strokeWidth={2.4} />
+            ) : (
+              <ArrowRight color={colors.surface} size={20} strokeWidth={2.4} />
+            )
           }
-          label="Continue"
-          onPress={continueToDeclaration}
+          label={
+            submitting
+              ? 'Saving...'
+              : mode === 'edit'
+                ? 'Save changes'
+                : 'Continue'
+          }
+          onPress={() => void continueToDeclaration()}
         />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -309,9 +413,11 @@ export function ProfileSetupScreen({
 
 function AgeField({
   age,
+  error,
   onChange,
 }: {
   age?: number;
+  error?: string;
   onChange: (age?: number) => void;
 }) {
   const updateFromText = (value: string) => {
@@ -362,6 +468,7 @@ function AgeField({
         </Pressable>
       </View>
       <Text style={styles.fieldMeta}>You must be 18 or older.</Text>
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
 }
@@ -402,6 +509,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     textAlignVertical: 'top',
   },
+  backButton: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
   choiceList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -424,6 +537,13 @@ const styles = StyleSheet.create({
   },
   fieldGroup: {
     gap: spacing.xs,
+  },
+  fieldError: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginBottom: spacing.sm,
   },
   fieldLabel: {
     color: colors.ink,
@@ -455,6 +575,9 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
+  },
+  invalidField: {
+    borderColor: colors.primaryDark,
   },
   eyebrow: {
     color: colors.secondary,
@@ -576,5 +699,23 @@ const styles = StyleSheet.create({
     fontSize: typography.heading,
     fontWeight: '800',
     lineHeight: 34,
+  },
+  topBar: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 56,
+    paddingHorizontal: spacing.md,
+  },
+  topBarSpacer: {
+    height: 40,
+    width: 40,
+  },
+  topBarTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
 });

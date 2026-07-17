@@ -58,7 +58,13 @@ type Route =
     }
   | { idToken: string; name: 'selfie'; user: NivaUser; joiningTitle?: string }
   | { idToken: string; name: 'pending'; user: NivaUser }
-  | { idToken: string; name: 'home'; user: NivaUser };
+  | { idToken: string; name: 'edit-profile'; user: NivaUser }
+  | {
+      idToken: string;
+      initialTab?: 'home' | 'profile';
+      name: 'home';
+      user: NivaUser;
+    };
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
@@ -195,6 +201,39 @@ export default function App() {
       setRoute(routeForApiUser(idToken, user));
     });
 
+  const handleProfileUpdate = (
+    idToken: string,
+    currentUser: NivaUser,
+    profile: ProfileDraft,
+  ) =>
+    withApiErrors(async () => {
+      const { age, profilePhoto, ...profileData } = profile;
+      if (!age) {
+        throw new Error('Enter a valid age before saving your profile.');
+      }
+
+      const profilePhotoUrl = profilePhoto
+        ? await uploadProfilePhoto(profilePhoto)
+        : currentUser.profilePhotoUrl;
+
+      if (!profilePhotoUrl) {
+        throw new Error('Add a profile photo before saving your profile.');
+      }
+
+      const { user } = await updateProfile(idToken, {
+        age,
+        ...profileData,
+        profilePhotoUrl,
+      });
+
+      setRoute({
+        idToken,
+        initialTab: 'profile',
+        name: 'home',
+        user: mapApiUser(user),
+      });
+    });
+
   const handleSelfie = (
     idToken: string,
     currentUser: NivaUser,
@@ -282,9 +321,30 @@ export default function App() {
             }
           />
         );
+      case 'edit-profile':
+        return (
+          <ProfileSetupScreen
+            initialProfile={profileDraftFromNivaUser(route.user)}
+            initialProfilePhotoUrl={route.user.profilePhotoUrl}
+            mode="edit"
+            onBack={() =>
+              setRoute({
+                idToken: route.idToken,
+                initialTab: 'profile',
+                name: 'home',
+                user: route.user,
+              })
+            }
+            onComplete={(profile) =>
+              handleProfileUpdate(route.idToken, route.user, profile)
+            }
+            username={route.user.username}
+          />
+        );
       case 'home':
         return (
           <HomeScreen
+            initialTab={route.initialTab}
             onDeleteAccount={async () => {
               await deleteAccount(route.idToken);
               await logoutMobileUser();
@@ -294,6 +354,13 @@ export default function App() {
               withApiErrors(async () => {
                 await logoutMobileUser();
                 setRoute({ name: 'login' });
+              })
+            }
+            onEditProfile={() =>
+              setRoute({
+                idToken: route.idToken,
+                name: 'edit-profile',
+                user: route.user,
               })
             }
             onStartVerification={(joiningTitle) =>
@@ -417,6 +484,18 @@ function profileDraftFromApiUser(user: ApiUser): ProfileDraft | undefined {
     languages: profile.languages?.length ? profile.languages : ['English'],
     occupation: profile.occupation ?? undefined,
     interests: profile.interests,
+  };
+}
+
+function profileDraftFromNivaUser(user: NivaUser): ProfileDraft {
+  return {
+    age: user.age,
+    bio: user.bio,
+    city: user.city,
+    displayName: user.displayName,
+    interests: user.interests,
+    languages: user.languages,
+    occupation: user.occupation,
   };
 }
 

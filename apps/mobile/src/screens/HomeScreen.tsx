@@ -8,6 +8,7 @@ import {
   Home,
   LockKeyhole,
   LogOut,
+  Pencil,
   Search,
   Settings,
   ShieldCheck,
@@ -94,9 +95,11 @@ import { NivaUser } from '../types/niva';
 
 type HomeScreenProps = {
   idToken: string;
+  initialTab?: 'home' | 'profile';
   user: NivaUser;
   onLogout: () => void;
   onDeleteAccount: () => Promise<void>;
+  onEditProfile: () => void;
   onStartVerification: (joiningTitle?: string) => void;
 };
 
@@ -127,12 +130,14 @@ const defaultSettings: CommunitySettings = {
 
 export function HomeScreen({
   idToken,
+  initialTab = 'home',
   user,
   onLogout,
   onDeleteAccount,
+  onEditProfile,
   onStartVerification,
 }: HomeScreenProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [blockedModalVisible, setBlockedModalVisible] = useState(false);
   const [joinRequest, setJoinRequest] = useState<string>();
   const [joinCandidate, setJoinCandidate] = useState<DiscoveryItem>();
@@ -1042,6 +1047,14 @@ export function HomeScreen({
               </View>
             </View>
             <View style={styles.profileActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onEditProfile}
+                style={styles.secondaryAction}
+              >
+                <Pencil color={colors.muted} size={19} strokeWidth={2.4} />
+                <Text style={styles.secondaryActionText}>Edit profile</Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setSecondaryScreen('settings')}
