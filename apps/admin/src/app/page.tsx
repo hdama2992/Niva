@@ -6,7 +6,10 @@ import {
   signOut,
 } from 'firebase/auth';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { getAdminFirebaseAuth } from '../lib/firebase';
+import {
+  firebaseAdminUiConfigured,
+  getAdminFirebaseAuth,
+} from '../lib/firebase';
 
 type ReviewStatus = 'APPROVED' | 'NEEDS_REVIEW' | 'PENDING' | 'REJECTED';
 
@@ -103,7 +106,11 @@ export default function Home() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [idToken, setIdToken] = useState('');
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | undefined>(() =>
+    firebaseAdminUiConfigured
+      ? undefined
+      : 'Add the public Firebase web configuration to apps/admin/.env.local.',
+  );
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState<VerificationReview[]>([]);
   const [approvals, setApprovals] = useState<HostApproval[]>([]);
@@ -140,9 +147,13 @@ export default function Home() {
   );
 
   useEffect(() => {
-    let unsubscribe: () => void = () => {};
-    try {
-      unsubscribe = onAuthStateChanged(getAdminFirebaseAuth(), async (user) => {
+    if (!firebaseAdminUiConfigured) {
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(
+      getAdminFirebaseAuth(),
+      async (user) => {
         setIdToken(user ? await user.getIdToken() : '');
         if (!user) {
           setLoaded(false);
@@ -153,14 +164,8 @@ export default function Home() {
           setDeletionRequests([]);
           setBetaRequests([]);
         }
-      });
-    } catch (configurationError) {
-      setError(
-        configurationError instanceof Error
-          ? configurationError.message
-          : 'Firebase admin sign-in is not configured.',
-      );
-    }
+      },
+    );
     return unsubscribe;
   }, []);
 

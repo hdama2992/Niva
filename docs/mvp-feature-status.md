@@ -184,12 +184,11 @@ Community: event chats and circle chats only
   data deletion, a public deletion-request page, and an admin processing queue.
 - Public privacy, beta terms, and account-deletion pages.
 - Backend-persisted website beta access requests.
+- Responsive web-preview QA completed at compact phone (320×568), standard
+  phone (390×844), and tablet (768×1024) viewports. Physical-device checks
+  remain part of production integration.
 
 ## Pending
-
-### Product And UX
-
-- Final visual and responsive QA across supported phone sizes.
 
 ### Mobile Integration
 

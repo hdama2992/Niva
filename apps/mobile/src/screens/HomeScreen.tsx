@@ -32,6 +32,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -1213,18 +1214,22 @@ function Header({
   onOpenNotifications: () => void;
   user: NivaUser;
 }) {
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
+
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, compact && styles.headerCompact]}>
       <View style={styles.headerCopy}>
         <Text numberOfLines={2} style={styles.greeting}>
-          Good morning, {user.displayName}
+          Good morning,{compact ? `\n` : ' '}
+          {user.displayName}
         </Text>
         <Text style={styles.city}>{user.city}</Text>
       </View>
       <Pressable
         accessibilityRole="button"
         onPress={onOpenNotifications}
-        style={styles.headerBadge}
+        style={[styles.headerBadge, compact && styles.headerBadgeCompact]}
       >
         <Bell color={colors.primary} size={20} strokeWidth={2.4} />
         <Text style={styles.headerBadgeText}>Alerts</Text>
@@ -1878,6 +1883,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  headerCompact: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
   headerBadge: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -1894,6 +1903,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: typography.small,
     fontWeight: '800',
+  },
+  headerBadgeCompact: {
+    alignSelf: 'flex-start',
   },
   horizontalCards: {
     marginRight: -spacing.lg,
@@ -1972,7 +1984,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flex: 1,
     minWidth: 96,
-    padding: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
   },
   metricLabel: {
     color: colors.muted,

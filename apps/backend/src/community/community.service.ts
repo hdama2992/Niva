@@ -10,7 +10,6 @@ import {
   HostApprovalStatus,
   MembershipStatus,
   NotificationType,
-  Prisma,
   TrustTier,
   TrustVerificationStatus,
 } from '@prisma/client';
@@ -1556,7 +1555,7 @@ export class CommunityService {
       data: {
         circleId: input.circleId,
         eventId: input.eventId,
-        metadata: input.metadata as Prisma.InputJsonValue | undefined,
+        metadata: input.metadata,
         type,
         userId: input.userId,
       },

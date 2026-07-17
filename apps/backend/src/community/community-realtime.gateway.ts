@@ -24,6 +24,8 @@ type CohortSubscription = {
 
 type GatewayResponse = { error?: string; ok: boolean };
 
+type RealtimeSocketData = Record<string, unknown>;
+
 const realtimeOrigins = [
   process.env.ADMIN_ORIGIN ?? 'http://localhost:3000',
   process.env.MOBILE_ORIGIN ?? 'http://localhost:8081',
@@ -67,7 +69,7 @@ export class CommunityRealtimeGateway
       const user = await this.usersService.upsertFromFirebase(
         firebaseTokenToSessionInput(firebaseUser),
       );
-      client.data.userId = user.id;
+      this.socketData(client).userId = user.id;
       await client.join(this.realtime.memberRoom(user.id));
       client.emit('realtime:ready');
     } catch {
@@ -111,18 +113,22 @@ export class CommunityRealtimeGateway
     }
   }
 
-  private currentUserId(client: Socket) {
-    if (typeof client.data.userId !== 'string') {
+  private currentUserId(client: Socket): string {
+    const userId = this.socketData(client).userId;
+    if (typeof userId !== 'string') {
       throw new UnauthorizedException(
         'Realtime connection is not authenticated.',
       );
     }
 
-    return client.data.userId;
+    return userId;
   }
 
-  private handshakeToken(client: Socket) {
-    const authToken = client.handshake.auth?.idToken;
+  private handshakeToken(client: Socket): string | undefined {
+    const handshakeAuth: unknown = client.handshake.auth;
+    const authToken = this.isRecord(handshakeAuth)
+      ? handshakeAuth.idToken
+      : undefined;
     if (typeof authToken === 'string' && authToken.trim()) {
       return authToken.trim();
     }
@@ -130,6 +136,10 @@ export class CommunityRealtimeGateway
     const authorization = client.handshake.headers.authorization;
     const [scheme, token] = authorization?.split(' ') ?? [];
     return scheme === 'Bearer' && token ? token : undefined;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private messageFor(error: unknown) {
@@ -151,5 +161,14 @@ export class CommunityRealtimeGateway
     }
 
     return { activityId: input.activityId, type: input.type };
+  }
+
+  private socketData(client: Socket): RealtimeSocketData {
+    const data: unknown = client.data;
+    if (!this.isRecord(data)) {
+      throw new UnauthorizedException('Invalid realtime session data.');
+    }
+
+    return data;
   }
 }

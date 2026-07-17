@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { FormEvent, useState } from 'react';
 
 type BetaForm = {
@@ -274,9 +275,11 @@ export default function Home() {
         </div>
         <div className="collection-grid">
           <article className="collection-card collection-card-tall">
-            <img
+            <Image
               alt="A woman writing at a shared creative table"
+              height={1402}
               src="/images/niva-circle-notes.png"
+              width={1122}
             />
             <div>
               <p className="card-label">KEEP GOING</p>
@@ -285,9 +288,11 @@ export default function Home() {
             </div>
           </article>
           <article className="collection-card">
-            <img
+            <Image
               alt="Hands holding a handmade ceramic cup"
+              height={1402}
               src="/images/niva-gathering-cup.png"
+              width={1122}
             />
             <div>
               <p className="card-label">MAKE SOMETHING</p>
@@ -298,9 +303,11 @@ export default function Home() {
             </div>
           </article>
           <article className="collection-card">
-            <img
+            <Image
               alt="A welcoming creative studio entrance with plants"
+              height={1402}
               src="/images/niva-safe-arrival.png"
+              width={1122}
             />
             <div>
               <p className="card-label">STEP OUT</p>
