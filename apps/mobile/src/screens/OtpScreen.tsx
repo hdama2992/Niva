@@ -47,7 +47,7 @@ export function OtpScreen({
         <Text style={styles.subtitle}>
           {authMode === 'firebase'
             ? `Enter the six-digit code sent to ${phone}.`
-            : `Use any six digits for the local beta preview of ${phone}.`}
+            : `Enter the six-digit code to continue as ${phone}.`}
         </Text>
       </View>
 

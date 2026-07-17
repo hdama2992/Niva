@@ -100,9 +100,7 @@ export function LoginScreen({
           <Text style={styles.subtitle}>
             {pnvAvailable
               ? 'Verify the phone number on this device in one secure step.'
-              : authMode === 'firebase'
-              ? 'Enter your phone number to receive a verification code.'
-              : 'Enter your phone number for the local beta preview.'}
+              : 'Your phone number helps keep every Niva circle safer and more accountable.'}
           </Text>
         </View>
 
@@ -174,7 +172,7 @@ export function LoginScreen({
               <MessageSquareText color={colors.surface} size={20} strokeWidth={2.4} />
             )
           }
-          label={submitting ? 'Starting verification...' : pnvAvailable ? 'Send SMS code' : 'Continue'}
+          label={submitting ? 'Starting verification...' : pnvAvailable ? 'Text me a code' : 'Continue securely'}
           onPress={() => void continueToOtp()}
         />
       </View>
