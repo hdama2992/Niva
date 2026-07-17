@@ -66,3 +66,37 @@ describe('username availability', () => {
     ).resolves.toEqual({ available: true, username: 'himaja' });
   });
 });
+
+describe('welcome completion', () => {
+  const update = jest.fn();
+  const service = new UsersService({
+    user: { update },
+  } as unknown as PrismaService);
+
+  beforeEach(() => {
+    update.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('records completion and returns the refreshed public member', async () => {
+    jest.useFakeTimers();
+    const completedAt = new Date('2026-07-17T12:00:00.000Z');
+    jest.setSystemTime(completedAt);
+    const publicUser = {
+      id: 'user_1',
+      welcomeCompletedAt: completedAt,
+    };
+    update.mockResolvedValue(publicUser);
+
+    await expect(service.completeWelcome('user_1')).resolves.toBe(publicUser);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { welcomeCompletedAt: completedAt },
+        where: { id: 'user_1' },
+      }),
+    );
+  });
+});

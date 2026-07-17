@@ -34,6 +34,7 @@ const publicUserSelect = {
   communityGuidelinesAccepted: true,
   communityGuidelinesAcceptedAt: true,
   communityGuidelinesVersion: true,
+  welcomeCompletedAt: true,
   profile: true,
   selfieVerification: true,
   trust: true,
@@ -415,6 +416,14 @@ export class UsersService {
     );
     await this.recalculateTrustScore(userId);
     return this.getPublicUserById(userId);
+  }
+
+  async completeWelcome(userId: string): Promise<PublicUser> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { welcomeCompletedAt: new Date() },
+      select: publicUserSelect,
+    });
   }
 
   async acceptCommunityGuidelines(

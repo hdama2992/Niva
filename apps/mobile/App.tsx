@@ -13,9 +13,11 @@ import { SelfieUploadScreen } from './src/screens/SelfieUploadScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { UsernameScreen } from './src/screens/UsernameScreen';
 import { VerificationPendingScreen } from './src/screens/VerificationPendingScreen';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import {
   acceptSelfDeclaration,
   checkUsernameAvailability,
+  completeWelcome,
   ApiUser,
   createBetaSession,
   createSession,
@@ -56,12 +58,24 @@ type Route =
       username: string;
       profile: ProfileDraft;
     }
-  | { idToken: string; name: 'selfie'; user: NivaUser; joiningTitle?: string }
-  | { idToken: string; name: 'pending'; user: NivaUser }
-  | { idToken: string; name: 'edit-profile'; user: NivaUser }
   | {
       idToken: string;
-      initialTab?: 'home' | 'profile';
+      joiningTitle?: string;
+      name: 'selfie';
+      returnTab?: 'explore' | 'home' | 'plans' | 'profile';
+      user: NivaUser;
+    }
+  | {
+      idToken: string;
+      name: 'pending';
+      returnTab?: 'explore' | 'home' | 'plans' | 'profile';
+      user: NivaUser;
+    }
+  | { idToken: string; name: 'edit-profile'; user: NivaUser }
+  | { idToken: string; name: 'welcome'; user: NivaUser }
+  | {
+      idToken: string;
+      initialTab?: 'explore' | 'home' | 'plans' | 'profile';
       name: 'home';
       user: NivaUser;
     };
@@ -234,10 +248,17 @@ export default function App() {
       });
     });
 
+  const handleWelcome = (idToken: string) =>
+    withApiErrors(async () => {
+      const { user } = await completeWelcome(idToken);
+      setRoute({ idToken, name: 'home', user: mapApiUser(user) });
+    });
+
   const handleSelfie = (
     idToken: string,
     currentUser: NivaUser,
     image: SelectedImage,
+    returnTab?: 'explore' | 'home' | 'plans' | 'profile',
   ) =>
     withApiErrors(async () => {
       const selfieStoragePath = await uploadVerificationSelfie(image);
@@ -245,6 +266,7 @@ export default function App() {
       setRoute({
         idToken,
         name: 'pending',
+        returnTab,
         user: {
           ...currentUser,
           ...mapApiUser(user),
@@ -305,7 +327,17 @@ export default function App() {
           <SelfieUploadScreen
             displayName={route.user.displayName}
             joiningTitle={route.joiningTitle}
-            onSubmit={(image) => handleSelfie(route.idToken, route.user, image)}
+            onBack={() =>
+              setRoute({
+                idToken: route.idToken,
+                initialTab: route.returnTab ?? 'home',
+                name: 'home',
+                user: route.user,
+              })
+            }
+            onSubmit={(image) =>
+              handleSelfie(route.idToken, route.user, image, route.returnTab)
+            }
           />
         );
       case 'pending':
@@ -315,6 +347,7 @@ export default function App() {
             onContinue={() =>
               setRoute({
                 idToken: route.idToken,
+                initialTab: route.returnTab ?? 'home',
                 name: 'home',
                 user: route.user,
               })
@@ -341,6 +374,13 @@ export default function App() {
             username={route.user.username}
           />
         );
+      case 'welcome':
+        return (
+          <WelcomeScreen
+            displayName={route.user.displayName}
+            onContinue={() => handleWelcome(route.idToken)}
+          />
+        );
       case 'home':
         return (
           <HomeScreen
@@ -363,10 +403,11 @@ export default function App() {
                 user: route.user,
               })
             }
-            onStartVerification={(joiningTitle) =>
+            onStartVerification={(joiningTitle, returnTab) =>
               setRoute({
                 idToken: route.idToken,
                 name: 'selfie',
+                returnTab,
                 user: route.user,
                 joiningTitle,
               })
@@ -433,6 +474,10 @@ function routeForApiUser(idToken: string, user: ApiUser): Route {
       profile,
       username: user.username,
     };
+  }
+
+  if (!user.welcomeCompletedAt) {
+    return { idToken, name: 'welcome', user: mappedUser };
   }
 
   return { idToken, name: 'home', user: mappedUser };

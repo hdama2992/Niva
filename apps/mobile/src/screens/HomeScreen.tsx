@@ -95,12 +95,12 @@ import { NivaUser } from '../types/niva';
 
 type HomeScreenProps = {
   idToken: string;
-  initialTab?: 'home' | 'profile';
+  initialTab?: Tab;
   user: NivaUser;
   onLogout: () => void;
   onDeleteAccount: () => Promise<void>;
   onEditProfile: () => void;
-  onStartVerification: (joiningTitle?: string) => void;
+  onStartVerification: (joiningTitle?: string, returnTab?: Tab) => void;
 };
 
 type Tab = 'home' | 'explore' | 'plans' | 'profile';
@@ -342,7 +342,7 @@ export function HomeScreen({
 
     if (!verified) {
       if (user.verificationStatus === 'not_started') {
-        onStartVerification(item.title);
+        onStartVerification(item.title, activeTab);
         return;
       }
 

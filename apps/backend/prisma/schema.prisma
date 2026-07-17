@@ -168,6 +168,7 @@ model User {
   communityGuidelinesAccepted   Boolean          @default(false)
   communityGuidelinesAcceptedAt DateTime?
   communityGuidelinesVersion    String?
+  welcomeCompletedAt            DateTime?
   createdAt                 DateTime             @default(now())
   updatedAt                 DateTime             @updatedAt
   profile                   UserProfile?

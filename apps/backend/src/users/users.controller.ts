@@ -100,6 +100,13 @@ export class UsersController {
     };
   }
 
+  @Post('me/welcome-completed')
+  async completeWelcome(@Req() request: RequestWithFirebaseUser) {
+    const user = await this.currentUser(request);
+
+    return { user: await this.usersService.completeWelcome(user.id) };
+  }
+
   @Post('me/selfie')
   async submitSelfie(
     @Req() request: RequestWithFirebaseUser,
@@ -121,6 +128,7 @@ export class UsersController {
     @Req() request: RequestWithFirebaseUser,
     @Body() _body: DeleteAccountDto,
   ) {
+    void _body;
     const user = await this.currentUser(request);
     await this.firebaseAdminService.deleteUserIdentityAndMedia(
       request.firebaseUser.uid,

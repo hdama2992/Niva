@@ -39,6 +39,7 @@ export type ApiUser = {
   communityGuidelinesAccepted: boolean;
   communityGuidelinesAcceptedAt: string | null;
   communityGuidelinesVersion: string | null;
+  welcomeCompletedAt: string | null;
   profile: ApiUserProfile | null;
   selfieVerification: ApiSelfieVerification | null;
   trust: ApiTrust | null;
@@ -185,6 +186,12 @@ async function readErrorMessage(response: Response, fallback: string) {
 export function acceptSelfDeclaration(idToken: string) {
   return request<{ user: ApiUser }>('/users/me/self-declaration', idToken, {
     body: { accepted: true, version: 'v1' },
+    method: 'POST',
+  });
+}
+
+export function completeWelcome(idToken: string) {
+  return request<{ user: ApiUser }>('/users/me/welcome-completed', idToken, {
     method: 'POST',
   });
 }

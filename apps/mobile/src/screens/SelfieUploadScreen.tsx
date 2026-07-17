@@ -1,11 +1,19 @@
 import {
+  ArrowLeft,
   Camera,
   Image as ImageIcon,
   ShieldCheck,
   UploadCloud,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
@@ -14,12 +22,14 @@ import { chooseSelfie, SelectedImage, takeSelfie } from '../services/media';
 type SelfieUploadScreenProps = {
   displayName: string;
   joiningTitle?: string;
+  onBack: () => void;
   onSubmit: (image: SelectedImage) => Promise<void> | void;
 };
 
 export function SelfieUploadScreen({
   displayName,
   joiningTitle,
+  onBack,
   onSubmit,
 }: SelfieUploadScreenProps) {
   const [selfie, setSelfie] = useState<SelectedImage>();
@@ -62,6 +72,15 @@ export function SelfieUploadScreen({
 
   return (
     <View style={styles.container}>
+      <Pressable
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
+        hitSlop={10}
+        onPress={onBack}
+        style={styles.backButton}
+      >
+        <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
+      </Pressable>
       <View>
         <View style={styles.iconPlate}>
           <Camera color={colors.secondary} size={36} strokeWidth={2.2} />
@@ -140,6 +159,15 @@ export function SelfieUploadScreen({
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+    left: spacing.md,
+    position: 'absolute',
+    top: spacing.md,
+    width: 40,
+  },
   check: {
     backgroundColor: colors.secondarySoft,
     borderRadius: radius.pill,
