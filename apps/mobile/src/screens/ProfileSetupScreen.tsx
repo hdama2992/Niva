@@ -39,11 +39,11 @@ export function ProfileSetupScreen({
   username,
   onComplete,
 }: ProfileSetupScreenProps) {
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(username);
   const [city, setCity] = useState('Bangalore');
-  const [ageRange, setAgeRange] = useState('25-30');
+  const [ageRange, setAgeRange] = useState('');
   const [bio, setBio] = useState('');
-  const [languages, setLanguages] = useState('English, Hindi');
+  const [languages, setLanguages] = useState('');
   const [occupation, setOccupation] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
@@ -54,8 +54,18 @@ export function ProfileSetupScreen({
     () =>
       displayName.trim().length >= 2 &&
       city.trim().length >= 2 &&
+      ageRange.trim().length >= 2 &&
+      languages.split(',').some((language) => language.trim().length > 0) &&
+      Boolean(profilePhoto) &&
       selectedEnoughInterests,
-    [city, displayName, selectedEnoughInterests],
+    [
+      ageRange,
+      city,
+      displayName,
+      languages,
+      profilePhoto,
+      selectedEnoughInterests,
+    ],
   );
 
   const toggleInterest = (interest: string) => {
@@ -69,7 +79,9 @@ export function ProfileSetupScreen({
 
   const continueToDeclaration = () => {
     if (!canContinue) {
-      setError('Add your name, city, and at least three interests.');
+      setError(
+        'Add a profile photo and complete every required field before continuing.',
+      );
       return;
     }
 
@@ -92,6 +104,7 @@ export function ProfileSetupScreen({
     try {
       const photo = await pickProfilePhoto();
       setProfilePhoto(photo);
+      setError(undefined);
     } catch (photoError) {
       setError(
         photoError instanceof Error
@@ -119,6 +132,7 @@ export function ProfileSetupScreen({
           <Text style={styles.subtitle}>
             Niva uses interests and city to recommend small recurring groups.
           </Text>
+          <Text style={styles.requiredNote}>* Required</Text>
         </View>
 
         <Pressable
@@ -127,23 +141,26 @@ export function ProfileSetupScreen({
           style={styles.profilePhotoPicker}
         >
           {profilePhoto ? (
-            <Image source={{ uri: profilePhoto.uri }} style={styles.profilePhoto} />
+            <Image
+              source={{ uri: profilePhoto.uri }}
+              style={styles.profilePhoto}
+            />
           ) : (
             <View style={styles.profilePhotoPlaceholder}>
               <Camera color={colors.secondary} size={24} strokeWidth={2.3} />
             </View>
           )}
           <View style={styles.profilePhotoCopy}>
-            <Text style={styles.profilePhotoTitle}>Profile photo</Text>
+            <Text style={styles.profilePhotoTitle}>Profile photo *</Text>
             <Text style={styles.profilePhotoMeta}>
-              Optional. Use a clear photo so event members can recognise you.
+              Add a clear photo so approved members can recognise you.
             </Text>
           </View>
         </Pressable>
 
         <View style={styles.form}>
           <TextField
-            label="Display name"
+            label="Display name *"
             onChangeText={(value) => {
               setDisplayName(value);
               setError(undefined);
@@ -153,7 +170,7 @@ export function ProfileSetupScreen({
           />
 
           <TextField
-            label="City"
+            label="City *"
             onChangeText={(value) => {
               setCity(value);
               setError(undefined);
@@ -163,28 +180,28 @@ export function ProfileSetupScreen({
           />
 
           <TextField
-            label="Age range"
+            label="Age range *"
             onChangeText={setAgeRange}
             placeholder="25-30"
             value={ageRange}
           />
 
           <TextField
-            label="Languages"
+            label="Languages *"
             onChangeText={setLanguages}
             placeholder="English, Kannada, Hindi"
             value={languages}
           />
 
           <TextField
-            label="Occupation"
+            label="Occupation (optional)"
             onChangeText={setOccupation}
             placeholder="Designer, student, founder"
             value={occupation}
           />
 
           <TextField
-            label="Bio"
+            label="Bio (optional)"
             multiline
             onChangeText={setBio}
             placeholder="New to the city, looking for weekend activities."
@@ -195,10 +212,8 @@ export function ProfileSetupScreen({
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <Text style={styles.sectionMeta}>
-              {interests.length}/3 selected
-            </Text>
+            <Text style={styles.sectionTitle}>Interests *</Text>
+            <Text style={styles.sectionMeta}>{interests.length}/3 minimum</Text>
           </View>
           <MapPin color={colors.secondary} size={20} strokeWidth={2.3} />
         </View>
@@ -233,7 +248,6 @@ export function ProfileSetupScreen({
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton
-          disabled={!canContinue}
           icon={
             <ArrowRight color={colors.surface} size={20} strokeWidth={2.4} />
           }
@@ -350,6 +364,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
+  },
+  requiredNote: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: spacing.sm,
   },
   sectionHeader: {
     alignItems: 'center',

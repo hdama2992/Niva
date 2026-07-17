@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Post,
+  Query,
   Put,
   Req,
   UnauthorizedException,
@@ -47,6 +48,16 @@ export class UsersController {
     return {
       user: await this.usersService.setUsername(user.id, body.username),
     };
+  }
+
+  @Get('me/username-availability')
+  async getUsernameAvailability(
+    @Req() request: RequestWithFirebaseUser,
+    @Query('username') username = '',
+  ) {
+    const user = await this.currentUser(request);
+
+    return this.usersService.getUsernameAvailability(user.id, username);
   }
 
   @Put('me/profile')

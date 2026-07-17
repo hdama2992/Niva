@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Clock3,
   MapPin,
+  MessageCircle,
   ShieldCheck,
   UsersRound,
 } from 'lucide-react-native';
@@ -31,6 +32,7 @@ type ActivityDetailScreenProps = {
   onEdit: () => void;
   onIcebreakers: () => void;
   onJoin: () => void;
+  onOpenChat: () => void;
   onLeave: () => void;
   onManage: () => void;
 };
@@ -44,6 +46,7 @@ export function ActivityDetailScreen({
   onEdit,
   onIcebreakers,
   onJoin,
+  onOpenChat,
   onLeave,
   onManage,
 }: ActivityDetailScreenProps) {
@@ -61,6 +64,7 @@ export function ActivityDetailScreen({
   const canOpenIcebreakers =
     item.membershipStatus === 'APPROVED' ||
     item.membershipStatus === 'ATTENDED';
+  const canOpenChat = canOpenIcebreakers;
 
   return (
     <View style={styles.screen}>
@@ -256,6 +260,17 @@ export function ActivityDetailScreen({
           </Pressable>
         ) : null}
 
+        {canOpenChat && !cancelled ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenChat}
+            style={styles.chatAction}
+          >
+            <MessageCircle color={colors.surface} size={20} strokeWidth={2.4} />
+            <Text style={styles.chatActionText}>Open group chat</Text>
+          </Pressable>
+        ) : null}
+
         {canJoin ? (
           <Pressable
             accessibilityRole="button"
@@ -319,6 +334,22 @@ function formatMembershipStatus(status: DiscoveryItem['membershipStatus']) {
 }
 
 const styles = StyleSheet.create({
+  chatAction: {
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    minHeight: 50,
+    paddingHorizontal: spacing.md,
+  },
+  chatActionText: {
+    color: colors.surface,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
   directionsAction: {
     alignItems: 'center',
     alignSelf: 'flex-start',

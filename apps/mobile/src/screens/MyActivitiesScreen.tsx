@@ -3,6 +3,7 @@ import {
   CalendarCheck,
   CalendarDays,
   Clock3,
+  MessageCircle,
 } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMemo, useState } from 'react';
@@ -10,11 +11,13 @@ import { useMemo, useState } from 'react';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
 
-type ActivityFilter = 'upcoming' | 'past' | 'cancelled';
+type ActivityFilter = 'upcoming' | 'pending' | 'past' | 'cancelled';
 
 type MyActivitiesScreenProps = {
   items: DiscoveryItem[];
-  onBack: () => void;
+  embedded?: boolean;
+  onBack?: () => void;
+  onChat: (item: DiscoveryItem) => void;
   onFeedback: (item: DiscoveryItem) => void;
   onLeave: (item: DiscoveryItem) => void;
   onOpen: (item: DiscoveryItem) => void;
@@ -22,13 +25,16 @@ type MyActivitiesScreenProps = {
 
 const filters: Array<{ id: ActivityFilter; label: string }> = [
   { id: 'upcoming', label: 'Upcoming' },
+  { id: 'pending', label: 'Pending' },
   { id: 'past', label: 'Past' },
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
 export function MyActivitiesScreen({
+  embedded = false,
   items,
   onBack,
+  onChat,
   onFeedback,
   onLeave,
   onOpen,
@@ -43,6 +49,7 @@ export function MyActivitiesScreen({
         const past = item.startsAt
           ? new Date(item.startsAt).getTime() < Date.now()
           : false;
+        const pending = item.membershipStatus === 'REQUESTED';
 
         if (activeFilter === 'cancelled') {
           return cancelled;
@@ -52,10 +59,77 @@ export function MyActivitiesScreen({
           return !cancelled && past;
         }
 
-        return !cancelled && !past;
+        if (activeFilter === 'pending') {
+          return !cancelled && pending;
+        }
+
+        return !cancelled && !past && !pending;
       }),
     [activeFilter, items],
   );
+
+  const content = (
+    <>
+      <View style={styles.headingRow}>
+        <View style={styles.headingCopy}>
+          <Text style={styles.title}>
+            {embedded ? 'Plans' : 'Your activities'}
+          </Text>
+          <Text style={styles.subtitle}>
+            Keep upcoming plans, requests, and recurring circles in one place.
+          </Text>
+        </View>
+        <View style={styles.count}>
+          <Text style={styles.countValue}>{items.length}</Text>
+          <Text style={styles.countLabel}>saved</Text>
+        </View>
+      </View>
+
+      <View style={styles.segmentedControl}>
+        {filters.map((filter) => (
+          <Pressable
+            accessibilityRole="button"
+            key={filter.id}
+            onPress={() => setActiveFilter(filter.id)}
+            style={[
+              styles.segment,
+              activeFilter === filter.id && styles.segmentActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                activeFilter === filter.id && styles.segmentTextActive,
+              ]}
+            >
+              {filter.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {filteredItems.length ? (
+        <View style={styles.list}>
+          {filteredItems.map((item) => (
+            <ActivityCard
+              item={item}
+              key={item.id}
+              onChat={onChat}
+              onFeedback={onFeedback}
+              onLeave={onLeave}
+              onOpen={onOpen}
+            />
+          ))}
+        </View>
+      ) : (
+        <EmptyPlans filter={activeFilter} />
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <View style={styles.embeddedContent}>{content}</View>;
+  }
 
   return (
     <View style={styles.screen}>
@@ -77,58 +151,7 @@ export function MyActivitiesScreen({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headingRow}>
-          <View>
-            <Text style={styles.title}>Your activities</Text>
-            <Text style={styles.subtitle}>
-              Keep your upcoming commitments and membership requests in one
-              place.
-            </Text>
-          </View>
-          <View style={styles.count}>
-            <Text style={styles.countValue}>{items.length}</Text>
-            <Text style={styles.countLabel}>saved</Text>
-          </View>
-        </View>
-
-        <View style={styles.segmentedControl}>
-          {filters.map((filter) => (
-            <Pressable
-              accessibilityRole="button"
-              key={filter.id}
-              onPress={() => setActiveFilter(filter.id)}
-              style={[
-                styles.segment,
-                activeFilter === filter.id && styles.segmentActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  activeFilter === filter.id && styles.segmentTextActive,
-                ]}
-              >
-                {filter.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {filteredItems.length ? (
-          <View style={styles.list}>
-            {filteredItems.map((item) => (
-              <ActivityCard
-                item={item}
-                key={item.id}
-                onFeedback={onFeedback}
-                onLeave={onLeave}
-                onOpen={onOpen}
-              />
-            ))}
-          </View>
-        ) : (
-          <EmptyPlans filter={activeFilter} />
-        )}
+        {content}
       </ScrollView>
     </View>
   );
@@ -136,11 +159,13 @@ export function MyActivitiesScreen({
 
 function ActivityCard({
   item,
+  onChat,
   onFeedback,
   onLeave,
   onOpen,
 }: {
   item: DiscoveryItem;
+  onChat: (item: DiscoveryItem) => void;
   onFeedback: (item: DiscoveryItem) => void;
   onLeave: (item: DiscoveryItem) => void;
   onOpen: (item: DiscoveryItem) => void;
@@ -153,6 +178,9 @@ function ActivityCard({
     item.activityStatus !== 'CANCELLED' &&
     item.membershipStatus !== 'CANCELLED' &&
     Boolean(item.startsAt && new Date(item.startsAt).getTime() < Date.now());
+  const canChat =
+    item.membershipStatus === 'APPROVED' ||
+    item.membershipStatus === 'ATTENDED';
 
   return (
     <View style={styles.card}>
@@ -183,6 +211,20 @@ function ActivityCard({
         >
           <Text style={styles.detailActionText}>View details</Text>
         </Pressable>
+        {canChat ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onChat(item)}
+            style={styles.chatAction}
+          >
+            <MessageCircle
+              color={colors.secondary}
+              size={17}
+              strokeWidth={2.4}
+            />
+            <Text style={styles.chatActionText}>Group chat</Text>
+          </Pressable>
+        ) : null}
         {canGiveFeedback ? (
           <Pressable
             accessibilityRole="button"
@@ -220,10 +262,15 @@ function EmptyPlans({ filter }: { filter: ActivityFilter }) {
             'No past activities yet',
             'Completed sessions will appear here after their start time.',
           ]
-        : [
-            'Nothing upcoming yet',
-            'Explore a small event or circle when you are ready.',
-          ];
+        : filter === 'pending'
+          ? [
+              'No pending requests',
+              'Join requests awaiting a host decision will appear here.',
+            ]
+          : [
+              'Nothing upcoming yet',
+              'Explore a small event or circle when you are ready.',
+            ];
 
   return (
     <View style={styles.emptyState}>
@@ -276,6 +323,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 25,
     marginTop: spacing.sm,
+  },
+  chatAction: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
+  },
+  chatActionText: {
+    color: colors.secondary,
+    fontSize: typography.small,
+    fontWeight: '800',
   },
   category: {
     color: colors.secondary,
@@ -338,6 +400,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  embeddedContent: {
+    flex: 1,
+  },
   emptyState: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -378,6 +443,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     justifyContent: 'space-between',
+  },
+  headingCopy: {
+    flex: 1,
   },
   iconButton: {
     alignItems: 'center',

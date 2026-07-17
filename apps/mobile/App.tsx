@@ -15,6 +15,7 @@ import { UsernameScreen } from './src/screens/UsernameScreen';
 import { VerificationPendingScreen } from './src/screens/VerificationPendingScreen';
 import {
   acceptSelfDeclaration,
+  checkUsernameAvailability,
   ApiUser,
   createBetaSession,
   createSession,
@@ -157,11 +158,10 @@ export default function App() {
       setRoute(routeForApiUser(session.idToken, session.user));
     });
 
-  const handleUsername = (idToken: string, username: string) =>
-    withApiErrors(async () => {
-      const { user } = await setUsername(idToken, username);
-      setRoute(routeForApiUser(idToken, user));
-    });
+  const handleUsername = async (idToken: string, username: string) => {
+    const { user } = await setUsername(idToken, username);
+    setRoute(routeForApiUser(idToken, user));
+  };
 
   const handleProfile = (
     idToken: string,
@@ -170,12 +170,20 @@ export default function App() {
     profile: ProfileDraft,
   ) =>
     withApiErrors(async () => {
-      const { profilePhoto, ...profileData } = profile;
-      const profilePhotoUrl = profilePhoto
-        ? await uploadProfilePhoto(profilePhoto)
-        : undefined;
+      const { ageRange, profilePhoto, ...profileData } = profile;
+      if (!profilePhoto || !ageRange) {
+        throw new Error(
+          'Complete the required profile fields before continuing.',
+        );
+      }
 
-      await updateProfile(idToken, { ...profileData, profilePhotoUrl });
+      const profilePhotoUrl = await uploadProfilePhoto(profilePhoto);
+
+      await updateProfile(idToken, {
+        ageRange,
+        ...profileData,
+        profilePhotoUrl,
+      });
       setRoute({
         idToken,
         name: 'declaration',
@@ -235,6 +243,9 @@ export default function App() {
         return (
           <UsernameScreen
             phone={route.phone}
+            onCheckAvailability={(username) =>
+              checkUsernameAvailability(route.idToken, username)
+            }
             onComplete={(username) => handleUsername(route.idToken, username)}
           />
         );

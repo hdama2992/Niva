@@ -21,15 +21,14 @@ export class UpdateProfileDto {
   @IsString({ each: true })
   interests!: string[];
 
-  @IsOptional()
   @IsString()
   @MaxLength(30)
-  ageRange?: string;
+  ageRange!: string;
 
-  @IsOptional()
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
-  languages?: string[];
+  languages!: string[];
 
   @IsOptional()
   @IsString()
@@ -41,7 +40,6 @@ export class UpdateProfileDto {
   @MaxLength(280)
   bio?: string;
 
-  @IsOptional()
   @IsUrl({ require_tld: false })
-  profilePhotoUrl?: string;
+  profilePhotoUrl!: string;
 }

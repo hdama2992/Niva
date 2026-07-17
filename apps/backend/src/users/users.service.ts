@@ -250,31 +250,60 @@ export class UsersService {
       throw new ConflictException('That username is already taken.');
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      if (user.username && user.username !== normalizedUsername) {
-        await tx.usernameReservation.deleteMany({ where: { userId } });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (user.username && user.username !== normalizedUsername) {
+          await tx.usernameReservation.deleteMany({ where: { userId } });
+        }
+
+        if (!conflict) {
+          await tx.usernameReservation.create({
+            data: { username: normalizedUsername, userId },
+          });
+        }
+
+        await tx.user.update({
+          where: { id: userId },
+          data: { username: normalizedUsername },
+        });
+
+        await tx.userProfile.updateMany({
+          where: { userId },
+          data: { username: normalizedUsername },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('That username is already taken.');
       }
 
-      await tx.usernameReservation.upsert({
-        where: { username: normalizedUsername },
-        create: { username: normalizedUsername, userId },
-        update: { userId },
-      });
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { username: normalizedUsername },
-      });
-
-      await tx.userProfile.updateMany({
-        where: { userId },
-        data: { username: normalizedUsername },
-      });
-    });
+      throw error;
+    }
 
     await this.recordTrustEventOnce(userId, TrustEventType.USERNAME_SET);
     await this.recalculateTrustScore(userId);
     return this.getPublicUserById(userId);
+  }
+
+  async getUsernameAvailability(userId: string, username: string) {
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!USERNAME_PATTERN.test(normalizedUsername)) {
+      return { available: false, username: normalizedUsername };
+    }
+
+    const reservation = await this.prisma.usernameReservation.findUnique({
+      where: { username: normalizedUsername },
+      select: { userId: true },
+    });
+
+    return {
+      available: !reservation || reservation.userId === userId,
+      username: normalizedUsername,
+    };
   }
 
   async updateProfile(
@@ -296,12 +325,20 @@ export class UsersService {
 
     const displayName = dto.displayName.trim();
     const city = dto.city.trim();
+    const ageRange = dto.ageRange.trim();
     const interests = this.normalizeList(dto.interests);
-    const languages = this.normalizeList(dto.languages ?? []);
+    const languages = this.normalizeList(dto.languages);
 
-    if (!displayName || !city || interests.length < 3) {
+    if (
+      !displayName ||
+      !city ||
+      !ageRange ||
+      !dto.profilePhotoUrl ||
+      languages.length < 1 ||
+      interests.length < 3
+    ) {
       throw new BadRequestException(
-        'Profile requires display name, city, and at least three interests.',
+        'Complete every required profile field before continuing.',
       );
     }
 
@@ -325,7 +362,7 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
-          ageRange: dto.ageRange?.trim() || undefined,
+          ageRange,
           languages,
           occupation: dto.occupation?.trim() || undefined,
           interests,
@@ -337,7 +374,7 @@ export class UsersService {
           displayName,
           username: user.username,
           city,
-          ageRange: dto.ageRange?.trim() || null,
+          ageRange,
           languages,
           occupation: dto.occupation?.trim() || null,
           interests,

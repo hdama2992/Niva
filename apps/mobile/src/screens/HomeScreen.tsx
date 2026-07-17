@@ -8,7 +8,6 @@ import {
   Home,
   LockKeyhole,
   LogOut,
-  MessageCircle,
   Search,
   Settings,
   ShieldCheck,
@@ -101,23 +100,24 @@ type HomeScreenProps = {
   onStartVerification: (joiningTitle?: string) => void;
 };
 
-type Tab = 'home' | 'explore' | 'circles' | 'messages' | 'profile';
+type Tab = 'home' | 'explore' | 'plans' | 'profile';
 type SecondaryScreen =
-  | 'create-circle'
-  | 'create-event'
-  | 'my-activities'
-  | 'notifications'
-  | 'settings';
+  'create-circle' | 'create-event' | 'notifications' | 'settings';
 
 const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: 'home', label: 'Home', icon: <Home size={21} /> },
   { id: 'explore', label: 'Explore', icon: <Search size={21} /> },
-  { id: 'circles', label: 'Circles', icon: <UsersRound size={21} /> },
-  { id: 'messages', label: 'Messages', icon: <MessageCircle size={21} /> },
+  { id: 'plans', label: 'Plans', icon: <CalendarCheck size={21} /> },
   { id: 'profile', label: 'Profile', icon: <CircleUserRound size={21} /> },
 ];
 
 const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Career', 'Safety'];
+const exploreKinds = [
+  { id: 'all', label: 'All' },
+  { id: 'event', label: 'Events' },
+  { id: 'circle', label: 'Circles' },
+] as const;
+type ExploreKind = (typeof exploreKinds)[number]['id'];
 const defaultSettings: CommunitySettings = {
   allowCircleContinuitySuggestions: true,
   notificationsEnabled: true,
@@ -162,9 +162,9 @@ export function HomeScreen({
   const [secondaryScreen, setSecondaryScreen] = useState<SecondaryScreen>();
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]);
+  const [activeExploreKind, setActiveExploreKind] =
+    useState<ExploreKind>('all');
   const verified = user.verificationStatus === 'approved';
-  const visibleEvents = apiEvents;
-  const visibleCircles = apiCircles;
   const allItems = useMemo(
     () => [...apiEvents, ...apiCircles],
     [apiCircles, apiEvents],
@@ -181,17 +181,23 @@ export function HomeScreen({
           .includes(normalizedQuery);
       const matchesFilter =
         activeFilter === 'All' || item.interests.includes(activeFilter);
+      const matchesKind =
+        activeExploreKind === 'all' || item.category === activeExploreKind;
 
-      return matchesQuery && matchesFilter;
+      return matchesQuery && matchesFilter && matchesKind;
     });
-  }, [activeFilter, allItems, query]);
-  const joinedItems = useMemo(
+  }, [activeExploreKind, activeFilter, allItems, query]);
+  const nextPlan = useMemo(
     () =>
-      myActivities.filter(
-        (item) =>
-          item.membershipStatus === 'APPROVED' ||
-          item.membershipStatus === 'ATTENDED',
-      ),
+      myActivities
+        .filter(
+          (item) =>
+            item.membershipStatus === 'APPROVED' &&
+            (!item.startsAt || new Date(item.startsAt).getTime() >= Date.now()),
+        )
+        .sort((left, right) =>
+          (left.startsAt ?? '').localeCompare(right.startsAt ?? ''),
+        )[0],
     [myActivities],
   );
 
@@ -653,6 +659,10 @@ export function HomeScreen({
           setSelectedItem(undefined);
           requestJoin(selectedItem);
         }}
+        onOpenChat={() => {
+          setChatItem(selectedItem);
+          setSelectedItem(undefined);
+        }}
         onLeave={() => void leaveActivity(selectedItem)}
         onManage={() => {
           if (selectedItem.category === 'circle') {
@@ -748,18 +758,6 @@ export function HomeScreen({
     );
   }
 
-  if (secondaryScreen === 'my-activities') {
-    return (
-      <MyActivitiesScreen
-        items={myActivities}
-        onBack={() => setSecondaryScreen(undefined)}
-        onFeedback={setFeedbackEvent}
-        onLeave={(item) => void leaveActivity(item)}
-        onOpen={setSelectedItem}
-      />
-    );
-  }
-
   if (secondaryScreen === 'notifications') {
     return (
       <NotificationsScreen
@@ -813,23 +811,15 @@ export function HomeScreen({
               user={user}
             />
             <TrustCard user={user} verified={verified} />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setSecondaryScreen('my-activities')}
-              style={styles.myPlansAction}
-            >
-              <CalendarDays color={colors.ink} size={19} strokeWidth={2.4} />
-              <Text style={styles.myPlansText}>My plans</Text>
-            </Pressable>
             {apiError ? (
               <View style={styles.apiBanner}>
                 <Text style={styles.apiBannerText}>{apiError}</Text>
               </View>
             ) : null}
-            <Section title="This week near you">
-              {visibleEvents.length ? (
-                <HorizontalCards
-                  items={visibleEvents}
+            <Section title="Your next plan">
+              {nextPlan ? (
+                <VerticalCards
+                  items={[nextPlan]}
                   onJoin={requestJoin}
                   onOpen={setSelectedItem}
                 />
@@ -842,15 +832,15 @@ export function HomeScreen({
                       strokeWidth={2.3}
                     />
                   }
-                  title="No events published yet"
-                  text="Your city’s next small gathering will appear here."
+                  title="Nothing scheduled yet"
+                  text="Explore an event or recurring circle when you are ready."
                 />
               )}
             </Section>
-            <Section title="Circles starting soon">
-              {visibleCircles.length ? (
+            <Section title="Recommended for you">
+              {recommended.length ? (
                 <HorizontalCards
-                  items={visibleCircles}
+                  items={recommended.slice(0, 2)}
                   onJoin={requestJoin}
                   onOpen={setSelectedItem}
                 />
@@ -863,15 +853,15 @@ export function HomeScreen({
                       strokeWidth={2.3}
                     />
                   }
-                  title="No circles announced yet"
-                  text="Recurring groups will appear here when hosts publish them."
+                  title="Recommendations are warming up"
+                  text="Your interests will shape the plans shown here."
                 />
               )}
             </Section>
-            <Section title="Recommended for your interests">
-              {recommended.length ? (
-                <VerticalCards
-                  items={recommended.slice(0, 3)}
+            <Section title={`Discover this week in ${user.city}`}>
+              {allItems.length ? (
+                <HorizontalCards
+                  items={allItems.slice(0, 3)}
                   onJoin={requestJoin}
                   onOpen={setSelectedItem}
                 />
@@ -880,8 +870,8 @@ export function HomeScreen({
                   icon={
                     <Compass color={colors.info} size={26} strokeWidth={2.3} />
                   }
-                  title="No recommendations yet"
-                  text="Choose a few more interests from Profile."
+                  title="No plans published yet"
+                  text="New events and circles will appear here as hosts publish them."
                 />
               )}
             </Section>
@@ -926,6 +916,31 @@ export function HomeScreen({
                 value={query}
               />
             </View>
+            <View style={styles.exploreTypeControl}>
+              {exploreKinds.map((kind) => {
+                const active = activeExploreKind === kind.id;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={kind.id}
+                    onPress={() => setActiveExploreKind(kind.id)}
+                    style={[
+                      styles.exploreTypeButton,
+                      active && styles.exploreTypeButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.exploreTypeText,
+                        active && styles.exploreTypeTextActive,
+                      ]}
+                    >
+                      {kind.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -968,82 +983,16 @@ export function HomeScreen({
             )}
           </>
         );
-      case 'circles':
+      case 'plans':
         return (
-          <>
-            <ScreenTitle
-              icon={
-                <UsersRound
-                  color={colors.secondary}
-                  size={26}
-                  strokeWidth={2.3}
-                />
-              }
-              title="Circles"
-              subtitle="Recurring groups with the same members over several weeks."
-            />
-            <VerticalCards
-              items={visibleCircles}
-              onJoin={requestJoin}
-              onOpen={setSelectedItem}
-            />
-          </>
-        );
-      case 'messages':
-        return (
-          <>
-            <ScreenTitle
-              icon={
-                <MessageCircle
-                  color={colors.info}
-                  size={26}
-                  strokeWidth={2.3}
-                />
-              }
-              title="Messages"
-              subtitle="Cohort chats open after basic verification and joining a group."
-            />
-            {verified && joinedItems.length ? (
-              <View style={styles.verticalCards}>
-                {joinedItems.map((item) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={item.id}
-                    onPress={() => setChatItem(item)}
-                    style={styles.chatRow}
-                  >
-                    <MessageCircle
-                      color={colors.info}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                    <View style={styles.chatCopy}>
-                      <Text style={styles.chatTitle}>{item.title}</Text>
-                      <Text style={styles.chatText}>
-                        Event and circle chats only. No random DMs.
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            ) : (
-              <EmptyState
-                icon={
-                  <LockKeyhole
-                    color={colors.info}
-                    size={26}
-                    strokeWidth={2.3}
-                  />
-                }
-                title={verified ? 'No cohort chats yet' : 'Chats are locked'}
-                text={
-                  verified
-                    ? 'Cohort chats open when a host approves your first join request.'
-                    : 'Complete verification to message cohorts.'
-                }
-              />
-            )}
-          </>
+          <MyActivitiesScreen
+            embedded
+            items={myActivities}
+            onChat={setChatItem}
+            onFeedback={setFeedbackEvent}
+            onLeave={(item) => void leaveActivity(item)}
+            onOpen={setSelectedItem}
+          />
         );
       case 'profile':
         return (
@@ -1093,14 +1042,6 @@ export function HomeScreen({
               </View>
             </View>
             <View style={styles.profileActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setSecondaryScreen('my-activities')}
-                style={styles.secondaryAction}
-              >
-                <CalendarCheck color={colors.ink} size={19} strokeWidth={2.4} />
-                <Text style={styles.secondaryActionText}>My plans</Text>
-              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setSecondaryScreen('settings')}
@@ -1261,8 +1202,10 @@ function Header({
 }) {
   return (
     <View style={styles.header}>
-      <View>
-        <Text style={styles.greeting}>Good morning, {user.displayName}</Text>
+      <View style={styles.headerCopy}>
+        <Text numberOfLines={2} style={styles.greeting}>
+          Good morning, {user.displayName}
+        </Text>
         <Text style={styles.city}>{user.city}</Text>
       </View>
       <Pressable
@@ -1835,6 +1778,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: spacing.md,
   },
+  exploreTypeButton: {
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+  },
+  exploreTypeButtonActive: {
+    backgroundColor: colors.surface,
+  },
+  exploreTypeControl: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    padding: spacing.xs,
+  },
+  exploreTypeText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  exploreTypeTextActive: {
+    color: colors.ink,
+  },
   filterChip: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -1892,6 +1861,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerBadge: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -1899,6 +1872,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     flexDirection: 'row',
+    flexShrink: 0,
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,

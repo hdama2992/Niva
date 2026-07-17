@@ -65,8 +65,9 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Unable to reach Niva backend.');
+    throw new Error(
+      await readErrorMessage(response, 'Niva is unavailable right now.'),
+    );
   }
 
   return (await response.json()) as T;
@@ -134,23 +135,50 @@ export function setUsername(idToken: string, username: string) {
   });
 }
 
+export function checkUsernameAvailability(idToken: string, username: string) {
+  return request<{ available: boolean; username: string }>(
+    `/users/me/username-availability?username=${encodeURIComponent(username)}`,
+    idToken,
+  );
+}
+
 export function updateProfile(
   idToken: string,
   profile: {
-    ageRange?: string;
+    ageRange: string;
     bio?: string;
     city: string;
     displayName: string;
     interests: string[];
     languages: string[];
     occupation?: string;
-    profilePhotoUrl?: string;
+    profilePhotoUrl: string;
   },
 ) {
   return request<{ user: ApiUser }>('/users/me/profile', idToken, {
     body: profile,
     method: 'PUT',
   });
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const rawMessage = await response.text();
+
+  if (!rawMessage) {
+    return fallback;
+  }
+
+  try {
+    const payload = JSON.parse(rawMessage) as { message?: string | string[] };
+
+    if (Array.isArray(payload.message)) {
+      return payload.message.join(' ');
+    }
+
+    return payload.message || fallback;
+  } catch {
+    return rawMessage;
+  }
 }
 
 export function acceptSelfDeclaration(idToken: string) {
