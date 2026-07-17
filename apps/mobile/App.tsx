@@ -1,6 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, SafeAreaView, StyleSheet, View } from 'react-native';
 
 import { colors } from './src/constants/theme';
@@ -27,7 +26,7 @@ import {
   submitSelfie,
   updateProfile,
 } from './src/services/session';
-import { firebaseConfig, initializeFirebase } from './src/services/firebase';
+import { initializeFirebase } from './src/services/firebase';
 import {
   getMobileAuthMode,
   getPhoneNumberVerificationAvailability,
@@ -83,7 +82,6 @@ type Route =
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
   const [pnvAvailable, setPnvAvailable] = useState(false);
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const authMode = getMobileAuthMode();
 
   if (authMode === 'firebase') {
@@ -151,7 +149,7 @@ export default function App() {
   }, [authMode]);
 
   const handleOtpRequested = async (phone: string) => {
-    await sendPhoneCode(phone, recaptchaVerifier.current);
+    await sendPhoneCode(phone);
     setRoute({ name: 'otp', phone });
   };
 
@@ -423,12 +421,6 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <View style={styles.app}>{screen}</View>
-      {authMode === 'firebase' ? (
-        <FirebaseRecaptchaVerifierModal
-          ref={recaptchaVerifier}
-          firebaseConfig={firebaseConfig}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }

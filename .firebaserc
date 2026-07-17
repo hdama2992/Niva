@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "niva-30f13",
+    "staging": "niva-30f13"
+  }
+}

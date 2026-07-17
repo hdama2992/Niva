@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, putFile, ref } from '@react-native-firebase/storage';
 
 import { getFirebaseAuth, getFirebaseStorage } from './firebase';
 
@@ -96,15 +96,13 @@ async function uploadImage(
     throw new Error('Sign in before uploading a photo.');
   }
 
-  const response = await fetch(image.uri);
-  const blob = await response.blob();
   const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
   const storageRef = ref(
     getFirebaseStorage(),
     `${folder}/${user.uid}/${Date.now()}.${extension}`,
   );
 
-  await uploadBytes(storageRef, blob, {
+  await putFile(storageRef, image.uri, {
     contentType: image.mimeType ?? `image/${extension}`,
   });
 

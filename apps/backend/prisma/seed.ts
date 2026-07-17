@@ -2,6 +2,13 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+function futureDate(daysFromNow: number, utcHour: number, utcMinute = 0) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + daysFromNow);
+  date.setUTCHours(utcHour, utcMinute, 0, 0);
+  return date;
+}
+
 async function main() {
   await prisma.event.upsert({
     where: { id: 'seed-badminton-saturday' },
@@ -11,7 +18,7 @@ async function main() {
       description: 'Small doubles rotation for women getting back into sport.',
       city: 'Bangalore',
       locationName: 'Indiranagar Sports Arena',
-      startsAt: new Date('2026-07-18T02:30:00.000Z'),
+      startsAt: futureDate(7, 2, 30),
       capacity: 8,
       difficulty: 'BEGINNER',
       interests: ['Badminton', 'Fitness'],
@@ -21,7 +28,7 @@ async function main() {
       description: 'Small doubles rotation for women getting back into sport.',
       city: 'Bangalore',
       locationName: 'Indiranagar Sports Arena',
-      startsAt: new Date('2026-07-18T02:30:00.000Z'),
+      startsAt: futureDate(7, 2, 30),
       capacity: 8,
       difficulty: 'BEGINNER',
       interests: ['Badminton', 'Fitness'],
@@ -36,7 +43,7 @@ async function main() {
       description: 'Bring one book, leave with a new reading buddy.',
       city: 'Bangalore',
       locationName: 'Church Street',
-      startsAt: new Date('2026-07-22T13:00:00.000Z'),
+      startsAt: futureDate(11, 13),
       capacity: 10,
       difficulty: 'SOCIAL',
       interests: ['Books', 'Coffee'],
@@ -46,7 +53,7 @@ async function main() {
       description: 'Bring one book, leave with a new reading buddy.',
       city: 'Bangalore',
       locationName: 'Church Street',
-      startsAt: new Date('2026-07-22T13:00:00.000Z'),
+      startsAt: futureDate(11, 13),
       capacity: 10,
       difficulty: 'SOCIAL',
       interests: ['Books', 'Coffee'],
@@ -61,7 +68,7 @@ async function main() {
       description: 'Same 6 women, same route, every Saturday morning.',
       city: 'Bangalore',
       locationName: 'Koramangala',
-      startsAt: new Date('2026-07-25T02:30:00.000Z'),
+      startsAt: futureDate(14, 2, 30),
       schedule: 'Saturdays, 8:00 AM',
       durationWeeks: 6,
       capacity: 6,
@@ -73,7 +80,7 @@ async function main() {
       description: 'Same 6 women, same route, every Saturday morning.',
       city: 'Bangalore',
       locationName: 'Koramangala',
-      startsAt: new Date('2026-07-25T02:30:00.000Z'),
+      startsAt: futureDate(14, 2, 30),
       schedule: 'Saturdays, 8:00 AM',
       durationWeeks: 6,
       capacity: 6,
@@ -90,7 +97,7 @@ async function main() {
       description: 'A recurring table for low-pressure creative projects.',
       city: 'Bangalore',
       locationName: 'HSR Layout',
-      startsAt: new Date('2026-07-29T13:30:00.000Z'),
+      startsAt: futureDate(18, 13, 30),
       schedule: 'Wednesdays, 7:00 PM',
       durationWeeks: 4,
       capacity: 8,
@@ -102,7 +109,7 @@ async function main() {
       description: 'A recurring table for low-pressure creative projects.',
       city: 'Bangalore',
       locationName: 'HSR Layout',
-      startsAt: new Date('2026-07-29T13:30:00.000Z'),
+      startsAt: futureDate(18, 13, 30),
       schedule: 'Wednesdays, 7:00 PM',
       durationWeeks: 4,
       capacity: 8,

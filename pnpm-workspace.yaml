@@ -23,3 +23,6 @@ minimumReleaseAgeExclude:
   - expo-modules-autolinking@57.0.4
   - expo-modules-core@57.0.2
   - expo@57.0.2
+  - expo-dev-client@57.0.7
+  - expo-dev-launcher@57.0.7
+  - expo-dev-menu@57.0.7

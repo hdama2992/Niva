@@ -100,12 +100,36 @@ type BetaAccessRequest = {
   status: 'DECLINED' | 'INVITED' | 'PENDING';
 };
 
+type AuthSession = {
+  user: {
+    id: string;
+  };
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+async function createAdminSession(idToken: string) {
+  const response = await fetch(`${apiUrl}/auth/session`, {
+    body: JSON.stringify({ idToken }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      (await response.text()) ||
+        'Unable to create the Niva administrator session.',
+    );
+  }
+
+  return (await response.json()) as AuthSession;
+}
 
 export default function Home() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [idToken, setIdToken] = useState('');
+  const [signedInUserId, setSignedInUserId] = useState('');
   const [error, setError] = useState<string | undefined>(() =>
     firebaseAdminUiConfigured
       ? undefined
@@ -154,8 +178,22 @@ export default function Home() {
     const unsubscribe = onAuthStateChanged(
       getAdminFirebaseAuth(),
       async (user) => {
-        setIdToken(user ? await user.getIdToken() : '');
+        const token = user ? await user.getIdToken() : '';
+        setIdToken(token);
+        if (token) {
+          try {
+            const session = await createAdminSession(token);
+            setSignedInUserId(session.user.id);
+          } catch (sessionError) {
+            setError(
+              sessionError instanceof Error
+                ? sessionError.message
+                : 'Unable to restore the Niva administrator session.',
+            );
+          }
+        }
         if (!user) {
+          setSignedInUserId('');
           setLoaded(false);
           setReviews([]);
           setApprovals([]);
@@ -184,7 +222,9 @@ export default function Home() {
         adminPassword,
       );
       const token = await credential.user.getIdToken();
+      const session = await createAdminSession(token);
       setIdToken(token);
+      setSignedInUserId(session.user.id);
       setAdminPassword('');
       await loadReviews(undefined, token);
     } catch (signInError) {
@@ -694,6 +734,15 @@ export default function Home() {
         {error ? (
           <p className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-900">
             {error}
+          </p>
+        ) : null}
+
+        {signedInUserId && !loaded ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Firebase sign-in succeeded. This account&apos;s Niva user ID is{' '}
+            <code className="font-mono font-semibold">{signedInUserId}</code>.
+            A Niva owner must grant this ID an administrator role before the
+            dashboard can load.
           </p>
         ) : null}
 

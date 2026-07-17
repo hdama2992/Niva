@@ -110,8 +110,10 @@ Community: event chats and circle chats only
 - Discovery excludes activities hosted by members the current user has blocked.
 - The mobile UI does not present placeholder activities as joinable.
 - Local beta auth bridge for Expo preview through `NIVA_BETA_AUTH_ENABLED`.
-- Firebase-ready Phone Auth with reCAPTCHA and Firebase ID-token exchange.
-- Firebase refresh-token persistence in Expo SecureStore.
+- Native Firebase Phone Auth through React Native Firebase, Expo Config
+  Plugins, and EAS development builds, with Firebase ID-token exchange.
+- Native Firebase session persistence and restoration through the Android/iOS
+  Firebase SDKs.
 - Android Firebase Phone Number Verification bridge with one-tap SIM consent,
   SMS fallback, and a backend Firebase custom-token exchange path.
 - Firebase Storage upload path for profile photos and join-time verification

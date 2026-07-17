@@ -35,6 +35,14 @@
         {
           "locationWhenInUsePermission": "Allow Niva to use your location when a host chooses the meeting place."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Niva to use your camera when you choose to take a profile or verification photo.",
+          "microphonePermission": false,
+          "photosPermission": "Allow Niva to choose a profile or verification photo from your library."
+        }
       ]
     ],
     "web": {
