@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, SafeAreaView, StyleSheet, View } from 'react-native';
+import { Alert, Platform, SafeAreaView, StyleSheet, View } from 'react-native';
 
 import { colors } from './src/constants/theme';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -160,19 +160,18 @@ export default function App() {
       setRoute(routeForApiUser(firebaseIdToken, user));
     });
 
-  const handleOtpVerified = (phone: string, code: string) =>
-    withApiErrors(async () => {
-      const firebaseIdToken = await verifyPhoneCode(code);
+  const handleOtpVerified = async (phone: string, code: string) => {
+    const firebaseIdToken = await verifyPhoneCode(code);
 
-      if (firebaseIdToken) {
-        const user = await createSession(firebaseIdToken);
-        setRoute(routeForApiUser(firebaseIdToken, user));
-        return;
-      }
+    if (firebaseIdToken) {
+      const user = await createSession(firebaseIdToken);
+      setRoute(routeForApiUser(firebaseIdToken, user));
+      return;
+    }
 
-      const session = await createBetaSession(phone);
-      setRoute(routeForApiUser(session.idToken, session.user));
-    });
+    const session = await createBetaSession(phone);
+    setRoute(routeForApiUser(session.idToken, session.user));
+  };
 
   const handleProfile = (
     idToken: string,
@@ -292,6 +291,7 @@ export default function App() {
             phone={route.phone}
             onBack={() => setRoute({ name: 'login' })}
             authMode={authMode}
+            onResend={() => sendPhoneCode(route.phone)}
             onVerified={(code) => handleOtpVerified(route.phone, code)}
           />
         );
@@ -375,6 +375,7 @@ export default function App() {
       case 'welcome':
         return (
           <WelcomeScreen
+            city={route.user.city}
             displayName={route.user.displayName}
             onContinue={() => handleWelcome(route.idToken)}
           />
@@ -573,5 +574,6 @@ const styles = StyleSheet.create({
   },
   app: {
     flex: 1,
+    paddingBottom: Platform.OS === 'android' ? 24 : 0,
   },
 });

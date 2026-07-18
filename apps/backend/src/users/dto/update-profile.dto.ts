@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsInt,
@@ -21,7 +22,9 @@ export class UpdateProfileDto {
 
   @IsArray()
   @ArrayMinSize(3)
+  @ArrayMaxSize(10)
   @IsString({ each: true })
+  @MaxLength(30, { each: true })
   interests!: string[];
 
   @IsInt()
@@ -31,7 +34,9 @@ export class UpdateProfileDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(12)
   @IsString({ each: true })
+  @MaxLength(40, { each: true })
   languages!: string[];
 
   @IsOptional()

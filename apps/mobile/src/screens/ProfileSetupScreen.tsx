@@ -71,7 +71,6 @@ const languageOptions = [
   'Odia',
   'Urdu',
 ];
-const betaCity = 'Bangalore';
 
 export function ProfileSetupScreen({
   initialProfile,
@@ -88,6 +87,7 @@ export function ProfileSetupScreen({
   const [displayName, setDisplayName] = useState(
     initialProfile?.displayName ?? username,
   );
+  const [city, setCity] = useState(initialProfile?.city ?? '');
   const [age, setAge] = useState<number | undefined>(initialProfile?.age);
   const [bio, setBio] = useState(initialProfile?.bio ?? '');
   const [languages, setLanguages] = useState<string[]>(
@@ -99,6 +99,8 @@ export function ProfileSetupScreen({
   const [interests, setInterests] = useState<string[]>(
     initialProfile?.interests ?? [],
   );
+  const [customInterest, setCustomInterest] = useState('');
+  const [customInterestOpen, setCustomInterestOpen] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
   const [error, setError] = useState<string>();
@@ -152,16 +154,14 @@ export function ProfileSetupScreen({
       ),
     [initialProfile?.languages],
   );
-  const availableInterests = useMemo(
-    () =>
-      Array.from(
-        new Set([...interestOptions, ...(initialProfile?.interests ?? [])]),
-      ),
-    [initialProfile?.interests],
+  const customInterests = useMemo(
+    () => interests.filter((interest) => !interestOptions.includes(interest)),
+    [interests],
   );
   const canContinue = useMemo(
     () =>
       displayName.trim().length >= 2 &&
+      city.trim().length >= 2 &&
       age !== undefined &&
       age >= 18 &&
       age <= 100 &&
@@ -173,6 +173,7 @@ export function ProfileSetupScreen({
           usernameAvailability === 'available')),
     [
       age,
+      city,
       displayName,
       hasProfilePhoto,
       languages,
@@ -189,6 +190,30 @@ export function ProfileSetupScreen({
         ? current.filter((item) => item !== interest)
         : [...current, interest],
     );
+    setError(undefined);
+  };
+
+  const addCustomInterest = () => {
+    const normalizedInterest = customInterest.trim().replace(/\s+/g, ' ');
+
+    if (normalizedInterest.length < 2) {
+      setError('Enter at least two characters for your interest.');
+      return;
+    }
+
+    if (
+      interests.some(
+        (interest) =>
+          interest.toLowerCase() === normalizedInterest.toLowerCase(),
+      )
+    ) {
+      setError('That interest is already selected.');
+      return;
+    }
+
+    setInterests((current) => [...current, normalizedInterest]);
+    setCustomInterest('');
+    setCustomInterestOpen(false);
     setError(undefined);
   };
 
@@ -213,7 +238,7 @@ export function ProfileSetupScreen({
       await onComplete(
         {
           displayName: displayName.trim(),
-          city: betaCity,
+          city: city.trim(),
           bio: bio.trim() || undefined,
           age,
           languages,
@@ -383,6 +408,23 @@ export function ProfileSetupScreen({
             value={age?.toString() ?? ''}
           />
 
+          <TextField
+            error={
+              attempted && city.trim().length < 2
+                ? 'Enter your city.'
+                : undefined
+            }
+            helperText="Used to show nearby events and circles."
+            label="City *"
+            maxLength={60}
+            onChangeText={(value) => {
+              setCity(value);
+              setError(undefined);
+            }}
+            placeholder="Bengaluru"
+            value={city}
+          />
+
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Languages *</Text>
             <Text style={styles.fieldMeta}>Select every language you use.</Text>
@@ -446,7 +488,7 @@ export function ProfileSetupScreen({
         </View>
 
         <View style={styles.interests}>
-          {availableInterests.map((interest) => {
+          {[...interestOptions, ...customInterests].map((interest) => {
             const selected = interests.includes(interest);
 
             return (
@@ -470,7 +512,49 @@ export function ProfileSetupScreen({
               </Pressable>
             );
           })}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setCustomInterestOpen((current) => !current);
+              setError(undefined);
+            }}
+            style={[
+              styles.interestChip,
+              customInterestOpen && styles.interestChipSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.interestText,
+                customInterestOpen && styles.interestTextSelected,
+              ]}
+            >
+              Other
+            </Text>
+          </Pressable>
         </View>
+
+        {customInterestOpen ? (
+          <View style={styles.customInterestPanel}>
+            <TextField
+              autoCapitalize="words"
+              label="Add another interest"
+              maxLength={30}
+              onChangeText={setCustomInterest}
+              onSubmitEditing={addCustomInterest}
+              placeholder="For example, photography"
+              returnKeyType="done"
+              value={customInterest}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={addCustomInterest}
+              style={styles.addInterestButton}
+            >
+              <Text style={styles.addInterestText}>Add interest</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {attempted && !selectedEnoughInterests ? (
           <Text style={styles.fieldError}>
@@ -612,6 +696,20 @@ function UsernameAvailabilityMessage({
 }
 
 const styles = StyleSheet.create({
+  addInterestButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.ink,
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  addInterestText: {
+    color: colors.surface,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
   availabilityError: {
     color: colors.primaryDark,
     fontSize: typography.small,
@@ -732,6 +830,10 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
+  },
+  customInterestPanel: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   modalBackdrop: {
     backgroundColor: 'rgba(33, 26, 29, 0.36)',

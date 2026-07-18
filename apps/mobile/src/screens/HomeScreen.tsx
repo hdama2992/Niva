@@ -115,7 +115,7 @@ const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: 'profile', label: 'Profile', icon: <CircleUserRound size={21} /> },
 ];
 
-const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Career', 'Safety'];
+const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Music', 'Safety'];
 const exploreKinds = [
   { id: 'all', label: 'All' },
   { id: 'event', label: 'Events' },
@@ -1036,7 +1036,7 @@ export function HomeScreen({
                 />
                 <ProfileMetric
                   label="Verification"
-                  value={verified ? 'Approved' : 'Pending'}
+                  value={formatVerificationStatus(user.verificationStatus)}
                 />
               </View>
               <View style={styles.profileInterests}>
@@ -1216,12 +1216,13 @@ function Header({
 }) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
+  const greeting = greetingForCurrentTime();
 
   return (
     <View style={[styles.header, compact && styles.headerCompact]}>
       <View style={styles.headerCopy}>
         <Text numberOfLines={2} style={styles.greeting}>
-          Good morning,{compact ? `\n` : ' '}
+          {greeting},{compact ? `\n` : ' '}
           {user.displayName}
         </Text>
         <Text style={styles.city}>{user.city}</Text>
@@ -1236,6 +1237,20 @@ function Header({
       </Pressable>
     </View>
   );
+}
+
+function greetingForCurrentTime() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return 'Good morning';
+  }
+
+  if (hour < 17) {
+    return 'Good afternoon';
+  }
+
+  return 'Good evening';
 }
 
 function TrustCard({ user, verified }: { user: NivaUser; verified: boolean }) {
@@ -1523,6 +1538,21 @@ function formatTrustTier(tier: NivaUser['trustTier']) {
       return 'New';
     case 'trusted':
       return 'Trusted';
+  }
+}
+
+function formatVerificationStatus(status: NivaUser['verificationStatus']) {
+  switch (status) {
+    case 'approved':
+      return 'Approved';
+    case 'needs_review':
+      return 'Needs review';
+    case 'not_started':
+      return 'Not started';
+    case 'pending':
+      return 'Pending';
+    case 'rejected':
+      return 'Action needed';
   }
 }
 

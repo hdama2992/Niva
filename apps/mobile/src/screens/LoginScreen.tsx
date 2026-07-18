@@ -40,11 +40,41 @@ type Country = {
 };
 
 const countries: Country[] = [
-  { code: 'IN', dialCode: '+91', localDigits: 10, name: 'India', placeholder: '98765 43210' },
-  { code: 'US', dialCode: '+1', localDigits: 10, name: 'United States', placeholder: '555 123 4567' },
-  { code: 'GB', dialCode: '+44', localDigits: 10, name: 'United Kingdom', placeholder: '7123 456789' },
-  { code: 'AE', dialCode: '+971', localDigits: 9, name: 'United Arab Emirates', placeholder: '50 123 4567' },
-  { code: 'SG', dialCode: '+65', localDigits: 8, name: 'Singapore', placeholder: '8123 4567' },
+  {
+    code: 'IN',
+    dialCode: '+91',
+    localDigits: 10,
+    name: 'India',
+    placeholder: '98765 43210',
+  },
+  {
+    code: 'US',
+    dialCode: '+1',
+    localDigits: 10,
+    name: 'United States',
+    placeholder: '555 123 4567',
+  },
+  {
+    code: 'GB',
+    dialCode: '+44',
+    localDigits: 10,
+    name: 'United Kingdom',
+    placeholder: '7123 456789',
+  },
+  {
+    code: 'AE',
+    dialCode: '+971',
+    localDigits: 9,
+    name: 'United Arab Emirates',
+    placeholder: '50 123 4567',
+  },
+  {
+    code: 'SG',
+    dialCode: '+65',
+    localDigits: 8,
+    name: 'Singapore',
+    placeholder: '8123 4567',
+  },
 ];
 
 export function LoginScreen({
@@ -108,17 +138,28 @@ export function LoginScreen({
           <View style={styles.pnvSection}>
             <View style={styles.pnvCopy}>
               <View style={styles.pnvIcon}>
-                <Smartphone color={colors.secondary} size={20} strokeWidth={2.4} />
+                <Smartphone
+                  color={colors.secondary}
+                  size={20}
+                  strokeWidth={2.4}
+                />
               </View>
               <View style={styles.pnvTextGroup}>
                 <Text style={styles.pnvTitle}>Verify from your SIM</Text>
                 <Text style={styles.pnvText}>
-                  Your mobile carrier confirms the number after you consent. No SMS code is needed.
+                  Your mobile carrier confirms the number after you consent. No
+                  SMS code is needed.
                 </Text>
               </View>
             </View>
             <PrimaryButton
-              icon={<ShieldCheck color={colors.surface} size={20} strokeWidth={2.4} />}
+              icon={
+                <ShieldCheck
+                  color={colors.surface}
+                  size={20}
+                  strokeWidth={2.4}
+                />
+              }
               label="Verify my phone number"
               onPress={onVerifyPhoneNumber}
             />
@@ -146,8 +187,11 @@ export function LoginScreen({
             <TextInput
               autoComplete="tel"
               keyboardType="number-pad"
+              maxLength={selectedCountry.localDigits}
               onChangeText={(value) => {
-                setPhone(cleanPhone(value));
+                setPhone(
+                  cleanPhone(value).slice(0, selectedCountry.localDigits),
+                );
                 if (error) {
                   setError(undefined);
                 }
@@ -169,10 +213,20 @@ export function LoginScreen({
             submitting ? (
               <ActivityIndicator color={colors.surface} />
             ) : (
-              <MessageSquareText color={colors.surface} size={20} strokeWidth={2.4} />
+              <MessageSquareText
+                color={colors.surface}
+                size={20}
+                strokeWidth={2.4}
+              />
             )
           }
-          label={submitting ? 'Starting verification...' : pnvAvailable ? 'Text me a code' : 'Continue securely'}
+          label={
+            submitting
+              ? 'Starting verification...'
+              : pnvAvailable
+                ? 'Text me a code'
+                : 'Continue securely'
+          }
           onPress={() => void continueToOtp()}
         />
       </View>
@@ -183,7 +237,10 @@ export function LoginScreen({
         transparent
         visible={countryPickerOpen}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setCountryPickerOpen(false)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setCountryPickerOpen(false)}
+        >
           <Pressable style={styles.countrySheet}>
             <Text style={styles.sheetTitle}>Select country</Text>
             <FlatList
@@ -208,7 +265,13 @@ export function LoginScreen({
                         {item.code} {item.dialCode}
                       </Text>
                     </View>
-                    {selected ? <Check color={colors.primary} size={22} strokeWidth={2.5} /> : null}
+                    {selected ? (
+                      <Check
+                        color={colors.primary}
+                        size={22}
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
                   </Pressable>
                 );
               }}

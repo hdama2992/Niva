@@ -11,34 +11,40 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
 
 type WelcomeScreenProps = {
+  city: string;
   displayName: string;
   onContinue: () => Promise<void> | void;
 };
 
-const steps: Array<{
-  icon: ReactNode;
-  text: string;
-  title: string;
-}> = [
-  {
-    icon: <Compass color={colors.primary} size={23} strokeWidth={2.4} />,
-    title: 'Explore',
-    text: 'Find small events and recurring circles around Bangalore.',
-  },
-  {
-    icon: <ShieldCheck color={colors.secondary} size={23} strokeWidth={2.4} />,
-    title: 'Join securely',
-    text: 'Verification begins only when you request to join your first plan.',
-  },
-  {
-    icon: <CalendarCheck color={colors.info} size={23} strokeWidth={2.4} />,
-    title: 'Plans',
-    text: 'Keep joined activities, schedules, and group chats together.',
-  },
-];
-
-export function WelcomeScreen({ displayName, onContinue }: WelcomeScreenProps) {
+export function WelcomeScreen({
+  city,
+  displayName,
+  onContinue,
+}: WelcomeScreenProps) {
   const [continuing, setContinuing] = useState(false);
+  const steps: Array<{
+    icon: ReactNode;
+    text: string;
+    title: string;
+  }> = [
+    {
+      icon: <Compass color={colors.primary} size={23} strokeWidth={2.4} />,
+      title: 'Explore',
+      text: `Find small events and recurring circles around ${city}.`,
+    },
+    {
+      icon: (
+        <ShieldCheck color={colors.secondary} size={23} strokeWidth={2.4} />
+      ),
+      title: 'Join securely',
+      text: 'Verification begins only when you request to join your first plan.',
+    },
+    {
+      icon: <CalendarCheck color={colors.info} size={23} strokeWidth={2.4} />,
+      title: 'Plans',
+      text: 'Keep joined activities, schedules, and group chats together.',
+    },
+  ];
 
   const continueToNiva = async () => {
     setContinuing(true);

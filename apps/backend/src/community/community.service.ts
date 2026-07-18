@@ -49,6 +49,7 @@ export class CommunityService {
     return this.prisma.event.findMany({
       where: {
         status: ActivityStatus.PUBLISHED,
+        startsAt: { gte: new Date() },
         city: city ? { equals: city, mode: 'insensitive' } : undefined,
         hostId: blockedHostIds.length ? { notIn: blockedHostIds } : undefined,
       },
