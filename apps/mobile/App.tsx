@@ -18,11 +18,9 @@ import { SelfDeclarationScreen } from './src/screens/SelfDeclarationScreen';
 import { SelfieUploadScreen } from './src/screens/SelfieUploadScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { VerificationPendingScreen } from './src/screens/VerificationPendingScreen';
-import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import {
   acceptSelfDeclaration,
   checkUsernameAvailability,
-  completeWelcome,
   ApiUser,
   createBetaSession,
   createSession,
@@ -76,7 +74,6 @@ type Route =
       user: NivaUser;
     }
   | { idToken: string; name: 'edit-profile'; user: NivaUser }
-  | { idToken: string; name: 'welcome'; user: NivaUser }
   | {
       idToken: string;
       initialTab?: 'explore' | 'home' | 'plans' | 'profile';
@@ -250,12 +247,6 @@ export default function App() {
       });
     });
 
-  const handleWelcome = (idToken: string) =>
-    withApiErrors(async () => {
-      const { user } = await completeWelcome(idToken);
-      setRoute({ idToken, name: 'home', user: mapApiUser(user) });
-    });
-
   const handleSelfie = (
     idToken: string,
     currentUser: NivaUser,
@@ -376,14 +367,6 @@ export default function App() {
             username={route.user.username}
           />
         );
-      case 'welcome':
-        return (
-          <WelcomeScreen
-            city={route.user.city}
-            displayName={route.user.displayName}
-            onContinue={() => handleWelcome(route.idToken)}
-          />
-        );
       case 'home':
         return (
           <HomeScreen
@@ -463,10 +446,6 @@ function routeForApiUser(idToken: string, user: ApiUser): Route {
       profile,
       username: user.username,
     };
-  }
-
-  if (!user.welcomeCompletedAt) {
-    return { idToken, name: 'welcome', user: mappedUser };
   }
 
   return { idToken, name: 'home', user: mappedUser };

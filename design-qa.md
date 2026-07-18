@@ -27,7 +27,7 @@
 
 - Mobile TypeScript check: passed.
 - Backend build: passed.
-- Backend test suites: 9 passed; 38 tests passed.
+- Backend test suites: 9 passed; 39 tests passed.
 - Prisma schema validation and generation: passed.
 - Additive migration applied successfully to local PostgreSQL.
 - Seed verification: Makers Night has 4 occurrences; Six-week Running Crew has 6 occurrences.
@@ -58,6 +58,47 @@
 The physical-device passes resolved membership-state, empty-member, image-frame, Android inset, bottom-navigation, and chat-keyboard issues. The final paired comparisons preserve the approved sapphire/porcelain hierarchy, trust-forward palette, activity imagery, sticky actions, Profile structure, and agenda flow. Differences in dates, attendee count, verification state, profile photo, interests, and artwork reflect the live local QA account and seeded activity data. The floating grey gear visible in captures is Expo development-client tooling and is not part of the production UI.
 
 final result: passed physical-device visual QA
+
+## Connected redesign pack follow-up
+
+### Added and verified
+
+- Removed the standalone Welcome route; onboarding now moves directly from
+  authentication into profile creation.
+- Rebuilt Login around the approved sapphire/porcelain visual direction with
+  real activity artwork, a single phone action, concise security guidance,
+  and working Privacy/Terms links.
+- Split first-time profile creation into three clear stages: details,
+  interests, and the public profile photo. The public photo is deliberately
+  last and provides direct camera and library actions.
+- Rebuilt the admin landing view as a production moderation queue while
+  preserving the existing real approve/reject operations.
+- Rebuilt the public Privacy page around public-photo versus private-selfie
+  handling, location privacy, reports, retention, and user controls.
+- Completing the existing profile declaration now completes onboarding on the
+  backend, replacing the removed Welcome confirmation without adding a dummy
+  client-only state.
+
+### Physical Android evidence
+
+- Redesigned Login: `/Users/hdama/Desktop/Niva/artifacts/complete-ui-redesign-2026-07-19/final-qa/login-android.png`
+- Final profile-photo step: `/Users/hdama/Desktop/Niva/artifacts/complete-ui-redesign-2026-07-19/final-qa/profile-photo-android.png`
+
+### Maestro regression evidence
+
+- Login shell flow: passed.
+- Complete deterministic onboarding flow: passed on the connected Android
+  device, including OTP, details, city selection, interests, and the final
+  profile-photo actions.
+- Focused profile-photo action flow: passed.
+- Reusable flows live in `.maestro/` and intentionally run in beta auth mode;
+  they do not upload a real personal photo.
+
+Live Firebase SMS remains an external environment check: the configured
+Firebase project currently reports `auth/operation-not-allowed`, which means
+Phone authentication must be enabled in Firebase Authentication before a live
+OTP pass can succeed. The app maps this to a friendly user-facing message
+instead of exposing the provider error.
 
 ## Profile policy placement and startup follow-up
 

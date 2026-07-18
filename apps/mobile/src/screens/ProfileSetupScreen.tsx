@@ -107,6 +107,7 @@ export function ProfileSetupScreen({
   const [customInterest, setCustomInterest] = useState('');
   const [customInterestOpen, setCustomInterestOpen] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [attempted, setAttempted] = useState(false);
@@ -189,6 +190,17 @@ export function ProfileSetupScreen({
     ],
   );
 
+  const detailsComplete =
+    displayName.trim().length >= 2 &&
+    city.trim().length >= 2 &&
+    age !== undefined &&
+    age >= 18 &&
+    age <= 100 &&
+    languages.length > 0 &&
+    (mode === 'edit' ||
+      (usernamePattern.test(profileUsername.trim()) &&
+        usernameAvailability === 'available'));
+
   const toggleInterest = (interest: string) => {
     setInterests((current) =>
       current.includes(interest)
@@ -233,6 +245,24 @@ export function ProfileSetupScreen({
 
   const continueToDeclaration = async () => {
     setAttempted(true);
+
+    if (mode === 'create' && step === 1) {
+      if (!detailsComplete) {
+        return;
+      }
+      setAttempted(false);
+      setStep(2);
+      return;
+    }
+
+    if (mode === 'create' && step === 2) {
+      if (!selectedEnoughInterests) {
+        return;
+      }
+      setAttempted(false);
+      setStep(3);
+      return;
+    }
 
     if (!canContinue) {
       return;
@@ -283,18 +313,27 @@ export function ProfileSetupScreen({
       behavior={Platform.select({ ios: 'padding', android: undefined })}
       style={styles.container}
     >
-      {mode === 'edit' ? (
+      {mode === 'edit' || step > 1 ? (
         <View style={styles.topBar}>
           <Pressable
             accessibilityLabel="Go back"
             accessibilityRole="button"
             hitSlop={10}
-            onPress={onBack}
+            onPress={() => {
+              if (mode === 'edit') {
+                onBack?.();
+              } else {
+                setAttempted(false);
+                setStep((current) => (current === 3 ? 2 : 1));
+              }
+            }}
             style={styles.backButton}
           >
             <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
           </Pressable>
-          <Text style={styles.topBarTitle}>Profile</Text>
+          <Text style={styles.topBarTitle}>
+            {mode === 'edit' ? 'Profile' : `Profile · ${step} of 3`}
+          </Text>
           <View style={styles.topBarSpacer} />
         </View>
       ) : null}
@@ -305,26 +344,58 @@ export function ProfileSetupScreen({
         <View style={styles.header}>
           {mode === 'edit' ? (
             <Text style={styles.eyebrow}>@{username}</Text>
-          ) : null}
+          ) : (
+            <Text style={styles.eyebrow}>Profile · {step} of 3</Text>
+          )}
           <Text style={styles.title}>
-            {mode === 'edit' ? 'Edit your profile' : 'Complete your profile'}
+            {mode === 'edit'
+              ? 'Edit your profile'
+              : step === 1
+                ? 'Tell us about you'
+                : step === 2
+                  ? 'What are you into?'
+                  : 'Finish with a profile photo'}
           </Text>
           <Text style={styles.subtitle}>
             {mode === 'edit'
               ? 'Keep your details up to date.'
-              : 'Tell us a little about yourself.'}
+              : step === 1
+                ? 'The essentials other members need to know.'
+                : step === 2
+                  ? 'Pick at least three so we can surface relevant plans.'
+                  : 'This helps people recognise you when you meet.'}
           </Text>
-          <Text style={styles.requiredNote}>* Required</Text>
+          {step !== 3 || mode === 'edit' ? (
+            <Text style={styles.requiredNote}>* Required</Text>
+          ) : null}
         </View>
 
-        <Pressable
+        {mode === 'edit' || step === 3 ? (
+          <>
+            {mode === 'create' ? (
+              <View style={styles.savedProfileCard}>
+                <View style={styles.savedProfileCopy}>
+                  <Text style={styles.savedProfileName}>
+                    {displayName} · {city}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.savedProfileMeta}>
+                    {interests.slice(0, 3).join(' · ')}
+                  </Text>
+                </View>
+                <View style={styles.savedBadge}>
+                  <CheckCircle2 color={colors.success} size={18} />
+                  <Text style={styles.savedBadgeText}>Details ready</Text>
+                </View>
+              </View>
+            ) : null}
+            <Pressable
           accessibilityRole="button"
           onPress={() => setPhotoSourceOpen(true)}
           style={[
             styles.profilePhotoPicker,
             attempted && !hasProfilePhoto && styles.invalidField,
           ]}
-        >
+            >
           {profilePhoto || initialProfilePhotoUrl ? (
             <Image
               source={{ uri: profilePhoto?.uri ?? initialProfilePhotoUrl }}
@@ -343,11 +414,53 @@ export function ProfileSetupScreen({
               Choose a photo or take one now.
             </Text>
           </View>
-        </Pressable>
-        {attempted && !hasProfilePhoto ? (
-          <Text style={styles.fieldError}>Add a profile photo.</Text>
+            </Pressable>
+            {mode === 'create' ? (
+              <View style={styles.photoActionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void chooseProfilePhoto('camera')}
+                  style={styles.photoActionButton}
+                >
+                  <Camera color={colors.primary} size={21} strokeWidth={2.3} />
+                  <Text style={styles.photoActionText}>Take a photo</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void chooseProfilePhoto('library')}
+                  style={styles.photoActionButton}
+                >
+                  <ImagePlus color={colors.primary} size={21} strokeWidth={2.3} />
+                  <Text style={styles.photoActionText}>Choose a photo</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <Text style={styles.photoPrivacyTitle}>Public profile photo</Text>
+            <Text style={styles.photoPrivacyText}>
+              Approved members may see this in plan details and attendee lists.
+            </Text>
+            {mode === 'create' ? (
+              <View style={styles.photoGuidance}>
+                {[
+                  'Recent solo photo',
+                  'Face clearly visible',
+                  'Good natural light',
+                  'No heavy filters',
+                ].map((item) => (
+                  <View key={item} style={styles.photoGuidanceRow}>
+                    <CheckCircle2 color={colors.success} size={20} />
+                    <Text style={styles.photoGuidanceText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {attempted && !hasProfilePhoto ? (
+              <Text style={styles.fieldError}>Add a profile photo.</Text>
+            ) : null}
+          </>
         ) : null}
 
+        {mode === 'edit' || step === 1 ? (
         <View style={styles.form}>
           {mode === 'create' ? (
             <View style={styles.usernameGroup}>
@@ -493,7 +606,10 @@ export function ProfileSetupScreen({
             value={bio}
           />
         </View>
+        ) : null}
 
+        {mode === 'edit' || step === 2 ? (
+        <>
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>Interests *</Text>
@@ -578,6 +694,8 @@ export function ProfileSetupScreen({
             Select at least three interests.
           </Text>
         ) : null}
+        </>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -595,10 +713,24 @@ export function ProfileSetupScreen({
               ? 'Saving...'
               : mode === 'edit'
                 ? 'Save changes'
-                : 'Continue'
+                : step === 3
+                  ? 'Finish profile'
+                  : 'Continue'
           }
           onPress={() => void continueToDeclaration()}
         />
+        {mode === 'create' && step === 3 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setAttempted(false);
+              setStep(1);
+            }}
+            style={styles.backToDetails}
+          >
+            <Text style={styles.backToDetailsText}>Back to profile details</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -759,6 +891,16 @@ function UsernameAvailabilityMessage({
 }
 
 const styles = StyleSheet.create({
+  backToDetails: {
+    alignItems: 'center',
+    minHeight: 48,
+    paddingTop: spacing.md,
+  },
+  backToDetailsText: {
+    color: colors.primary,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
   addInterestButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -1000,6 +1142,63 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '800',
   },
+  photoGuidance: {
+    backgroundColor: colors.glass,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  photoActionButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: spacing.sm,
+  },
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  photoActionText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  photoGuidanceRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 54,
+  },
+  photoGuidanceText: {
+    color: colors.ink,
+    fontSize: typography.body,
+  },
+  photoPrivacyText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  photoPrivacyTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '800',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
   photoSheet: {
     backgroundColor: colors.background,
     borderTopLeftRadius: radius.lg,
@@ -1068,6 +1267,41 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '700',
     marginTop: spacing.sm,
+  },
+  savedBadge: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  savedBadgeText: {
+    color: colors.success,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  savedProfileCard: {
+    alignItems: 'center',
+    backgroundColor: colors.glass,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  savedProfileCopy: {
+    flex: 1,
+  },
+  savedProfileMeta: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 3,
+  },
+  savedProfileName: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
   sectionHeader: {
     alignItems: 'center',

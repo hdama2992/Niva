@@ -13,6 +13,7 @@ type PrimaryButtonProps = {
 export function PrimaryButton({ label, onPress, disabled = false, icon }: PrimaryButtonProps) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}

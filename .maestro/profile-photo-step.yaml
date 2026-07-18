@@ -1,0 +1,7 @@
+appId: com.niva.niva
+name: Niva profile photo guidance and actions
+---
+- assertVisible: "Finish with a profile photo"
+- assertVisible: "Public profile photo"
+- assertVisible: "Take a photo"
+- assertVisible: "Choose a photo"

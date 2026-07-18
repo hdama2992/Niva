@@ -407,6 +407,9 @@ export class UsersService {
         selfDeclarationAccepted: true,
         selfDeclarationAcceptedAt: new Date(),
         selfDeclarationVersion: dto.version ?? 'v1',
+        // Welcome is no longer a separate onboarding screen. Recording this
+        // here keeps restored sessions compatible with older app versions.
+        welcomeCompletedAt: new Date(),
       },
     });
 

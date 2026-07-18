@@ -658,26 +658,40 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-stone-50 px-6 py-8 text-stone-950">
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-4 border-b border-stone-200 pb-6 md:flex-row md:items-end md:justify-between">
+    <main className="min-h-screen bg-[#fcf8f2] text-[#17212e] lg:grid lg:grid-cols-[15.5rem_1fr]">
+      <aside className="hidden min-h-screen bg-gradient-to-b from-[#082b50] to-[#031d36] px-4 py-7 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+        <p className="px-3 text-3xl font-black tracking-tight">Niva</p>
+        <nav className="mt-9 grid gap-2 text-sm font-bold">
+          <a className="rounded-xl bg-white/12 px-4 py-3" href="#review-queue">Review queue</a>
+          <a className="rounded-xl px-4 py-3 text-white/75 hover:bg-white/10" href="#members">Members</a>
+          <a className="rounded-xl px-4 py-3 text-white/75 hover:bg-white/10" href="#account-requests">Account requests</a>
+          <a className="rounded-xl px-4 py-3 text-white/75 hover:bg-white/10" href="#activities">Activities</a>
+          <a className="rounded-xl px-4 py-3 text-white/75 hover:bg-white/10" href="#analytics">Analytics</a>
+        </nav>
+        <div className="mt-auto rounded-2xl border border-white/15 bg-white/8 p-4 text-sm">
+          <p className="font-bold">Administrator workspace</p>
+          <p className="mt-1 text-xs leading-5 text-white/65">Every moderation action is attributed and audited.</p>
+        </div>
+      </aside>
+      <section className="min-w-0 px-5 py-7 md:px-8 lg:px-10">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-8">
+        <header className="flex flex-col gap-4 border-b border-[#ded8cf] pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-sm font-semibold text-rose-700">
-              Niva Admin
-            </p>
-            <h1 className="text-4xl font-bold tracking-tight">
-              Selfie review queue
+            <p className="mb-2 text-sm font-bold text-[#4f846f]">Niva Admin</p>
+            <h1 className="text-4xl font-black tracking-tight text-[#17345b]">
+              Review queue
             </h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-              Approve or hold join-time selfie submissions. The backend applies
-              the verification status and trust-tier updates after each
-              decision.
+            <p className="mt-2 max-w-2xl text-base leading-7 text-[#667181]">
+              Identity, host, safety, and account decisions in one auditable workspace.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-[#e4eee8] px-4 py-2 text-xs font-black text-[#315c49]">Production</span>
+          <div className="grid grid-cols-3 gap-2 text-center">
             <Metric label="Pending" value={counts.pending} />
             <Metric label="Needs review" value={counts.needsReview} />
             <Metric label="Approved" value={counts.approved} />
+          </div>
           </div>
         </header>
 
@@ -747,7 +761,7 @@ export default function Home() {
         ) : null}
 
         {reviews.length ? (
-          <section className="grid gap-3">
+          <section className="grid gap-3" id="review-queue">
             {reviews.map((review) => (
               <ReviewCard
                 busy={reviewingUserId === review.userId}
@@ -769,7 +783,7 @@ export default function Home() {
         )}
 
         {loaded ? (
-          <section className="grid gap-4 border-t border-stone-200 pt-6">
+          <section className="grid gap-4 border-t border-stone-200 pt-6" id="members">
             <div>
               <p className="text-sm font-semibold text-sky-700">Member care</p>
               <h2 className="mt-1 text-2xl font-bold">Member lookup</h2>
@@ -818,7 +832,7 @@ export default function Home() {
         ) : null}
 
         {loaded ? (
-          <section className="grid gap-4 border-t border-stone-200 pt-6">
+          <section className="grid gap-4 border-t border-stone-200 pt-6" id="account-requests">
             <div>
               <p className="text-sm font-semibold text-teal-700">
                 Website waitlist
@@ -938,7 +952,7 @@ export default function Home() {
         ) : null}
 
         {loaded ? (
-          <section className="grid gap-4 border-t border-stone-200 pt-6">
+          <section className="grid gap-4 border-t border-stone-200 pt-6" id="analytics">
             <div>
               <p className="text-sm font-semibold text-violet-700">
                 Closed beta
@@ -1017,7 +1031,7 @@ export default function Home() {
         ) : null}
 
         {loaded ? (
-          <section className="grid gap-4 border-t border-stone-200 pt-6">
+          <section className="grid gap-4 border-t border-stone-200 pt-6" id="activities">
             <div className="flex items-baseline justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-amber-700">
@@ -1094,6 +1108,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+      </section>
       </section>
     </main>
   );

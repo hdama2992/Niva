@@ -1,0 +1,44 @@
+appId: com.niva.niva
+name: Niva onboarding reaches the final profile-photo step
+---
+- assertVisible: "Find plans you’ll look forward to."
+- tapOn: "98765 43210"
+- inputText: "9876500199"
+- hideKeyboard
+- tapOn: "Continue"
+- assertVisible: "Verify your number"
+- tapOn: "000000"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify"
+- assertVisible: "Tell us about you"
+- tapOn: "yourname"
+- inputText: "niva_ui_0199"
+- tapOn: "Himaja"
+- eraseText
+- inputText: "Niva Tester"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Enter age"
+    direction: DOWN
+- tapOn: "Enter age"
+- inputText: "28"
+- hideKeyboard
+- tapOn: "Select your city"
+- tapOn: "Bangalore"
+- tapOn: "English"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+- tapOn: "Continue"
+- assertVisible: "What are you into?"
+- tapOn: "Books"
+- tapOn: "Photography"
+- tapOn: "Wellness"
+- tapOn: "Continue"
+- assertVisible: "Finish with a profile photo"
+- assertVisible: "Public profile photo"
+- assertVisible: "Take a photo"
+- assertVisible: "Choose a photo"

@@ -1,0 +1,8 @@
+appId: com.niva.niva
+name: Niva phone login shell
+---
+- assertVisible: "Find plans you’ll look forward to."
+- assertVisible: "Log in or sign up"
+- assertVisible: "Continue"
+- assertVisible: "Privacy Policy"
+- assertVisible: "Terms"

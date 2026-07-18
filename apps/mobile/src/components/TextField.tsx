@@ -28,6 +28,7 @@ export function TextField({
       <Text style={styles.label}>{label}</Text>
       {helperText ? <Text style={styles.helper}>{helperText}</Text> : null}
       <TextInput
+        accessibilityLabel={props.accessibilityLabel ?? label}
         placeholderTextColor={colors.muted}
         selectionColor={colors.primary}
         style={[styles.input, error && styles.inputError, style]}

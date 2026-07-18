@@ -1,20 +1,22 @@
 import {
   Check,
   ChevronDown,
+  LockKeyhole,
   MessageSquareText,
   ShieldCheck,
   Smartphone,
-  UsersRound,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  ImageBackground,
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -108,11 +110,7 @@ export function LoginScreen({
     try {
       await onContinue(`${selectedCountry.dialCode}${localPhone}`);
     } catch (authError) {
-      setError(
-        authError instanceof Error
-          ? authError.message
-          : 'Unable to start phone verification. Try again.',
-      );
+      setError(friendlyPhoneError(authError));
     } finally {
       setSubmitting(false);
     }
@@ -123,15 +121,25 @@ export function LoginScreen({
       behavior={Platform.select({ ios: 'padding', android: undefined })}
       style={styles.container}
     >
-      <View style={styles.content}>
-        <View style={styles.iconPlate}>
-          <UsersRound color={colors.primary} size={40} strokeWidth={2.2} />
-        </View>
-
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ImageBackground
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
+          source={require('../../assets/home/coffee-books-hero.webp')}
+          style={styles.hero}
+        >
+          <View style={styles.brandGlass}>
+            <Text style={styles.brand}>niva</Text>
+          </View>
+        </ImageBackground>
+        <View style={styles.content}>
         <View style={styles.copy}>
-          <Text style={styles.title}>Find your people.</Text>
+          <Text style={styles.title}>Find plans you’ll look forward to.</Text>
           <Text style={styles.subtitle}>
-            Meet people through welcoming plans near you.
+            Meet people through thoughtful plans near you.
           </Text>
         </View>
 
@@ -173,7 +181,7 @@ export function LoginScreen({
         ) : null}
 
         <View style={styles.phoneGroup}>
-          <Text style={styles.label}>Phone number</Text>
+          <Text style={styles.label}>Log in or sign up</Text>
           <View style={[styles.phoneRow, error && styles.phoneRowError]}>
             <Pressable
               accessibilityRole="button"
@@ -186,6 +194,7 @@ export function LoginScreen({
             </Pressable>
 
             <TextInput
+              accessibilityLabel="Phone number"
               autoComplete="tel"
               keyboardType="number-pad"
               maxLength={selectedCountry.localDigits}
@@ -226,13 +235,21 @@ export function LoginScreen({
               ? 'Starting verification...'
               : pnvAvailable
                 ? 'Text me a code'
-                : 'Continue with phone'
+                : 'Continue'
           }
           onPress={() => void continueToOtp()}
         />
+        <View style={styles.securityNote}>
+          <View style={styles.securityIcon}>
+            <LockKeyhole color={colors.success} size={19} strokeWidth={2.3} />
+          </View>
+          <Text style={styles.securityText}>
+            Your number is used to sign in and protect your account. It isn’t
+            shown on your profile.
+          </Text>
+        </View>
         <Text style={styles.consentText}>
-          We’ll text a verification code. Standard SMS rates may apply. By
-          continuing, you agree to our{' '}
+          By continuing, you agree to our{' '}
           <Text
             accessibilityRole="link"
             onPress={
@@ -256,7 +273,8 @@ export function LoginScreen({
           </Text>
           .
         </Text>
-      </View>
+        </View>
+      </ScrollView>
 
       <Modal
         animationType="slide"
@@ -310,14 +328,50 @@ export function LoginScreen({
   );
 }
 
+function friendlyPhoneError(error: unknown) {
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String(error.code)
+      : '';
+
+  switch (code) {
+    case 'auth/invalid-phone-number':
+      return 'That phone number is not supported. Check it and try again.';
+    case 'auth/operation-not-allowed':
+      return 'Phone sign-in is temporarily unavailable. Please try again later.';
+    case 'auth/quota-exceeded':
+    case 'auth/too-many-requests':
+      return 'Too many attempts were made. Please wait and try again later.';
+    case 'auth/network-request-failed':
+      return 'Check your internet connection and try again.';
+    default:
+      return 'Unable to start phone verification. Please try again.';
+  }
+}
+
 const styles = StyleSheet.create({
+  brand: {
+    color: colors.surface,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  brandGlass: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(23,52,91,0.55)',
+    borderColor: 'rgba(255,255,255,0.42)',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
   container: {
     flex: 1,
   },
   content: {
-    flex: 1,
-    justifyContent: 'center',
     padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   consentLink: {
     color: colors.secondary,
@@ -334,14 +388,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xl,
   },
-  iconPlate: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.lg,
-    height: 72,
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    width: 72,
+  hero: {
+    height: 260,
+    justifyContent: 'flex-start',
+    padding: spacing.lg,
+  },
+  heroImage: {
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
   },
   countryButton: {
     alignItems: 'center',
@@ -483,6 +537,30 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  securityIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  securityNote: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+  },
+  securityText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: typography.small,
+    lineHeight: 19,
   },
   sheetTitle: {
     color: colors.ink,

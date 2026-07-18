@@ -100,3 +100,47 @@ describe('welcome completion', () => {
     );
   });
 });
+
+describe('onboarding completion', () => {
+  const update = jest.fn();
+  const service = new UsersService({
+    user: { update },
+  } as unknown as PrismaService);
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-19T10:30:00.000Z'));
+    update.mockReset().mockResolvedValue({ id: 'user_1' });
+    jest
+      .spyOn(service as never, 'recordTrustEventOnce')
+      .mockResolvedValue(undefined as never);
+    jest
+      .spyOn(service as never, 'recalculateTrustScore')
+      .mockResolvedValue(undefined as never);
+    jest
+      .spyOn(service as never, 'getPublicUserById')
+      .mockResolvedValue({ id: 'user_1' } as never);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('finishes onboarding when the community declaration is accepted', async () => {
+    await service.acceptSelfDeclaration('user_1', {
+      accepted: true,
+      version: 'v1',
+    });
+
+    expect(update).toHaveBeenCalledWith({
+      data: {
+        selfDeclarationAccepted: true,
+        selfDeclarationAcceptedAt: new Date('2026-07-19T10:30:00.000Z'),
+        selfDeclarationVersion: 'v1',
+        welcomeCompletedAt: new Date('2026-07-19T10:30:00.000Z'),
+      },
+      where: { id: 'user_1' },
+    });
+  });
+});
