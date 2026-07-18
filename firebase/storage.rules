@@ -27,6 +27,12 @@ service firebase.storage {
       allow read, update, delete: if false;
     }
 
+    match /activity-covers/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create: if ownsPath(userId) && isSafeImageUpload(fileName);
+      allow delete: if ownsPath(userId);
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

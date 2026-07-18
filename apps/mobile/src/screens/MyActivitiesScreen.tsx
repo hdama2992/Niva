@@ -1,17 +1,28 @@
 import {
   ArrowLeft,
-  CalendarCheck,
   CalendarDays,
+  CheckCircle2,
   Clock3,
+  History,
+  MapPin,
   MessageCircle,
+  TimerReset,
 } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useMemo, useState } from 'react';
 
+import { resolveActivityCardArtwork } from '../constants/activity-artwork';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
 
-type ActivityFilter = 'upcoming' | 'pending' | 'past' | 'cancelled';
+type PlanView = 'history' | 'pending' | 'upcoming';
 
 type MyActivitiesScreenProps = {
   items: DiscoveryItem[];
@@ -23,13 +34,6 @@ type MyActivitiesScreenProps = {
   onOpen: (item: DiscoveryItem) => void;
 };
 
-const filters: Array<{ id: ActivityFilter; label: string }> = [
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'past', label: 'Past' },
-  { id: 'cancelled', label: 'Cancelled' },
-];
-
 export function MyActivitiesScreen({
   embedded = false,
   items,
@@ -39,96 +43,150 @@ export function MyActivitiesScreen({
   onLeave,
   onOpen,
 }: MyActivitiesScreenProps) {
-  const [activeFilter, setActiveFilter] = useState<ActivityFilter>('upcoming');
-  const filteredItems = useMemo(
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
+  const [view, setView] = useState<PlanView>('upcoming');
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const week = useMemo(() => currentWeek(today), [today]);
+  const filtered = useMemo(
     () =>
-      items.filter((item) => {
-        const cancelled =
-          item.membershipStatus === 'CANCELLED' ||
-          item.activityStatus === 'CANCELLED';
-        const past = item.startsAt
-          ? new Date(item.startsAt).getTime() < Date.now()
-          : false;
-        const pending = item.membershipStatus === 'REQUESTED';
-
-        if (activeFilter === 'cancelled') {
-          return cancelled;
-        }
-
-        if (activeFilter === 'past') {
-          return !cancelled && past;
-        }
-
-        if (activeFilter === 'pending') {
-          return !cancelled && pending;
-        }
-
-        return !cancelled && !past && !pending;
-      }),
-    [activeFilter, items],
+      items
+        .filter((item) => matchesView(item, view, today))
+        .sort(
+          (left, right) =>
+            activityTime(left).getTime() - activityTime(right).getTime(),
+        ),
+    [items, today, view],
+  );
+  const groups = useMemo(() => groupByDay(filtered), [filtered]);
+  const pendingCount = items.filter(
+    (item) => item.membershipStatus === 'REQUESTED',
+  ).length;
+  const todayHasPlan = items.some(
+    (item) => startOfDay(activityTime(item)).getTime() === today.getTime(),
   );
 
   const content = (
     <>
       <View style={styles.headingRow}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.title}>
-            {embedded ? 'Plans' : 'Your activities'}
-          </Text>
-          <Text style={styles.subtitle}>
-            Keep upcoming plans, requests, and recurring circles in one place.
-          </Text>
-        </View>
-        <View style={styles.count}>
-          <Text style={styles.countValue}>{items.length}</Text>
-          <Text style={styles.countLabel}>saved</Text>
-        </View>
+        <Text style={styles.title}>{embedded ? 'Plans' : 'Your plans'}</Text>
+        <CalendarDays color={colors.primary} size={28} strokeWidth={2.3} />
       </View>
 
-      <View style={styles.segmentedControl}>
-        {filters.map((filter) => (
-          <Pressable
-            accessibilityRole="button"
-            key={filter.id}
-            onPress={() => setActiveFilter(filter.id)}
+      <View style={styles.viewRow}>
+        <View style={styles.segmentedControl}>
+          <Segment
+            active={view === 'upcoming'}
+            label="Upcoming"
+            onPress={() => setView('upcoming')}
+          />
+          <Segment
+            active={view === 'pending'}
+            label={`Pending${pendingCount ? ` ${pendingCount}` : ''}`}
+            onPress={() => setView('pending')}
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setView('history')}
+          style={styles.historyAction}
+        >
+          <History
+            color={view === 'history' ? colors.primary : colors.info}
+            size={19}
+            strokeWidth={2.3}
+          />
+          <Text
             style={[
-              styles.segment,
-              activeFilter === filter.id && styles.segmentActive,
+              styles.historyText,
+              view === 'history' && styles.historyTextActive,
             ]}
           >
-            <Text
-              style={[
-                styles.segmentText,
-                activeFilter === filter.id && styles.segmentTextActive,
-              ]}
-            >
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
+            History
+          </Text>
+        </Pressable>
       </View>
 
-      {filteredItems.length ? (
-        <View style={styles.list}>
-          {filteredItems.map((item) => (
-            <ActivityCard
-              item={item}
-              key={item.id}
-              onChat={onChat}
-              onFeedback={onFeedback}
-              onLeave={onLeave}
-              onOpen={onOpen}
-            />
+      <View style={styles.weekStrip}>
+        {week.map((date) => {
+          const active = date.getTime() === today.getTime();
+          const hasPlan = items.some(
+            (item) =>
+              startOfDay(activityTime(item)).getTime() === date.getTime(),
+          );
+          return (
+            <View key={date.toISOString()} style={styles.day}>
+              <Text style={styles.dayName}>
+                {date
+                  .toLocaleDateString(undefined, { weekday: 'short' })
+                  .toUpperCase()}
+              </Text>
+              <View
+                style={[styles.dayNumberWrap, active && styles.dayNumberActive]}
+              >
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    active && styles.dayNumberTextActive,
+                  ]}
+                >
+                  {date.getDate()}
+                </Text>
+              </View>
+              {active ? (
+                <Text style={styles.todayLabel}>Today</Text>
+              ) : hasPlan ? (
+                <View style={styles.planDot} />
+              ) : (
+                <View style={styles.dotSpacer} />
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      {view === 'upcoming' && !todayHasPlan ? (
+        <View style={styles.todayEmpty}>
+          <Clock3 color={colors.info} size={20} strokeWidth={2.2} />
+          <Text style={styles.todayEmptyText}>
+            Nothing planned today · Enjoy your day
+          </Text>
+        </View>
+      ) : null}
+
+      {groups.length ? (
+        <View style={styles.timeline}>
+          <View style={styles.timelineLine} />
+          {groups.map((group) => (
+            <View key={group.key} style={styles.dayGroup}>
+              <View style={styles.groupHeading}>
+                <View style={styles.timelineNode} />
+                <Text style={styles.groupTitle}>{group.label}</Text>
+              </View>
+              <View style={styles.groupItems}>
+                {group.items.map((item) => (
+                  <AgendaCard
+                    compact={compact}
+                    item={item}
+                    key={item.id}
+                    onChat={onChat}
+                    onFeedback={onFeedback}
+                    onLeave={onLeave}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </View>
+            </View>
           ))}
         </View>
       ) : (
-        <EmptyPlans filter={activeFilter} />
+        <EmptyPlans view={view} />
       )}
     </>
   );
 
   if (embedded) {
-    return <View style={styles.embeddedContent}>{content}</View>;
+    return <View style={styles.embedded}>{content}</View>;
   }
 
   return (
@@ -136,405 +194,444 @@ export function MyActivitiesScreen({
       <View style={styles.topBar}>
         <Pressable
           accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
           onPress={onBack}
-          style={styles.iconButton}
+          style={styles.back}
         >
           <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
         </Pressable>
-        <Text style={styles.topBarTitle}>My plans</Text>
-        <View style={styles.topBarSpacer} />
+        <Text style={styles.topBarTitle}>Plans</Text>
+        <View style={styles.back} />
       </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </ScrollView>
+      <View style={styles.content}>{content}</View>
     </View>
   );
 }
 
-function ActivityCard({
+function Segment({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.segment, active && styles.segmentActive]}
+    >
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function AgendaCard({
+  compact,
   item,
   onChat,
   onFeedback,
   onLeave,
   onOpen,
 }: {
+  compact: boolean;
   item: DiscoveryItem;
   onChat: (item: DiscoveryItem) => void;
   onFeedback: (item: DiscoveryItem) => void;
   onLeave: (item: DiscoveryItem) => void;
   onOpen: (item: DiscoveryItem) => void;
 }) {
-  const canLeave =
-    item.membershipStatus === 'REQUESTED' ||
-    item.membershipStatus === 'APPROVED';
-  const canGiveFeedback =
-    item.category === 'event' &&
-    item.activityStatus !== 'CANCELLED' &&
-    item.membershipStatus !== 'CANCELLED' &&
-    Boolean(item.startsAt && new Date(item.startsAt).getTime() < Date.now());
-  const canChat =
+  const approved =
     item.membershipStatus === 'APPROVED' ||
     item.membershipStatus === 'ATTENDED';
+  const pending = item.membershipStatus === 'REQUESTED';
+  const past = activityTime(item).getTime() < Date.now();
+  const recurring = item.category === 'circle' && item.occurrenceId;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.category}>
-          {item.category === 'circle' ? 'Circle' : 'Event'}
+    <Pressable
+      onPress={() => onOpen(item)}
+      style={[styles.card, compact && styles.cardCompact]}
+    >
+      <Image
+        resizeMode="cover"
+        source={resolveActivityCardArtwork(item)}
+        style={[styles.cardImage, compact && styles.cardImageCompact]}
+      />
+      <View style={[styles.cardBody, compact && styles.cardBodyCompact]}>
+        <View style={styles.cardTypeRow}>
+          <Text style={styles.cardType}>
+            {recurring ? 'RECURRING' : 'PLAN'}
+          </Text>
+          {recurring ? (
+            <TimerReset color={colors.secondary} size={15} strokeWidth={2.3} />
+          ) : null}
+        </View>
+        <Text numberOfLines={2} style={styles.cardTitle}>
+          {item.title}
         </Text>
-        <Text style={styles.status}>
-          {item.activityStatus === 'CANCELLED'
-            ? 'Activity cancelled'
-            : formatStatus(item.membershipStatus)}
-        </Text>
-      </View>
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <View style={styles.detailRow}>
-        <CalendarDays color={colors.primary} size={17} strokeWidth={2.3} />
-        <Text style={styles.detailText}>{item.time}</Text>
-      </View>
-      <View style={styles.detailRow}>
-        <Clock3 color={colors.secondary} size={17} strokeWidth={2.3} />
-        <Text style={styles.detailText}>{item.location}</Text>
-      </View>
-      <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onOpen(item)}
-          style={styles.detailAction}
-        >
-          <Text style={styles.detailActionText}>View details</Text>
-        </Pressable>
-        {canChat ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onChat(item)}
-            style={styles.chatAction}
-          >
-            <MessageCircle
-              color={colors.secondary}
-              size={17}
-              strokeWidth={2.4}
-            />
-            <Text style={styles.chatActionText}>Group chat</Text>
-          </Pressable>
-        ) : null}
-        {canGiveFeedback ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onFeedback(item)}
-            style={styles.feedbackAction}
-          >
-            <Text style={styles.feedbackActionText}>Give feedback</Text>
-          </Pressable>
-        ) : null}
-        {canLeave ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onLeave(item)}
-            style={styles.leaveAction}
-          >
-            <Text style={styles.leaveActionText}>
-              {item.membershipStatus === 'REQUESTED' ? 'Withdraw' : 'Leave'}
+        <View style={styles.metaRow}>
+          <Clock3 color={colors.warning} size={16} strokeWidth={2.3} />
+          <Text style={styles.metaText}>
+            {activityTime(item).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </Text>
+        </View>
+        <View style={styles.metaRow}>
+          <MapPin color={colors.info} size={16} strokeWidth={2.3} />
+          <Text numberOfLines={1} style={styles.metaText}>
+            {item.location}
+          </Text>
+        </View>
+        <View style={[styles.cardFooter, compact && styles.cardFooterCompact]}>
+          <View style={styles.statusRow}>
+            {pending ? (
+              <TimerReset color={colors.warning} size={16} strokeWidth={2.3} />
+            ) : (
+              <CheckCircle2
+                color={colors.success}
+                size={16}
+                strokeWidth={2.3}
+              />
+            )}
+            <Text style={[styles.statusText, pending && styles.statusPending]}>
+              {pending
+                ? 'Request pending'
+                : past
+                  ? 'Completed'
+                  : 'You’re going'}
             </Text>
-          </Pressable>
-        ) : null}
+          </View>
+          {approved && !past ? (
+            <Pressable onPress={() => onChat(item)} style={styles.quickAction}>
+              <MessageCircle color={colors.info} size={16} strokeWidth={2.3} />
+              <Text style={styles.quickActionText}>Chat</Text>
+            </Pressable>
+          ) : past && item.category === 'event' ? (
+            <Pressable
+              onPress={() => onFeedback(item)}
+              style={styles.quickAction}
+            >
+              <Text style={styles.quickActionText}>Feedback</Text>
+            </Pressable>
+          ) : pending ? (
+            <Pressable onPress={() => onLeave(item)} style={styles.quickAction}>
+              <Text style={styles.quickActionText}>Withdraw</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-function EmptyPlans({ filter }: { filter: ActivityFilter }) {
+function EmptyPlans({ view }: { view: PlanView }) {
   const copy =
-    filter === 'cancelled'
+    view === 'pending'
       ? [
-          'No cancelled activities',
-          'Any activity you leave will be listed here.',
+          'No pending requests',
+          'Plans awaiting a host decision will appear here.',
         ]
-      : filter === 'past'
+      : view === 'history'
         ? [
-            'No past activities yet',
-            'Completed sessions will appear here after their start time.',
+            'No plan history yet',
+            'Completed and cancelled plans will stay here.',
           ]
-        : filter === 'pending'
-          ? [
-              'No pending requests',
-              'Join requests awaiting a host decision will appear here.',
-            ]
-          : [
-              'Nothing upcoming yet',
-              'Explore a small event or circle when you are ready.',
-            ];
-
+        : ['Nothing upcoming yet', 'Explore a plan when you are ready.'];
   return (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <CalendarCheck color={colors.info} size={25} strokeWidth={2.3} />
-      </View>
+    <View style={styles.empty}>
+      <CalendarDays color={colors.info} size={28} strokeWidth={2.2} />
       <Text style={styles.emptyTitle}>{copy[0]}</Text>
       <Text style={styles.emptyText}>{copy[1]}</Text>
     </View>
   );
 }
 
-function formatStatus(status: DiscoveryItem['membershipStatus']) {
-  switch (status) {
-    case 'APPROVED':
-      return 'Going';
-    case 'ATTENDED':
-      return 'Attended';
-    case 'CANCELLED':
-      return 'Cancelled';
-    case 'NO_SHOW':
-      return 'No-show';
-    default:
-      return 'Pending';
-  }
+function matchesView(item: DiscoveryItem, view: PlanView, today: Date) {
+  const cancelled =
+    item.membershipStatus === 'CANCELLED' ||
+    item.activityStatus === 'CANCELLED';
+  const past = activityTime(item).getTime() < today.getTime();
+  if (view === 'pending')
+    return !cancelled && item.membershipStatus === 'REQUESTED';
+  if (view === 'history') return cancelled || past;
+  return !cancelled && !past && item.membershipStatus !== 'REQUESTED';
+}
+
+function groupByDay(items: DiscoveryItem[]) {
+  const groups = new Map<string, DiscoveryItem[]>();
+  items.forEach((item) => {
+    const key = startOfDay(activityTime(item)).toISOString();
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  });
+  return [...groups.entries()].map(([key, grouped]) => ({
+    items: grouped,
+    key,
+    label: new Date(key).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      weekday: 'long',
+    }),
+  }));
+}
+
+function activityTime(item: DiscoveryItem) {
+  return item.startsAt ? new Date(item.startsAt) : new Date(0);
+}
+
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function currentWeek(today: Date) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return date;
+  });
 }
 
 const styles = StyleSheet.create({
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+  back: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    padding: spacing.md,
+    flexDirection: 'row',
+    minHeight: 174,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
-  cardHeader: {
+  cardBody: { flex: 1, padding: spacing.md },
+  cardBodyCompact: { padding: spacing.sm },
+  cardCompact: { minHeight: 160 },
+  cardFooter: {
     alignItems: 'center',
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
   },
+  cardFooterCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: spacing.xs,
+  },
+  cardImage: { backgroundColor: colors.accentSoft, height: '100%', width: 122 },
+  cardImageCompact: { width: 94 },
   cardTitle: {
-    color: colors.ink,
+    color: colors.primaryDark,
     fontSize: typography.subheading,
     fontWeight: '800',
-    lineHeight: 25,
-    marginTop: spacing.sm,
+    lineHeight: 24,
+    marginBottom: spacing.xs,
   },
-  chatAction: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.md,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: spacing.md,
-  },
-  chatActionText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  category: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  count: {
-    alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.md,
-    minWidth: 62,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  countLabel: {
-    color: colors.warning,
+  cardType: {
+    color: colors.success,
     fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 0.8,
   },
-  countValue: {
-    color: colors.ink,
-    fontSize: typography.subheading,
+  cardTypeRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  content: { padding: spacing.lg },
+  day: { alignItems: 'center', flex: 1, gap: 4 },
+  dayGroup: { gap: spacing.sm, marginBottom: spacing.lg },
+  dayName: {
+    color: colors.primary,
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.7,
   },
-  detailAction: {
-    alignItems: 'center',
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 42,
-  },
-  detailActionText: {
+  dayNumber: {
     color: colors.ink,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  detailRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  detailText: {
-    color: colors.muted,
-    flex: 1,
-    fontSize: typography.small,
+    fontSize: typography.body,
     fontWeight: '700',
   },
-  emptyIcon: {
+  dayNumberActive: { backgroundColor: colors.primary },
+  dayNumberTextActive: { color: colors.surface },
+  dayNumberWrap: {
     alignItems: 'center',
-    backgroundColor: colors.infoSoft,
     borderRadius: radius.pill,
-    height: 48,
+    height: 38,
     justifyContent: 'center',
-    width: 48,
+    width: 38,
   },
-  embeddedContent: {
-    flex: 1,
-  },
-  emptyState: {
+  dotSpacer: { height: 11 },
+  embedded: { gap: spacing.lg },
+  empty: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.xl,
+    gap: spacing.sm,
+    paddingVertical: spacing.xxl,
   },
   emptyText: {
     color: colors.muted,
     fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: spacing.xs,
     textAlign: 'center',
   },
   emptyTitle: {
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
-    marginTop: spacing.md,
   },
-  feedbackAction: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: spacing.md,
-  },
-  feedbackActionText: {
-    color: colors.secondary,
-    fontSize: typography.small,
+  groupHeading: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  groupItems: { gap: spacing.md, marginLeft: spacing.xl },
+  groupTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
     fontWeight: '800',
   },
   headingRow: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
     justifyContent: 'space-between',
   },
-  headingCopy: {
-    flex: 1,
-  },
-  iconButton: {
+  historyAction: {
     alignItems: 'center',
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    minHeight: 44,
   },
-  leaveAction: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: spacing.md,
-  },
-  leaveActionText: {
-    color: colors.surface,
+  historyText: {
+    color: colors.info,
     fontSize: typography.small,
     fontWeight: '800',
   },
-  list: {
-    gap: spacing.md,
-    marginTop: spacing.lg,
+  historyTextActive: { color: colors.primary },
+  metaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: 4,
   },
-  screen: {
-    backgroundColor: colors.background,
-    flex: 1,
+  metaText: { color: colors.muted, flexShrink: 1, fontSize: typography.small },
+  planDot: {
+    backgroundColor: colors.success,
+    borderRadius: radius.pill,
+    height: 7,
+    width: 7,
   },
+  quickAction: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
+  },
+  quickActionText: { color: colors.info, fontSize: 12, fontWeight: '800' },
+  screen: { backgroundColor: colors.background, flex: 1 },
   segment: {
     alignItems: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 46,
+    paddingHorizontal: spacing.md,
   },
-  segmentActive: {
+  segmentActive: { backgroundColor: colors.primary },
+  segmentedControl: {
     backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    padding: 4,
   },
   segmentText: {
     color: colors.muted,
     fontSize: typography.small,
     fontWeight: '800',
   },
-  segmentTextActive: {
-    color: colors.ink,
+  segmentTextActive: { color: colors.surface },
+  statusPending: { color: colors.warning },
+  statusRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  statusText: { color: colors.success, fontSize: 12, fontWeight: '800' },
+  timeline: { position: 'relative' },
+  timelineLine: {
+    backgroundColor: colors.border,
+    bottom: 12,
+    left: 8,
+    position: 'absolute',
+    top: 12,
+    width: 1,
   },
-  segmentedControl: {
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.md,
-    flexDirection: 'row',
-    marginTop: spacing.xl,
-    padding: 4,
-  },
-  status: {
-    color: colors.warning,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 23,
-    marginTop: spacing.xs,
-    maxWidth: 275,
+  timelineNode: {
+    backgroundColor: colors.primary,
+    borderColor: colors.background,
+    borderRadius: radius.pill,
+    borderWidth: 4,
+    height: 18,
+    width: 18,
   },
   title: {
-    color: colors.ink,
-    fontSize: typography.heading,
+    color: colors.primaryDark,
+    fontSize: 34,
     fontWeight: '800',
-    lineHeight: 34,
+    letterSpacing: -0.8,
+  },
+  todayEmpty: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  todayEmptyText: { color: colors.muted, fontSize: typography.small },
+  todayLabel: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    color: colors.warning,
+    fontSize: 10,
+    fontWeight: '800',
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
-    minHeight: 62,
-    paddingHorizontal: spacing.md,
-  },
-  topBarSpacer: {
-    height: 44,
-    width: 44,
+    justifyContent: 'space-between',
+    minHeight: 60,
+    paddingHorizontal: spacing.sm,
   },
   topBarTitle: {
     color: colors.ink,
-    flex: 1,
     fontSize: typography.body,
     fontWeight: '800',
-    textAlign: 'center',
+  },
+  viewRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  weekStrip: {
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    shadowColor: colors.primary,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
 });

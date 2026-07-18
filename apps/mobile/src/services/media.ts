@@ -102,6 +102,53 @@ export async function chooseSelfie(): Promise<SelectedImage | undefined> {
   return { mimeType: asset.mimeType, uri: asset.uri };
 }
 
+export async function pickActivityCover(): Promise<SelectedImage | undefined> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    throw new Error(
+      'Photo library permission is needed to add an event cover.',
+    );
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    allowsEditing: true,
+    aspect: [3, 2],
+    mediaTypes: ['images'],
+    quality: 0.84,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  const asset = result.assets[0];
+  return { mimeType: asset.mimeType, uri: asset.uri };
+}
+
+export async function takeActivityCover(): Promise<SelectedImage | undefined> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    throw new Error('Camera permission is needed to take an event cover.');
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    aspect: [3, 2],
+    cameraType: ImagePicker.CameraType.back,
+    mediaTypes: ['images'],
+    quality: 0.84,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  const asset = result.assets[0];
+  return { mimeType: asset.mimeType, uri: asset.uri };
+}
+
 export async function uploadProfilePhoto(
   image: SelectedImage,
 ): Promise<string> {
@@ -112,6 +159,10 @@ export async function uploadVerificationSelfie(
   image: SelectedImage,
 ): Promise<string> {
   return uploadImage(image, 'verification-selfies', true);
+}
+
+export async function uploadActivityCover(image: SelectedImage) {
+  return uploadImage(image, 'activity-covers');
 }
 
 async function uploadImage(

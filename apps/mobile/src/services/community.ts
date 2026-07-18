@@ -28,21 +28,39 @@ export type CommunityActivity = {
   _count?: { members: number };
   category?: 'event' | 'circle';
   city: string;
+  coverImageUrl?: string | null;
   capacity: number;
   cancellationReason?: string | null;
   cancelledAt?: string | null;
   description: string;
   difficulty: string;
   durationWeeks?: number;
-  host?: { displayName: string | null; id: string; username: string | null };
+  host?: {
+    displayName: string | null;
+    id: string;
+    profile?: { bio: string | null; profilePhotoUrl: string | null } | null;
+    trust?: { score: number } | null;
+    username: string | null;
+  };
   id: string;
+  hostNote?: string | null;
   interests: string[];
   latitude?: number | null;
   locationName: string;
   longitude?: number | null;
+  membershipStatus?:
+    'APPROVED' | 'ATTENDED' | 'CANCELLED' | 'NO_SHOW' | 'REQUESTED';
+  occurrences?: Array<{
+    cancellationReason?: string | null;
+    id: string;
+    startsAt: string;
+    status: 'CANCELLED' | 'COMPLETED' | 'SCHEDULED';
+  }>;
+  recurrenceIntervalWeeks?: number;
   status?: 'CANCELLED' | 'COMPLETED' | 'DRAFT' | 'PUBLISHED';
   schedule?: string;
   startsAt: string;
+  timezone?: string;
   title: string;
 };
 
@@ -74,6 +92,7 @@ export type CommunitySettings = {
 export type IcebreakerMember = {
   displayName: string | null;
   id: string;
+  profilePhotoUrl?: string | null;
   prompts: string[];
   sharedInterests: string[];
 };
@@ -168,9 +187,11 @@ export function createEvent(
   event: {
     capacity: number;
     city: string;
+    coverImageUrl?: string;
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     interests: string[];
+    hostNote?: string;
     latitude?: number;
     locationName: string;
     longitude?: number;
@@ -189,16 +210,20 @@ export function createCircle(
   circle: {
     capacity: number;
     city: string;
+    coverImageUrl?: string;
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     durationWeeks: number;
     interests: string[];
+    hostNote?: string;
     latitude?: number;
     locationName: string;
     longitude?: number;
+    recurrenceIntervalWeeks: number;
     schedule: string;
     startsAt: string;
     title: string;
+    timezone: string;
   },
 ) {
   return request<{ circle: CommunityActivity }>('/community/circles', idToken, {
@@ -213,9 +238,11 @@ export function updateEvent(
   event: Partial<{
     capacity: number;
     city: string;
+    coverImageUrl?: string;
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     interests: string[];
+    hostNote?: string;
     latitude?: number;
     locationName: string;
     longitude?: number;
@@ -239,16 +266,20 @@ export function updateCircle(
   circle: Partial<{
     capacity: number;
     city: string;
+    coverImageUrl?: string;
     description: string;
     difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
     durationWeeks: number;
     interests: string[];
+    hostNote?: string;
     latitude?: number;
     locationName: string;
     longitude?: number;
+    recurrenceIntervalWeeks: number;
     schedule: string;
     startsAt: string;
     title: string;
+    timezone: string;
   }>,
 ) {
   return request<{ circle: CommunityActivity }>(
@@ -299,6 +330,8 @@ export function listMyActivities(idToken: string) {
   return request<{
     circles: CommunityMembership[];
     events: CommunityMembership[];
+    hostedCircles: CommunityActivity[];
+    hostedEvents: CommunityActivity[];
   }>('/community/me/activities', idToken);
 }
 

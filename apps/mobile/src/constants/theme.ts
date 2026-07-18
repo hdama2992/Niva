@@ -1,21 +1,24 @@
 export const colors = {
-  accent: '#F2B84B',
-  accentSoft: '#FFF4D8',
-  background: '#FFF9F4',
-  info: '#315F8F',
-  infoSoft: '#E8F0FA',
+  accent: '#E9D7BA',
+  accentSoft: '#F6ECDD',
+  background: '#FCF8F2',
+  info: '#416C96',
+  infoSoft: '#E7EEF5',
   surface: '#FFFFFF',
-  surfaceStrong: '#F5EEF8',
-  primary: '#D95778',
-  primaryDark: '#A33B5A',
-  secondary: '#197C7B',
-  secondarySoft: '#E3F3F1',
-  ink: '#211A1D',
-  muted: '#6F6368',
-  border: '#E7DAD2',
-  success: '#287A61',
-  successSoft: '#E4F3EC',
-  warning: '#8A5A00',
+  surfaceStrong: '#F3EEE7',
+  primary: '#17345B',
+  primaryDark: '#102742',
+  secondary: '#6F9482',
+  secondarySoft: '#E4EEE8',
+  ink: '#17212E',
+  muted: '#667181',
+  border: '#DED8CF',
+  success: '#4F846F',
+  successSoft: '#E4EEE8',
+  warning: '#A64D38',
+  warningSoft: '#F7E6DF',
+  glass: 'rgba(255,255,255,0.86)',
+  glassBorder: 'rgba(255,255,255,0.96)',
 };
 
 export const spacing = {
@@ -28,9 +31,9 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 8,
-  lg: 12,
+  sm: 12,
+  md: 18,
+  lg: 24,
   pill: 999,
 };
 

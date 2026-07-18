@@ -11,6 +11,7 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import { ActivityCoverSelector } from '../components/ActivityCoverSelector';
 import {
   formatRecurringSchedule,
   RecurringCadence,
@@ -21,20 +22,25 @@ import {
   LocationSelector,
 } from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
+import { SelectedImage } from '../services/media';
 
 export type CreateCircleInput = {
   capacity: number;
   city: string;
+  coverImage?: SelectedImage;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
+  hostNote?: string;
   durationWeeks: number;
   interests: string[];
   locationName: string;
   latitude?: number;
   longitude?: number;
+  recurrenceIntervalWeeks: number;
   schedule: string;
   startsAt: string;
   title: string;
+  timezone: string;
 };
 
 type CreateCircleScreenProps = {
@@ -57,6 +63,8 @@ export function CreateCircleScreen({
 }: CreateCircleScreenProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [hostNote, setHostNote] = useState('');
+  const [coverImage, setCoverImage] = useState<SelectedImage>();
   const [location, setLocation] = useState<ActivityLocation>({
     city: user.city,
     locationName: '',
@@ -99,16 +107,21 @@ export function CreateCircleScreen({
       await onCreate({
         capacity,
         city: location.city,
+        coverImage,
         description: description.trim(),
         difficulty,
+        hostNote: hostNote.trim() || undefined,
         durationWeeks,
         interests,
         latitude: location.latitude,
         locationName: location.locationName.trim(),
         longitude: location.longitude,
+        recurrenceIntervalWeeks: cadence === 'FORTNIGHTLY' ? 2 : 1,
         schedule: formatRecurringSchedule(startsAt, cadence),
         startsAt: startsAt.toISOString(),
         title: title.trim(),
+        timezone:
+          Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
       });
     } catch (createError) {
       setError(
@@ -164,6 +177,24 @@ export function CreateCircleScreen({
             textAlignVertical="top"
             value={description}
           />
+        </Field>
+        <Field label="A note from your host (optional)">
+          <TextInput
+            maxLength={400}
+            multiline
+            onChangeText={setHostNote}
+            placeholder="Share the feeling you want this circle to have and how you’ll welcome the group."
+            placeholderTextColor={colors.muted}
+            style={[styles.input, styles.textArea]}
+            textAlignVertical="top"
+            value={hostNote}
+          />
+          <Text style={styles.helper}>
+            This introduction stays with every session in the circle.
+          </Text>
+        </Field>
+        <Field label="Cover photo">
+          <ActivityCoverSelector onChange={setCoverImage} value={coverImage} />
         </Field>
         <Field label="Meeting location">
           <LocationSelector onChange={setLocation} value={location} />

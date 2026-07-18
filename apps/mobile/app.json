@@ -15,6 +15,7 @@
     "android": {
       "versionCode": 1,
       "package": "com.niva.niva",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#FFF8F8",
         "foregroundImage": "./assets/android-icon-foreground.png",

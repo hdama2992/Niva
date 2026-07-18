@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   MaxLength,
   Min,
@@ -23,6 +24,16 @@ export class CreateCircleDto {
   @IsString()
   @MaxLength(1000)
   description!: string;
+
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  coverImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  hostNote?: string;
 
   @IsString()
   @IsIn(SUPPORTED_CITIES)
@@ -56,6 +67,14 @@ export class CreateCircleDto {
   @Min(2)
   @Max(16)
   durationWeeks!: number;
+
+  @IsInt()
+  @IsIn([1, 2])
+  recurrenceIntervalWeeks!: number;
+
+  @IsString()
+  @MaxLength(80)
+  timezone!: string;
 
   @IsInt()
   @Min(2)

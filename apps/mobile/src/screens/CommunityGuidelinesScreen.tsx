@@ -7,19 +7,21 @@ type CommunityGuidelinesScreenProps = {
   activityTitle: string;
   onAccept: () => void;
   onBack: () => void;
+  reviewOnly?: boolean;
 };
 
 const guidelines = [
-  'Treat every member with respect and keep disagreement constructive.',
-  'Do not harass, pressure, stalk, or share anyone’s private information.',
-  'Use a real identity and keep event chats for coordination and community.',
-  'Niva is a women-centered community. Join only if you are a woman or identify as a woman.',
+  'Be kind, inclusive, and make space for everyone to feel welcome.',
+  'Respect consent and personal boundaries. Never pressure, harass, or share private information.',
+  'Show up when you say you will, or cancel early so the host can plan fairly.',
+  'Keep chats helpful and community-focused, and report anything that feels unsafe.',
 ];
 
 export function CommunityGuidelinesScreen({
   activityTitle,
   onAccept,
   onBack,
+  reviewOnly = false,
 }: CommunityGuidelinesScreenProps) {
   return (
     <View style={styles.screen}>
@@ -33,7 +35,7 @@ export function CommunityGuidelinesScreen({
         >
           <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
         </Pressable>
-        <Text style={styles.topBarTitle}>Before you join</Text>
+        <Text style={styles.topBarTitle}>{reviewOnly ? 'Community Promise' : 'Before you join'}</Text>
         <View style={styles.iconButton} />
       </View>
 
@@ -41,9 +43,13 @@ export function CommunityGuidelinesScreen({
         <View style={styles.iconWrap}>
           <ShieldCheck color={colors.secondary} size={31} strokeWidth={2.3} />
         </View>
-        <Text style={styles.title}>A considered community starts with clear boundaries.</Text>
+        <Text style={styles.title}>
+          A friendly plan starts with a shared promise.
+        </Text>
         <Text style={styles.subtitle}>
-          These apply to {activityTitle} and every Niva space you join.
+          {reviewOnly
+            ? 'These expectations apply in every plan, circle, and conversation on Niva.'
+            : `These apply to ${activityTitle} and every Niva space you join.`}
         </Text>
 
         <View style={styles.guidelines}>
@@ -64,7 +70,7 @@ export function CommunityGuidelinesScreen({
           onPress={onAccept}
           style={styles.acceptButton}
         >
-          <Text style={styles.acceptText}>I agree and continue</Text>
+          <Text style={styles.acceptText}>{reviewOnly ? 'Done' : 'I agree and continue'}</Text>
         </Pressable>
       </View>
     </View>

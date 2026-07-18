@@ -131,9 +131,7 @@ export function LoginScreen({
         <View style={styles.copy}>
           <Text style={styles.title}>Find your people.</Text>
           <Text style={styles.subtitle}>
-            {pnvAvailable
-              ? 'Verify the phone number on this device in one secure step.'
-              : 'Your phone number helps keep every Niva circle safer and more accountable.'}
+            Meet people through welcoming plans near you.
           </Text>
         </View>
 
@@ -228,14 +226,13 @@ export function LoginScreen({
               ? 'Starting verification...'
               : pnvAvailable
                 ? 'Text me a code'
-                : 'Continue securely'
+                : 'Continue with phone'
           }
           onPress={() => void continueToOtp()}
         />
         <Text style={styles.consentText}>
-          By continuing, you agree to receive an authentication SMS. Firebase
-          may process your phone number to prevent abuse. Standard SMS rates may
-          apply.{' '}
+          We’ll text a verification code. Standard SMS rates may apply. By
+          continuing, you agree to our{' '}
           <Text
             accessibilityRole="link"
             onPress={

@@ -1,6 +1,8 @@
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -37,6 +39,7 @@ export function ChatScreen({
   const [activityNotice, setActivityNotice] = useState<string>();
   const [error, setError] = useState<string>();
   const [live, setLive] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -54,6 +57,8 @@ export function ChatScreen({
           ? requestError.message
           : 'Unable to load this cohort chat.',
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,7 +110,8 @@ export function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={0}
       style={styles.screen}
     >
       <View style={styles.topBar}>
@@ -130,7 +136,9 @@ export function ChatScreen({
       </View>
 
       <ScrollView
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         contentContainerStyle={styles.messages}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() =>
           scrollRef.current?.scrollToEnd({ animated: false })
@@ -146,12 +154,13 @@ export function ChatScreen({
           <Text style={styles.activityNotice}>{activityNotice}</Text>
         ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {!messages.length && !error ? (
+        {loading ? <ChatShimmer /> : null}
+        {!loading && !messages.length && !error ? (
           <Text style={styles.emptyText}>
             Start with a quick hello or a practical question about the activity.
           </Text>
         ) : null}
-        {messages.map((message) => {
+        {!loading ? messages.map((message) => {
           const own = message.senderId === userId;
           return (
             <View
@@ -174,7 +183,7 @@ export function ChatScreen({
               </View>
             </View>
           );
-        })}
+        }) : null}
       </ScrollView>
 
       <View style={styles.composer}>
@@ -182,6 +191,11 @@ export function ChatScreen({
           maxLength={500}
           multiline
           onChangeText={setDraft}
+          onFocus={() =>
+            requestAnimationFrame(() =>
+              scrollRef.current?.scrollToEnd({ animated: true }),
+            )
+          }
           placeholder="Message the cohort"
           placeholderTextColor={colors.muted}
           style={styles.input}
@@ -204,6 +218,36 @@ export function ChatScreen({
   );
 }
 
+function ChatShimmer() {
+  const opacity = useRef(new Animated.Value(0.38)).current;
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | undefined;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (reduceMotion) {
+        opacity.setValue(0.58);
+        return;
+      }
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, { duration: 720, toValue: 0.78, useNativeDriver: true }),
+          Animated.timing(opacity, { duration: 720, toValue: 0.38, useNativeDriver: true }),
+        ]),
+      );
+      animation.start();
+    });
+    return () => animation?.stop();
+  }, [opacity]);
+
+  return (
+    <View accessibilityLabel="Loading cohort messages" style={styles.chatShimmer}>
+      <Animated.View style={[styles.chatShimmerWide, { opacity }]} />
+      <Animated.View style={[styles.chatShimmerShort, { opacity }]} />
+      <Animated.View style={[styles.chatShimmerOwn, { opacity }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   activityNotice: {
     color: colors.info,
@@ -222,6 +266,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  chatShimmer: { gap: spacing.sm, paddingVertical: spacing.sm },
+  chatShimmerOwn: { alignSelf: 'flex-end', backgroundColor: colors.infoSoft, borderRadius: radius.md, height: 62, width: '68%' },
+  chatShimmerShort: { backgroundColor: colors.surfaceStrong, borderRadius: radius.md, height: 52, width: '62%' },
+  chatShimmerWide: { backgroundColor: colors.surfaceStrong, borderRadius: radius.md, height: 72, width: '82%' },
   composer: {
     alignItems: 'flex-end',
     backgroundColor: colors.surface,
@@ -229,7 +277,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    padding: spacing.sm,
+    paddingBottom: Platform.OS === 'android' ? spacing.lg : spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
   },
   emptyText: {
     color: colors.muted,

@@ -1,21 +1,27 @@
 import {
+  ArrowRight,
   Bell,
   CalendarDays,
   CalendarCheck,
   CheckCircle2,
+  ChevronRight,
+  CircleHelp,
   CircleUserRound,
+  Clock3,
   Compass,
   Home,
   LockKeyhole,
   LogOut,
+  MapPin,
   Pencil,
   Search,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Star,
-  UserPlus,
   UsersRound,
+  X,
 } from 'lucide-react-native';
 import {
   cloneElement,
@@ -23,23 +29,37 @@ import {
   ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
   ActivityIndicator,
+  AccessibilityInfo,
   Alert,
+  Animated,
+  BackHandler,
+  Easing,
+  Image,
+  ImageSourcePropType,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
+  Vibration,
   View,
 } from 'react-native';
 
 import { DiscoveryItem, safetyTips } from '../data/discovery';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import {
+  activityArtwork as curatedArtwork,
+  resolveActivityCardArtwork,
+  resolveActivityArtwork,
+} from '../constants/activity-artwork';
 import { ActivityDetailScreen } from './ActivityDetailScreen';
 import { ChatScreen } from './ChatScreen';
 import { CommunityGuidelinesScreen } from './CommunityGuidelinesScreen';
@@ -52,9 +72,11 @@ import { ManageCircleScreen } from './ManageCircleScreen';
 import { MyActivitiesScreen } from './MyActivitiesScreen';
 import { ManageEventScreen } from './ManageEventScreen';
 import { NotificationsScreen } from './NotificationsScreen';
+import { HostPathwayScreen } from './HostPathwayScreen';
 import { ReportReason, ReportScreen } from './ReportScreen';
-import { SettingsScreen } from './SettingsScreen';
+import { SettingsScreen, SettingsSection } from './SettingsScreen';
 import { acceptCommunityGuidelines } from '../services/session';
+import { uploadActivityCover } from '../services/media';
 import {
   blockUser,
   BlockedUser,
@@ -74,11 +96,13 @@ import {
   listBlocks,
   listCircles,
   listEvents,
+  listIcebreakers,
   listRecommendations,
   listMyActivities,
   listNotifications,
   markNotificationRead,
   NotificationItem,
+  IcebreakerMember,
   reportUser,
   requestHostApproval,
   submitEventFeedback,
@@ -110,7 +134,12 @@ type HomeScreenProps = {
 
 type Tab = 'home' | 'explore' | 'plans' | 'profile';
 type SecondaryScreen =
-  'create-circle' | 'create-event' | 'notifications' | 'settings';
+  | 'create-circle'
+  | 'create-event'
+  | 'community-promise'
+  | 'host-pathway'
+  | 'notifications'
+  | `settings-${SettingsSection}`;
 
 const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: 'home', label: 'Home', icon: <Home size={21} /> },
@@ -154,6 +183,10 @@ export function HomeScreen({
   const [feedbackEvent, setFeedbackEvent] = useState<DiscoveryItem>();
   const [editingActivity, setEditingActivity] = useState<DiscoveryItem>();
   const [selectedItem, setSelectedItem] = useState<DiscoveryItem>();
+  const [detailMembers, setDetailMembers] = useState<IcebreakerMember[]>([]);
+  const [nextPlanMembers, setNextPlanMembers] = useState<IcebreakerMember[]>(
+    [],
+  );
   const [reportItem, setReportItem] = useState<DiscoveryItem>();
   const [blockedHosts, setBlockedHosts] = useState<string[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
@@ -175,8 +208,48 @@ export function HomeScreen({
   const [secondaryScreen, setSecondaryScreen] = useState<SecondaryScreen>();
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]);
+  const [exploreFilterOpen, setExploreFilterOpen] = useState(false);
   const [activeExploreKind, setActiveExploreKind] =
     useState<ExploreKind>('all');
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (joinCandidate) setJoinCandidate(undefined);
+        else if (reportItem) setReportItem(undefined);
+        else if (editingActivity) setEditingActivity(undefined);
+        else if (feedbackEvent) setFeedbackEvent(undefined);
+        else if (managedCircle) setManagedCircle(undefined);
+        else if (managedEvent) setManagedEvent(undefined);
+        else if (icebreakerActivity) setIcebreakerActivity(undefined);
+        else if (chatItem) setChatItem(undefined);
+        else if (selectedItem) setSelectedItem(undefined);
+        else if (secondaryScreen) setSecondaryScreen(undefined);
+        else if (activeTab !== 'home') setActiveTab('home');
+        else return false;
+        return true;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [
+    activeTab,
+    chatItem,
+    editingActivity,
+    feedbackEvent,
+    icebreakerActivity,
+    joinCandidate,
+    managedCircle,
+    managedEvent,
+    reportItem,
+    secondaryScreen,
+    selectedItem,
+  ]);
   const verified = user.verificationStatus === 'approved';
   const allItems = useMemo(
     () => [...apiEvents, ...apiCircles],
@@ -213,6 +286,22 @@ export function HomeScreen({
         )[0],
     [myActivities],
   );
+  const homeRecommendations = useMemo(() => {
+    const source = recommended.length ? recommended : allItems;
+    const nextPlanId = nextPlan?.remoteId ?? nextPlan?.id;
+    const seen = new Set<string>();
+
+    return source
+      .filter((item) => {
+        const id = item.remoteId ?? item.id;
+        if (id === nextPlanId || seen.has(id)) {
+          return false;
+        }
+        seen.add(id);
+        return true;
+      })
+      .slice(0, 5);
+  }, [allItems, nextPlan, recommended]);
 
   useEffect(() => {
     void loadCommunityData();
@@ -227,28 +316,83 @@ export function HomeScreen({
     [idToken],
   );
 
+  useEffect(() => {
+    let active = true;
+    setDetailMembers([]);
+
+    if (
+      !selectedItem?.remoteId ||
+      (selectedItem.category !== 'event' &&
+        selectedItem.category !== 'circle') ||
+      (selectedItem.membershipStatus !== 'APPROVED' &&
+        selectedItem.membershipStatus !== 'ATTENDED')
+    ) {
+      return () => {
+        active = false;
+      };
+    }
+
+    void listIcebreakers(
+      idToken,
+      selectedItem.category === 'circle' ? 'CIRCLE' : 'EVENT',
+      selectedItem.remoteId,
+    )
+      .then((payload) => {
+        if (active) {
+          setDetailMembers(payload.members);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDetailMembers([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [idToken, selectedItem]);
+
+  useEffect(() => {
+    let active = true;
+    setNextPlanMembers([]);
+
+    if (!nextPlan?.remoteId || nextPlan.membershipStatus !== 'APPROVED') {
+      return () => {
+        active = false;
+      };
+    }
+
+    void listIcebreakers(
+      idToken,
+      nextPlan.category === 'circle' ? 'CIRCLE' : 'EVENT',
+      nextPlan.remoteId,
+    )
+      .then((payload) => {
+        if (active) {
+          setNextPlanMembers(payload.members);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setNextPlanMembers([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [idToken, nextPlan]);
+
   const loadCommunityData = async () => {
     try {
       setLoadError(undefined);
-      const [
-        eventsPayload,
-        circlesPayload,
-        activitiesPayload,
-        notificationsPayload,
-        settingsPayload,
-        blocksPayload,
-        hostApprovalPayload,
-        recommendationsPayload,
-      ] = await Promise.all([
-        listEvents(idToken, user.city),
-        listCircles(idToken, user.city),
-        listMyActivities(idToken),
-        listNotifications(idToken),
-        getSettings(idToken),
-        listBlocks(idToken),
-        getHostApproval(idToken),
-        listRecommendations(idToken),
-      ]);
+      const [eventsPayload, circlesPayload, activitiesPayload] =
+        await Promise.all([
+          listEvents(idToken, user.city),
+          listCircles(idToken, user.city),
+          listMyActivities(idToken),
+        ]);
 
       const events = eventsPayload.events.map((event) =>
         activityToDiscoveryItem(event, 'event'),
@@ -267,32 +411,92 @@ export function HomeScreen({
               ]
             : [],
         ),
-        ...activitiesPayload.circles.flatMap((membership) =>
-          membership.circle
-            ? [
-                {
-                  ...activityToDiscoveryItem(membership.circle, 'circle'),
-                  membershipStatus: membership.status,
-                },
-              ]
-            : [],
-        ),
-      ];
-      const recommendations = recommendationsPayload.recommendations.flatMap(
-        (activity) =>
-          activity.category === 'circle' || activity.category === 'event'
-            ? [activityToDiscoveryItem(activity, activity.category)]
-            : [],
-      );
+        ...activitiesPayload.circles.flatMap((membership) => {
+          if (!membership.circle) {
+            return [];
+          }
 
+          const base = activityToDiscoveryItem(membership.circle, 'circle');
+          const occurrences = membership.circle.occurrences ?? [];
+          const visibleOccurrences =
+            membership.status === 'APPROVED' || membership.status === 'ATTENDED'
+              ? occurrences
+              : occurrences
+                  .filter(
+                    (occurrence) =>
+                      new Date(occurrence.startsAt).getTime() >= Date.now(),
+                  )
+                  .slice(0, 1);
+
+          if (!visibleOccurrences.length) {
+            return [{ ...base, membershipStatus: membership.status }];
+          }
+
+          return visibleOccurrences.map((occurrence) => ({
+            ...base,
+            id: `${base.id}:${occurrence.id}`,
+            occurrenceId: occurrence.id,
+            startsAt: occurrence.startsAt,
+            time: formatActivityDate(occurrence.startsAt),
+            membershipStatus: membership.status,
+          }));
+        }),
+        ...activitiesPayload.hostedEvents.map((event) => ({
+          ...activityToDiscoveryItem(event, 'event'),
+          membershipStatus: 'APPROVED' as const,
+        })),
+        ...activitiesPayload.hostedCircles.flatMap((circle) => {
+          const base = activityToDiscoveryItem(circle, 'circle');
+          const occurrences = circle.occurrences ?? [];
+
+          return occurrences.length
+            ? occurrences.map((occurrence) => ({
+                ...base,
+                id: `${base.id}:${occurrence.id}`,
+                membershipStatus: 'APPROVED' as const,
+                occurrenceId: occurrence.id,
+                startsAt: occurrence.startsAt,
+                time: formatActivityDate(occurrence.startsAt),
+              }))
+            : [{ ...base, membershipStatus: 'APPROVED' as const }];
+        }),
+      ];
       setApiEvents(events);
       setApiCircles(circles);
-      setApiRecommendations(recommendations);
       setMyActivities(memberships);
-      setNotifications(notificationsPayload.notifications);
-      setSettings(settingsPayload.settings);
-      setBlockedUsers(blocksPayload.blocks);
-      setHostApproval(hostApprovalPayload.approval);
+
+      void Promise.all([
+        listNotifications(idToken),
+        getSettings(idToken),
+        listBlocks(idToken),
+        getHostApproval(idToken),
+        listRecommendations(idToken),
+      ])
+        .then(
+          ([
+            notificationsPayload,
+            settingsPayload,
+            blocksPayload,
+            hostApprovalPayload,
+            recommendationsPayload,
+          ]) => {
+            const recommendations =
+              recommendationsPayload.recommendations.flatMap((activity) =>
+                activity.category === 'circle' || activity.category === 'event'
+                  ? [activityToDiscoveryItem(activity, activity.category)]
+                  : [],
+              );
+
+            setNotifications(notificationsPayload.notifications);
+            setSettings(settingsPayload.settings);
+            setBlockedUsers(blocksPayload.blocks);
+            setHostApproval(hostApprovalPayload.approval);
+            setApiRecommendations(recommendations);
+          },
+        )
+        .catch((error) => {
+          console.warn('Unable to load non-critical community data.', error);
+        });
     } catch (error) {
       setLoadError(
         error instanceof Error
@@ -328,6 +532,8 @@ export function HomeScreen({
   }, [idToken, user.city]);
 
   const requestJoin = (item: DiscoveryItem) => {
+    softHaptic();
+
     if (!item.remoteId) {
       setApiError(
         'This activity is not published yet. Join requests open only for live Niva activities.',
@@ -358,6 +564,18 @@ export function HomeScreen({
     }
 
     setJoinCandidate(item);
+  };
+
+  const changeTab = (tab: Tab) => {
+    if (tab !== activeTab) {
+      softHaptic();
+      setActiveTab(tab);
+    }
+  };
+
+  const openItem = (item: DiscoveryItem) => {
+    softHaptic();
+    setSelectedItem(item);
   };
 
   const acceptGuidelinesForJoin = async () => {
@@ -404,11 +622,16 @@ export function HomeScreen({
 
   const createHostedEvent = async (input: CreateEventInput) => {
     try {
+      const coverImageUrl = input.coverImage
+        ? await uploadActivityCover(input.coverImage)
+        : undefined;
       await createCommunityEvent(idToken, {
         capacity: input.capacity,
         city: input.city,
+        coverImageUrl,
         description: input.description,
         difficulty: input.difficulty,
+        hostNote: input.hostNote,
         interests: input.interests,
         latitude: input.latitude,
         locationName: input.locationName,
@@ -423,24 +646,32 @@ export function HomeScreen({
       setApiError(
         error instanceof Error ? error.message : 'Unable to create event.',
       );
+      throw error;
     }
   };
 
   const createHostedCircle = async (input: CreateCircleInput) => {
     try {
+      const coverImageUrl = input.coverImage
+        ? await uploadActivityCover(input.coverImage)
+        : undefined;
       await createCommunityCircle(idToken, {
         capacity: input.capacity,
         city: input.city,
+        coverImageUrl,
         description: input.description,
         difficulty: input.difficulty,
         durationWeeks: input.durationWeeks,
+        hostNote: input.hostNote,
         interests: input.interests,
         latitude: input.latitude,
         locationName: input.locationName,
         longitude: input.longitude,
+        recurrenceIntervalWeeks: input.recurrenceIntervalWeeks,
         schedule: input.schedule,
         startsAt: input.startsAt,
         title: input.title,
+        timezone: input.timezone,
       });
       setSecondaryScreen(undefined);
       await loadCommunityData();
@@ -448,6 +679,7 @@ export function HomeScreen({
       setApiError(
         error instanceof Error ? error.message : 'Unable to create circle.',
       );
+      throw error;
     }
   };
 
@@ -496,27 +728,36 @@ export function HomeScreen({
     }
 
     const activityId = editingActivity.remoteId ?? editingActivity.id;
+    const coverImageUrl = input.coverImage
+      ? await uploadActivityCover(input.coverImage)
+      : undefined;
     if (editingActivity.category === 'circle') {
       await updateCircle(idToken, activityId, {
         capacity: input.capacity,
         city: input.city,
+        coverImageUrl,
         description: input.description,
         difficulty: input.difficulty,
+        hostNote: input.hostNote,
         durationWeeks: input.durationWeeks,
         interests: input.interests,
         latitude: input.latitude,
         locationName: input.locationName,
         longitude: input.longitude,
+        recurrenceIntervalWeeks: input.recurrenceIntervalWeeks,
         schedule: input.schedule,
         startsAt: input.startsAt,
         title: input.title,
+        timezone: input.timezone,
       });
     } else {
       await updateEvent(idToken, activityId, {
         capacity: input.capacity,
         city: input.city,
+        coverImageUrl,
         description: input.description,
         difficulty: input.difficulty,
+        hostNote: input.hostNote,
         interests: input.interests,
         latitude: input.latitude,
         locationName: input.locationName,
@@ -715,6 +956,7 @@ export function HomeScreen({
 
     return (
       <ActivityDetailScreen
+        attendees={detailMembers}
         blocked={blocked}
         isHost={selectedItem.hostId === user.id}
         item={selectedItem}
@@ -837,15 +1079,40 @@ export function HomeScreen({
     );
   }
 
-  if (secondaryScreen === 'settings') {
+  if (secondaryScreen?.startsWith('settings-')) {
+    const section = secondaryScreen.replace('settings-', '') as SettingsSection;
     return (
       <SettingsScreen
         blockedUsers={blockedUsers}
         onBack={() => setSecondaryScreen(undefined)}
         onChange={(nextSettings) => void updateMemberSettings(nextSettings)}
         onDeleteAccount={onDeleteAccount}
+        onOpenCommunityPromise={() => setSecondaryScreen('community-promise')}
         onUnblock={(blockedUserId) => void unblockMember(blockedUserId)}
+        section={section}
         settings={settings ?? defaultSettings}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'host-pathway') {
+    return (
+      <HostPathwayScreen
+        approval={hostApproval}
+        onApply={() => void requestHostAccess()}
+        onBack={() => setSecondaryScreen(undefined)}
+        user={user}
+      />
+    );
+  }
+
+  if (secondaryScreen === 'community-promise') {
+    return (
+      <CommunityGuidelinesScreen
+        activityTitle="Niva"
+        onAccept={() => setSecondaryScreen(undefined)}
+        onBack={() => setSecondaryScreen(undefined)}
+        reviewOnly
       />
     );
   }
@@ -879,7 +1146,7 @@ export function HomeScreen({
               onOpenNotifications={() => setSecondaryScreen('notifications')}
               user={user}
             />
-            <TrustCard user={user} verified={verified} />
+            <TrustStatusStrip user={user} verified={verified} />
             {apiError ? (
               <View style={styles.apiBanner}>
                 <Text style={styles.apiBannerText}>{apiError}</Text>
@@ -897,70 +1164,49 @@ export function HomeScreen({
                 </Pressable>
               </View>
             ) : null}
-            {isLoading ? (
-              <View style={styles.loadingPanel}>
-                <ActivityIndicator color={colors.primary} />
-                <Text style={styles.loadingText}>
-                  Loading your Niva plans...
-                </Text>
-              </View>
+            {isLoading ? <HomeShimmer /> : null}
+            {!isLoading ? (
+              <Section title="Your next plan">
+                {nextPlan ? (
+                  <HomePlanHero
+                    attendees={nextPlanMembers}
+                    item={nextPlan}
+                    onOpen={() => openItem(nextPlan)}
+                    onPeople={() => {
+                      softHaptic();
+                      setIcebreakerActivity(nextPlan);
+                    }}
+                  />
+                ) : (
+                  <IllustratedEmptyState
+                    actionLabel="Explore plans"
+                    onAction={() => changeTab('explore')}
+                    text="Find a small gathering that feels like your kind of afternoon."
+                    title="Your next plan starts here"
+                  />
+                )}
+              </Section>
             ) : null}
-            <Section title="Your next plan">
-              {nextPlan ? (
-                <VerticalCards
-                  items={[nextPlan]}
-                  onJoin={requestJoin}
-                  onOpen={setSelectedItem}
-                />
-              ) : (
-                <EmptyState
-                  icon={
-                    <CalendarDays
-                      color={colors.info}
-                      size={26}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  title="Nothing scheduled yet"
-                  text="Explore an event or recurring circle when you are ready."
-                />
-              )}
-            </Section>
             <Section title="Recommended for you">
-              {recommended.length ? (
-                <HorizontalCards
-                  items={recommended.slice(0, 2)}
-                  onJoin={requestJoin}
-                  onOpen={setSelectedItem}
-                />
-              ) : (
-                <EmptyState
-                  icon={
-                    <UsersRound
-                      color={colors.info}
-                      size={26}
-                      strokeWidth={2.3}
+              {homeRecommendations.length ? (
+                <View style={styles.homeRecommendationList}>
+                  {homeRecommendations.map((item, index) => (
+                    <HomeRecommendationCard
+                      artwork={activityArtwork(item, index)}
+                      item={item}
+                      key={item.id}
+                      onJoin={() => requestJoin(item)}
+                      onOpen={() => openItem(item)}
+                      reason={recommendationReason(item, user)}
                     />
-                  }
-                  title="Recommendations are warming up"
-                  text="Your interests will shape the plans shown here."
-                />
-              )}
-            </Section>
-            <Section title={`Discover this week in ${user.city}`}>
-              {allItems.length ? (
-                <HorizontalCards
-                  items={allItems.slice(0, 3)}
-                  onJoin={requestJoin}
-                  onOpen={setSelectedItem}
-                />
+                  ))}
+                </View>
               ) : (
-                <EmptyState
-                  icon={
-                    <Compass color={colors.info} size={26} strokeWidth={2.3} />
-                  }
-                  title="No plans published yet"
-                  text="New events and circles will appear here as hosts publish them."
+                <IllustratedEmptyState
+                  actionLabel="Browse everything"
+                  onAction={() => changeTab('explore')}
+                  text="New plans will appear here as hosts publish them in your city."
+                  title="Recommendations are warming up"
                 />
               )}
             </Section>
@@ -1005,31 +1251,25 @@ export function HomeScreen({
                 value={query}
               />
             </View>
-            <View style={styles.exploreTypeControl}>
-              {exploreKinds.map((kind) => {
-                const active = activeExploreKind === kind.id;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    key={kind.id}
-                    onPress={() => setActiveExploreKind(kind.id)}
-                    style={[
-                      styles.exploreTypeButton,
-                      active && styles.exploreTypeButtonActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.exploreTypeText,
-                        active && styles.exploreTypeTextActive,
-                      ]}
-                    >
-                      {kind.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setExploreFilterOpen(true)}
+              style={styles.filterButton}
+            >
+              <SlidersHorizontal
+                color={colors.primary}
+                size={18}
+                strokeWidth={2.4}
+              />
+              <Text style={styles.filterButtonText}>
+                {activeExploreKind === 'all'
+                  ? 'Filter plans'
+                  : activeExploreKind === 'event'
+                    ? 'Events only'
+                    : 'Circles only'}
+              </Text>
+              <ChevronRight color={colors.muted} size={18} strokeWidth={2.4} />
+            </Pressable>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1056,10 +1296,7 @@ export function HomeScreen({
               ))}
             </ScrollView>
             {isLoading ? (
-              <View style={styles.loadingPanel}>
-                <ActivityIndicator color={colors.primary} />
-                <Text style={styles.loadingText}>Loading nearby plans...</Text>
-              </View>
+              <ListShimmer label="Loading nearby plans" />
             ) : exploreResults.length ? (
               <VerticalCards
                 items={exploreResults}
@@ -1079,10 +1316,7 @@ export function HomeScreen({
         );
       case 'plans':
         return isLoading ? (
-          <View style={styles.loadingPanel}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.loadingText}>Loading your plans...</Text>
-          </View>
+          <ListShimmer label="Loading your plans" />
         ) : (
           <MyActivitiesScreen
             embedded
@@ -1096,123 +1330,183 @@ export function HomeScreen({
       case 'profile':
         return (
           <>
-            <ScreenTitle
-              icon={
-                <CircleUserRound
-                  color={colors.primary}
-                  size={26}
-                  strokeWidth={2.3}
-                />
-              }
-              title={user.displayName}
-              subtitle={`@${user.username} · ${user.city}`}
-            />
-            <View style={styles.profilePanel}>
-              <Text style={styles.profileLabel}>About</Text>
-              <Text style={styles.profileText}>
-                {user.bio ||
-                  'Ready to meet women through recurring activities.'}
-              </Text>
-              <Text style={styles.profileTextMuted}>
-                {[user.age, user.occupation, user.languages.join(', ')]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-              <View style={styles.profileMetaGrid}>
-                <ProfileMetric
-                  label="Trust score"
-                  value={`${user.trustScore}`}
-                />
-                <ProfileMetric
-                  label="Tier"
-                  value={formatTrustTier(user.trustTier)}
-                />
-                <ProfileMetric
-                  label="Verification"
-                  value={formatVerificationStatus(user.verificationStatus)}
-                />
+            <View style={styles.profileHeader}>
+              <View style={styles.profileAvatar}>
+                {user.profilePhotoUrl ? (
+                  <Image
+                    source={{ uri: user.profilePhotoUrl }}
+                    style={styles.profileAvatarImage}
+                  />
+                ) : (
+                  <CircleUserRound
+                    color={colors.primary}
+                    size={46}
+                    strokeWidth={1.9}
+                  />
+                )}
               </View>
-              <View style={styles.profileInterests}>
-                {user.interests.map((interest) => (
-                  <Text key={interest} style={styles.profileInterest}>
-                    {interest}
-                  </Text>
-                ))}
+              <View style={styles.profileHeaderCopy}>
+                <Text numberOfLines={1} style={styles.profileName}>
+                  {user.displayName}
+                </Text>
+                <Text style={styles.profileHandle}>
+                  @{user.username} · {user.city}
+                </Text>
               </View>
-            </View>
-            <View style={styles.profileActions}>
               <Pressable
                 accessibilityRole="button"
                 onPress={onEditProfile}
-                style={styles.secondaryAction}
+                style={styles.profileEditButton}
               >
-                <Pencil color={colors.muted} size={19} strokeWidth={2.4} />
-                <Text style={styles.secondaryActionText}>Edit profile</Text>
+                <Pencil color={colors.primary} size={16} strokeWidth={2.4} />
+                <Text style={styles.profileEditText}>Edit</Text>
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setSecondaryScreen('settings')}
-                style={styles.secondaryAction}
+            </View>
+
+            <Text style={styles.profileBio}>
+              {user.bio ||
+                'Here to meet good people through thoughtful local plans.'}
+            </Text>
+
+            <View style={styles.profileVerification}>
+              <View
+                style={
+                  verified
+                    ? styles.profileVerificationIcon
+                    : styles.profileVerificationIconPending
+                }
               >
-                <Settings color={colors.muted} size={19} strokeWidth={2.4} />
-                <Text style={styles.secondaryActionText}>Settings</Text>
-              </Pressable>
-              {hostApproval?.status === 'APPROVED' ? (
-                <>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setSecondaryScreen('create-event')}
-                    style={styles.secondaryAction}
-                  >
-                    <UserPlus
-                      color={colors.muted}
-                      size={19}
-                      strokeWidth={2.4}
-                    />
-                    <Text style={styles.secondaryActionText}>Create event</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setSecondaryScreen('create-circle')}
-                    style={styles.secondaryAction}
-                  >
-                    <UsersRound
-                      color={colors.muted}
-                      size={19}
-                      strokeWidth={2.4}
-                    />
-                    <Text style={styles.secondaryActionText}>
-                      Create circle
-                    </Text>
-                  </Pressable>
-                </>
-              ) : (
+                <ShieldCheck
+                  color={verified ? colors.surface : colors.warning}
+                  size={18}
+                  strokeWidth={2.5}
+                />
+              </View>
+              <View style={styles.profileHeaderCopy}>
+                <Text style={styles.profileVerificationTitle}>
+                  {verified
+                    ? 'Profile verified'
+                    : user.verificationStatus === 'pending'
+                      ? 'Verification in review'
+                      : 'Verification not completed'}
+                </Text>
+                {!verified ? (
+                  <Text style={styles.profileVerificationText}>
+                    Verification is required before joining plans.
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.profileInterests}>
+              {user.interests.map((interest) => (
+                <Text key={interest} style={styles.profileInterest}>
+                  {interest}
+                </Text>
+              ))}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSecondaryScreen('host-pathway')}
+              style={styles.hostPathCard}
+            >
+              <View style={styles.hostPathCopy}>
+                <Text style={styles.hostPathEyebrow}>HOST WITH NIVA</Text>
+                <Text style={styles.hostPathTitle}>
+                  {hostApproval?.status === 'APPROVED'
+                    ? 'Your hosting tools'
+                    : 'Bring a thoughtful plan to life'}
+                </Text>
+                <Text style={styles.hostPathText}>
+                  {hostApproval?.status === 'PENDING'
+                    ? 'Your application is under review.'
+                    : 'Learn what hosts do and how approval works.'}
+                </Text>
+                <View style={styles.hostPathAction}>
+                  <Text style={styles.hostPathActionText}>View hosting</Text>
+                  <ArrowRight
+                    color={colors.surface}
+                    size={16}
+                    strokeWidth={2.5}
+                  />
+                </View>
+              </View>
+              <Image
+                resizeMode="cover"
+                source={curatedArtwork.books}
+                style={styles.hostPathImage}
+              />
+            </Pressable>
+
+            {hostApproval?.status === 'APPROVED' ? (
+              <View style={styles.hostCreateRow}>
                 <Pressable
                   accessibilityRole="button"
-                  disabled={hostApproval?.status === 'PENDING'}
-                  onPress={() => void requestHostAccess()}
-                  style={[
-                    styles.secondaryAction,
-                    hostApproval?.status === 'PENDING' && styles.actionDisabled,
-                  ]}
+                  onPress={() => setSecondaryScreen('create-event')}
+                  style={styles.hostCreateButton}
                 >
-                  <UserPlus color={colors.muted} size={19} strokeWidth={2.4} />
-                  <Text style={styles.secondaryActionText}>
-                    {hostApproval?.status === 'PENDING'
-                      ? 'Host request pending'
-                      : hostApproval?.status === 'REJECTED'
-                        ? 'Request host access again'
-                        : 'Request host access'}
-                  </Text>
+                  <CalendarDays
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={2.4}
+                  />
+                  <Text style={styles.hostCreateText}>Create event</Text>
                 </Pressable>
-              )}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setSecondaryScreen('create-circle')}
+                  style={styles.hostCreateButton}
+                >
+                  <UsersRound
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={2.4}
+                  />
+                  <Text style={styles.hostCreateText}>Create circle</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={styles.profileMenu}>
+              <ProfileMenuRow
+                icon={
+                  <Settings
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={2.3}
+                  />
+                }
+                label="Preferences"
+                onPress={() => setSecondaryScreen('settings-preferences')}
+              />
+              <ProfileMenuRow
+                icon={
+                  <ShieldCheck
+                    color={colors.secondary}
+                    size={20}
+                    strokeWidth={2.3}
+                  />
+                }
+                label="Safety & privacy"
+                onPress={() => setSecondaryScreen('settings-safety')}
+              />
+              <ProfileMenuRow
+                icon={
+                  <CircleHelp color={colors.info} size={20} strokeWidth={2.3} />
+                }
+                label="Support & policies"
+                onPress={() => setSecondaryScreen('settings-support')}
+                last
+              />
             </View>
+
             <Pressable
               accessibilityRole="button"
               onPress={onLogout}
               style={styles.logoutButton}
             >
-              <LogOut color={colors.primaryDark} size={19} strokeWidth={2.4} />
+              <LogOut color={colors.primary} size={19} strokeWidth={2.4} />
               <Text style={styles.logoutText}>Log out</Text>
             </Pressable>
           </>
@@ -1230,15 +1524,10 @@ export function HomeScreen({
       </ScrollView>
 
       {joinRequest ? (
-        <View style={styles.toast}>
-          <CheckCircle2 color={colors.success} size={20} strokeWidth={2.5} />
-          <Text style={styles.toastText}>
-            Join request sent for {joinRequest}
-          </Text>
-          <Pressable onPress={() => setJoinRequest(undefined)}>
-            <Text style={styles.toastDismiss}>OK</Text>
-          </Pressable>
-        </View>
+        <JoinSuccessToast
+          activityTitle={joinRequest}
+          onDismiss={() => setJoinRequest(undefined)}
+        />
       ) : null}
 
       <View style={styles.tabBar}>
@@ -1249,8 +1538,8 @@ export function HomeScreen({
             <Pressable
               accessibilityRole="button"
               key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={styles.tabButton}
+              onPress={() => changeTab(tab.id)}
+              style={[styles.tabButton, active && styles.tabButtonActive]}
             >
               <View style={active ? styles.tabIconActive : styles.tabIcon}>
                 {cloneIcon(tab.icon, active ? colors.surface : colors.muted)}
@@ -1291,6 +1580,63 @@ export function HomeScreen({
         </View>
       </Modal>
 
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setExploreFilterOpen(false)}
+        transparent
+        visible={exploreFilterOpen}
+      >
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setExploreFilterOpen(false)}
+        >
+          <Pressable style={styles.filterSheet}>
+            <View style={styles.filterSheetHandle} />
+            <Text style={styles.filterSheetTitle}>Show me</Text>
+            <Text style={styles.filterSheetText}>
+              Choose a plan type. Activity categories stay available above the
+              results.
+            </Text>
+            <View style={styles.filterSheetOptions}>
+              {exploreKinds.map((kind) => {
+                const active = activeExploreKind === kind.id;
+                return (
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    key={kind.id}
+                    onPress={() => {
+                      setActiveExploreKind(kind.id);
+                      setExploreFilterOpen(false);
+                    }}
+                    style={[
+                      styles.filterSheetOption,
+                      active && styles.filterSheetOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterSheetOptionText,
+                        active && styles.filterSheetOptionTextActive,
+                      ]}
+                    >
+                      {kind.label === 'All' ? 'All plans' : kind.label}
+                    </Text>
+                    {active ? (
+                      <CheckCircle2
+                        color={colors.primary}
+                        size={20}
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <JoinConfirmModal
         item={joinCandidate}
         onCancel={() => setJoinCandidate(undefined)}
@@ -1310,24 +1656,116 @@ function Header({
   const { width } = useWindowDimensions();
   const compact = width < 360;
   const greeting = greetingForCurrentTime();
+  const firstName = user.displayName.trim().split(/\s+/)[0] || user.displayName;
 
   return (
     <View style={[styles.header, compact && styles.headerCompact]}>
       <View style={styles.headerCopy}>
         <Text numberOfLines={2} style={styles.greeting}>
           {greeting},{compact ? `\n` : ' '}
-          {user.displayName}
+          {firstName}
         </Text>
         <Text style={styles.city}>{user.city}</Text>
       </View>
       <Pressable
+        accessibilityLabel="Open notifications"
         accessibilityRole="button"
         onPress={onOpenNotifications}
         style={[styles.headerBadge, compact && styles.headerBadgeCompact]}
       >
         <Bell color={colors.primary} size={20} strokeWidth={2.4} />
-        <Text style={styles.headerBadgeText}>Alerts</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function HomeShimmer() {
+  const opacity = useRef(new Animated.Value(0.38)).current;
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | undefined;
+    let mounted = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((reducedMotion) => {
+      if (!mounted || reducedMotion) {
+        opacity.setValue(0.58);
+        return;
+      }
+
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacity, {
+            duration: 760,
+            easing: Easing.inOut(Easing.ease),
+            toValue: 0.78,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            duration: 760,
+            easing: Easing.inOut(Easing.ease),
+            toValue: 0.38,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      animation.start();
+    });
+
+    return () => {
+      mounted = false;
+      animation?.stop();
+    };
+  }, [opacity]);
+
+  return (
+    <View accessibilityLabel="Loading your Niva plans" style={styles.shimmer}>
+      <Animated.View style={[styles.shimmerHero, { opacity }]} />
+      <View style={styles.shimmerRow}>
+        <Animated.View style={[styles.shimmerImage, { opacity }]} />
+        <View style={styles.shimmerCopy}>
+          <Animated.View style={[styles.shimmerLineWide, { opacity }]} />
+          <Animated.View style={[styles.shimmerLine, { opacity }]} />
+          <Animated.View style={[styles.shimmerLineShort, { opacity }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ListShimmer({ label }: { label: string }) {
+  const opacity = useRef(new Animated.Value(0.38)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          duration: 720,
+          toValue: 0.78,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          duration: 720,
+          toValue: 0.38,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <View accessibilityLabel={label} style={styles.listShimmer}>
+      {[0, 1, 2].map((item) => (
+        <View key={item} style={styles.listShimmerCard}>
+          <Animated.View style={[styles.listShimmerImage, { opacity }]} />
+          <View style={styles.shimmerCopy}>
+            <Animated.View style={[styles.shimmerLineWide, { opacity }]} />
+            <Animated.View style={[styles.shimmerLine, { opacity }]} />
+            <Animated.View style={[styles.shimmerLineShort, { opacity }]} />
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -1346,48 +1784,241 @@ function greetingForCurrentTime() {
   return 'Good evening';
 }
 
-function TrustCard({ user, verified }: { user: NivaUser; verified: boolean }) {
+function TrustStatusStrip({
+  user,
+  verified,
+}: {
+  user: NivaUser;
+  verified: boolean;
+}) {
   const statusTitle = verified
-    ? "You're verified"
+    ? 'Verified member'
     : user.verificationStatus === 'pending'
       ? 'Verification pending'
-      : 'Verify when you join';
-  const statusText = verified
-    ? 'You can join events, circles, and cohort chats.'
-    : user.verificationStatus === 'pending'
-      ? 'Selfie review is pending before joins and chat open.'
-      : 'Browse freely. Selfie review starts when you request to join.';
+      : 'Verification starts when you join';
 
   return (
-    <View style={styles.trustCard}>
-      <View style={styles.trustHeader}>
-        <View
-          style={verified ? styles.trustIconVerified : styles.trustIconPending}
+    <View style={styles.trustStrip}>
+      <View style={verified ? styles.trustDotVerified : styles.trustDotPending}>
+        {verified ? (
+          <CheckCircle2 color={colors.surface} size={15} strokeWidth={2.8} />
+        ) : (
+          <ShieldCheck color={colors.warning} size={15} strokeWidth={2.6} />
+        )}
+      </View>
+      <Text style={styles.trustStripTitle}>{statusTitle}</Text>
+    </View>
+  );
+}
+
+function HomePlanHero({
+  attendees,
+  item,
+  onOpen,
+  onPeople,
+}: {
+  attendees: IcebreakerMember[];
+  item: DiscoveryItem;
+  onOpen: () => void;
+  onPeople: () => void;
+}) {
+  return (
+    <View style={styles.homeHero}>
+      <View style={styles.homeHeroMain}>
+        <View style={styles.homeHeroContent}>
+          <Text style={styles.homeHeroEyebrow}>
+            {formatCategory(item.category)} · {countdownLabel(item.startsAt)}
+          </Text>
+          <Text numberOfLines={2} style={styles.homeHeroTitle}>
+            {item.title}
+          </Text>
+          <View style={styles.homeHeroMetaRow}>
+            <MapPin color={colors.accent} size={16} strokeWidth={2.5} />
+            <Text numberOfLines={1} style={styles.homeHeroMetaText}>
+              {item.location}
+            </Text>
+          </View>
+          <View style={styles.homeHeroMetaRow}>
+            <UsersRound color={colors.accent} size={16} strokeWidth={2.5} />
+            <Text style={styles.homeHeroMetaText}>
+              {item.capacity ? `Up to ${item.capacity} people` : 'Hosted plan'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.homeHeroImage}>
+          <Image
+            resizeMode="cover"
+            source={resolveActivityArtwork(item)}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+        <Pressable
+          accessibilityLabel={`View ${item.title}`}
+          accessibilityRole="button"
+          onPress={onOpen}
+          style={({ pressed }) => [
+            styles.homeHeroButton,
+            pressed && styles.homeHeroButtonPressed,
+          ]}
         >
-          {verified ? (
-            <CheckCircle2 color={colors.surface} size={25} strokeWidth={2.4} />
-          ) : (
-            <ShieldCheck color={colors.warning} size={25} strokeWidth={2.4} />
+          <Text style={styles.homeHeroButtonText}>View</Text>
+          <ArrowRight color={colors.primary} size={17} strokeWidth={2.6} />
+        </Pressable>
+      </View>
+      <Pressable
+        accessibilityHint="Available only after your join request is approved"
+        accessibilityRole="button"
+        onPress={onPeople}
+        style={styles.peoplePreview}
+      >
+        <View style={styles.peopleAvatars}>
+          {(attendees.length ? attendees.slice(0, 4) : [undefined]).map(
+            (member, index) => (
+              <View
+                key={member?.id ?? index}
+                style={[
+                  styles.peopleAvatar,
+                  index > 0 && styles.peopleAvatarOverlap,
+                ]}
+              >
+                {member?.profilePhotoUrl ? (
+                  <Image
+                    source={{ uri: member.profilePhotoUrl }}
+                    style={styles.peopleAvatarImage}
+                  />
+                ) : (
+                  <CircleUserRound
+                    color={colors.secondary}
+                    size={20}
+                    strokeWidth={2.2}
+                  />
+                )}
+              </View>
+            ),
           )}
         </View>
-        <View style={styles.trustCopy}>
-          <Text style={styles.trustTitle}>{statusTitle}</Text>
-          <Text style={styles.trustText}>{statusText}</Text>
+        <View style={styles.peoplePreviewCopy}>
+          <Text style={styles.peoplePreviewTitle}>People you’ll meet</Text>
+          <Text style={styles.peoplePreviewText}>
+            {attendees.length
+              ? `${attendees.length} approved ${attendees.length === 1 ? 'member' : 'members'} going`
+              : 'You’re the first approved member'}
+          </Text>
         </View>
-      </View>
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${Math.min(Math.max(user.trustScore, 20), 100)}%` },
-          ]}
+        <View style={styles.peoplePrivacy}>
+          <LockKeyhole color={colors.secondary} size={14} strokeWidth={2.6} />
+          <Text style={styles.peoplePrivacyText}>Approved</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+function HomeRecommendationCard({
+  artwork,
+  item,
+  onJoin,
+  onOpen,
+  reason,
+}: {
+  artwork: ImageSourcePropType;
+  item: DiscoveryItem;
+  onJoin: () => void;
+  onOpen: () => void;
+  reason: string;
+}) {
+  const alreadyJoined = Boolean(item.membershipStatus);
+
+  return (
+    <Pressable
+      accessibilityLabel={`Open ${item.title}`}
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={({ pressed }) => [
+        styles.homeRecommendationCard,
+        pressed && styles.homeRecommendationCardPressed,
+      ]}
+    >
+      <View style={styles.homeRecommendationImage}>
+        <Image
+          resizeMode="contain"
+          source={artwork}
+          style={StyleSheet.absoluteFill}
         />
       </View>
-      <View style={styles.trustMeta}>
-        <Text style={styles.trustMetaText}>Trust score {user.trustScore}</Text>
-        <Text style={styles.trustMetaText}>
-          {formatTrustTier(user.trustTier)}
+      <View style={styles.homeRecommendationBody}>
+        <View style={styles.homeRecommendationTopRow}>
+          <Text style={styles.homeRecommendationCategory}>
+            {formatCategory(item.category)}
+          </Text>
+          {item.seats !== undefined ? (
+            <Text style={styles.homeRecommendationSeats}>
+              {item.seats ? `${item.seats} spots` : 'Full'}
+            </Text>
+          ) : null}
+        </View>
+        <Text numberOfLines={2} style={styles.homeRecommendationTitle}>
+          {item.title}
         </Text>
+        <View style={styles.homeRecommendationMetaRow}>
+          <MapPin color={colors.muted} size={14} strokeWidth={2.4} />
+          <Text numberOfLines={1} style={styles.homeRecommendationMeta}>
+            {item.location}
+          </Text>
+        </View>
+        <View style={styles.homeRecommendationMetaRow}>
+          <Clock3 color={colors.muted} size={14} strokeWidth={2.4} />
+          <Text numberOfLines={1} style={styles.homeRecommendationMeta}>
+            {item.time}
+          </Text>
+        </View>
+        <View style={styles.recommendationReason}>
+          <Sparkles color={colors.primaryDark} size={13} strokeWidth={2.5} />
+          <Text numberOfLines={1} style={styles.recommendationReasonText}>
+            {reason}
+          </Text>
+        </View>
+      </View>
+      <Pressable
+        accessibilityLabel={alreadyJoined ? 'View plan' : `Join ${item.title}`}
+        accessibilityRole="button"
+        onPress={alreadyJoined ? onOpen : onJoin}
+        style={styles.homeRecommendationAction}
+      >
+        <ArrowRight color={colors.surface} size={18} strokeWidth={2.7} />
+      </Pressable>
+    </Pressable>
+  );
+}
+
+function IllustratedEmptyState({
+  actionLabel,
+  onAction,
+  text,
+  title,
+}: {
+  actionLabel: string;
+  onAction: () => void;
+  text: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.illustratedEmptyState}>
+      <Image
+        source={curatedArtwork.empty}
+        style={styles.illustratedEmptyImage}
+      />
+      <View style={styles.illustratedEmptyCopy}>
+        <Text style={styles.illustratedEmptyTitle}>{title}</Text>
+        <Text style={styles.illustratedEmptyText}>{text}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAction}
+          style={styles.illustratedEmptyAction}
+        >
+          <Text style={styles.illustratedEmptyActionText}>{actionLabel}</Text>
+          <ArrowRight color={colors.primaryDark} size={17} strokeWidth={2.6} />
+        </Pressable>
       </View>
     </View>
   );
@@ -1490,6 +2121,15 @@ function DiscoveryCard({
       onPress={() => onOpen(item)}
       style={[styles.card, compact && styles.compactCard]}
     >
+      {!compact ? (
+        <View style={styles.discoveryCardImage}>
+          <Image
+            resizeMode="contain"
+            source={resolveActivityArtwork(item)}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      ) : null}
       <View style={styles.cardTopRow}>
         <Text style={styles.category}>{formatCategory(item.category)}</Text>
         {item.seats ? (
@@ -1586,12 +2226,180 @@ function EmptyState({
   );
 }
 
-function ProfileMetric({ label, value }: { label: string; value: string }) {
+function JoinSuccessToast({
+  activityTitle,
+  onDismiss,
+}: {
+  activityTitle: string;
+  onDismiss: () => void;
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    successHaptic();
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (cancelled) {
+        return;
+      }
+
+      if (reduceMotion) {
+        progress.setValue(1);
+      } else {
+        Animated.spring(progress, {
+          damping: 16,
+          mass: 0.7,
+          stiffness: 170,
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      timer = setTimeout(() => {
+        if (reduceMotion) {
+          onDismiss();
+          return;
+        }
+
+        Animated.timing(progress, {
+          duration: 180,
+          easing: Easing.in(Easing.quad),
+          toValue: 0,
+          useNativeDriver: true,
+        }).start(({ finished }) => finished && onDismiss());
+      }, 4200);
+    });
+
+    return () => {
+      cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      progress.stopAnimation();
+    };
+  }, [activityTitle, onDismiss, progress]);
+
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
+    <Animated.View
+      accessibilityLiveRegion="polite"
+      style={[
+        styles.toast,
+        {
+          opacity: progress,
+          transform: [
+            {
+              translateY: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [24, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.toastIcon}>
+        <CheckCircle2 color={colors.surface} size={19} strokeWidth={2.8} />
+      </View>
+      <View style={styles.toastCopy}>
+        <Text style={styles.toastTitle}>Request sent</Text>
+        <Text numberOfLines={2} style={styles.toastText}>
+          We’ll let you know when {activityTitle}’s host responds.
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel="Dismiss confirmation"
+        accessibilityRole="button"
+        hitSlop={10}
+        onPress={onDismiss}
+      >
+        <X color={colors.surface} size={18} strokeWidth={2.5} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function activityArtwork(item: DiscoveryItem, index: number) {
+  void index;
+  return resolveActivityCardArtwork(item);
+}
+
+function recommendationReason(item: DiscoveryItem, user: NivaUser) {
+  const userInterests = new Set(
+    user.interests.map((interest) => interest.toLowerCase()),
+  );
+  const matches = item.interests.filter((interest) =>
+    userInterests.has(interest.toLowerCase()),
+  );
+
+  if (matches.length >= 2) {
+    return `Because you like ${matches.slice(0, 2).join(' + ')}`;
+  }
+
+  if (matches.length === 1) {
+    return `Because you like ${matches[0]}`;
+  }
+
+  if (item.city?.toLowerCase() === user.city.toLowerCase()) {
+    return `Popular in ${user.city}`;
+  }
+
+  return 'A thoughtful match for you';
+}
+
+function countdownLabel(startsAt?: string) {
+  if (!startsAt) {
+    return 'Coming up';
+  }
+
+  const difference = new Date(startsAt).getTime() - Date.now();
+  if (difference <= 0) {
+    return 'Starting soon';
+  }
+
+  const hours = Math.ceil(difference / (60 * 60 * 1000));
+  if (hours < 24) {
+    return `In ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  }
+
+  const days = Math.ceil(hours / 24);
+  return `In ${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+function softHaptic() {
+  if (Platform.OS === 'android') {
+    Vibration.vibrate(8);
+  }
+}
+
+function successHaptic() {
+  if (Platform.OS === 'android') {
+    Vibration.vibrate([0, 12, 55, 18]);
+  }
+}
+
+function ProfileMenuRow({
+  icon,
+  label,
+  last = false,
+  onPress,
+}: {
+  icon: ReactNode;
+  label: string;
+  last?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.profileMenuRow, last && styles.profileMenuRowLast]}
+    >
+      <View style={styles.profileMenuIcon}>{icon}</View>
+      <Text style={styles.profileMenuLabel}>{label}</Text>
+      <ChevronRight color={colors.muted} size={20} strokeWidth={2.4} />
+    </Pressable>
   );
 }
 
@@ -1619,41 +2427,15 @@ function formatCategory(category: DiscoveryItem['category']) {
   }
 }
 
-function formatTrustTier(tier: NivaUser['trustTier']) {
-  switch (tier) {
-    case 'basic_verified':
-      return 'Basic verified';
-    case 'host':
-      return 'Host';
-    case 'host_eligible':
-      return 'Host eligible';
-    case 'new':
-      return 'New';
-    case 'trusted':
-      return 'Trusted';
-  }
-}
-
-function formatVerificationStatus(status: NivaUser['verificationStatus']) {
-  switch (status) {
-    case 'approved':
-      return 'Approved';
-    case 'needs_review':
-      return 'Needs review';
-    case 'not_started':
-      return 'Not started';
-    case 'pending':
-      return 'Pending';
-    case 'rejected':
-      return 'Action needed';
-  }
-}
-
 function activityToDiscoveryItem(
   activity: CommunityActivity,
   category: 'circle' | 'event',
 ): DiscoveryItem {
-  const startsAt = new Date(activity.startsAt);
+  const effectiveStartsAt =
+    category === 'circle' && activity.occurrences?.length
+      ? activity.occurrences[0].startsAt
+      : activity.startsAt;
+  const startsAt = new Date(effectiveStartsAt);
   const availableSeats = Math.max(
     activity.capacity - (activity._count?.members ?? 0),
     0,
@@ -1667,23 +2449,25 @@ function activityToDiscoveryItem(
     activityStatus: activity.status,
     cancellationReason: activity.cancellationReason,
     capacity: activity.capacity,
-    startsAt: activity.startsAt,
+    coverImageUrl: activity.coverImageUrl ?? undefined,
+    startsAt: effectiveStartsAt,
+    occurrences: activity.occurrences,
+    recurrenceIntervalWeeks: activity.recurrenceIntervalWeeks,
     hostId: activity.host?.id,
+    hostBio: activity.host?.profile?.bio ?? undefined,
+    hostNote: activity.hostNote?.trim() || undefined,
+    hostProfilePhotoUrl: activity.host?.profile?.profilePhotoUrl ?? undefined,
     category,
     title: activity.title,
     location: activity.locationName,
     city: activity.city,
     latitude: activity.latitude ?? undefined,
     longitude: activity.longitude ?? undefined,
+    membershipStatus: activity.membershipStatus,
     time:
       category === 'circle' && activity.schedule
         ? activity.schedule
-        : startsAt.toLocaleString(undefined, {
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            month: 'short',
-          }),
+        : formatActivityDate(effectiveStartsAt),
     seats: availableSeats,
     duration: activity.durationWeeks
       ? `${activity.durationWeeks} weeks`
@@ -1694,7 +2478,17 @@ function activityToDiscoveryItem(
     host:
       category === 'circle' ? `Led by ${hostName}` : `Hosted by ${hostName}`,
     summary: activity.description,
+    timezone: activity.timezone,
   };
+}
+
+function formatActivityDate(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+  });
 }
 
 function formatActivityDifficulty(
@@ -1746,6 +2540,19 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '700',
   },
+  listShimmer: { gap: spacing.md },
+  listShimmerCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 142,
+    overflow: 'hidden',
+    paddingRight: spacing.md,
+  },
+  listShimmerImage: { backgroundColor: colors.infoSoft, width: 112 },
   retryButton: {
     alignSelf: 'flex-start',
     borderColor: colors.warning,
@@ -1772,7 +2579,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     gap: spacing.sm,
+    overflow: 'hidden',
     padding: spacing.md,
+  },
+  discoveryCardImage: {
+    alignSelf: 'stretch',
+    aspectRatio: 3 / 2,
+    backgroundColor: colors.infoSoft,
+    marginHorizontal: -spacing.md,
+    marginTop: -spacing.md,
+    overflow: 'hidden',
   },
   cardFooter: {
     alignItems: 'center',
@@ -1888,6 +2704,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     paddingBottom: 116,
+    paddingTop: spacing.xl,
   },
   detailHeader: {
     alignItems: 'flex-start',
@@ -1975,6 +2792,24 @@ const styles = StyleSheet.create({
   exploreTypeTextActive: {
     color: colors.ink,
   },
+  filterButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
+  },
+  filterButtonText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
   filterChip: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -1998,6 +2833,53 @@ const styles = StyleSheet.create({
   },
   filterTextActive: {
     color: colors.surface,
+  },
+  filterSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  filterSheetHandle: {
+    alignSelf: 'center',
+    backgroundColor: colors.border,
+    borderRadius: radius.pill,
+    height: 5,
+    marginBottom: spacing.lg,
+    width: 44,
+  },
+  filterSheetOption: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+  },
+  filterSheetOptionActive: {
+    backgroundColor: colors.infoSoft,
+    borderColor: colors.primary,
+  },
+  filterSheetOptionText: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  filterSheetOptionTextActive: { color: colors.primary },
+  filterSheetOptions: { gap: spacing.sm, marginTop: spacing.lg },
+  filterSheetText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 20,
+    marginTop: spacing.xs,
+  },
+  filterSheetTitle: {
+    color: colors.ink,
+    fontSize: typography.heading,
+    fontWeight: '900',
   },
   formError: {
     color: colors.primaryDark,
@@ -2042,26 +2924,238 @@ const styles = StyleSheet.create({
   },
   headerBadge: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
     borderRadius: radius.pill,
     borderWidth: 1,
-    flexDirection: 'row',
     flexShrink: 0,
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  headerBadgeText: {
-    color: colors.primary,
-    fontSize: typography.small,
-    fontWeight: '800',
+    height: 44,
+    justifyContent: 'center',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    width: 44,
   },
   headerBadgeCompact: {
     alignSelf: 'flex-start',
   },
+  homeHero: {
+    backgroundColor: colors.surface,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { height: 12, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+  },
+  homeHeroButton: {
+    alignItems: 'center',
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: 18,
+    position: 'absolute',
+    right: '34%',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    top: 176,
+    transform: [{ translateX: 28 }],
+  },
+  homeHeroButtonPressed: {
+    opacity: 0.86,
+    transform: [{ translateX: 28 }, { scale: 0.98 }],
+  },
+  homeHeroButtonText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  homeHeroContent: {
+    justifyContent: 'center',
+    minHeight: 246,
+    padding: spacing.lg,
+    paddingRight: spacing.md,
+    width: '66%',
+  },
+  homeHeroEyebrow: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+  },
+  homeHeroImage: {
+    height: '100%',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: '38%',
+  },
+  homeHeroMain: {
+    backgroundColor: colors.primary,
+    minHeight: 246,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  homeHeroMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  homeHeroMetaText: {
+    color: 'rgba(255,255,255,0.86)',
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  homeHeroTitle: {
+    color: colors.surface,
+    fontSize: 25,
+    fontWeight: '900',
+    letterSpacing: -0.7,
+    lineHeight: 29,
+    marginBottom: spacing.xs,
+  },
+  homeRecommendationAction: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    bottom: spacing.md,
+    height: 38,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.md,
+    width: 38,
+  },
+  homeRecommendationBody: {
+    flex: 1,
+    minWidth: 0,
+    paddingBottom: 44,
+    paddingVertical: spacing.sm,
+  },
+  homeRecommendationCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 164,
+    overflow: 'hidden',
+    padding: spacing.sm,
+    position: 'relative',
+  },
+  homeRecommendationCardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
+  },
+  homeRecommendationCategory: {
+    color: colors.secondary,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  homeRecommendationImage: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 12,
+    height: 142,
+    overflow: 'hidden',
+    width: 116,
+  },
+  homeRecommendationList: {
+    gap: spacing.md,
+  },
+  homeRecommendationMeta: {
+    color: colors.muted,
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  homeRecommendationMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 4,
+  },
+  homeRecommendationSeats: {
+    color: colors.warning,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  homeRecommendationTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+    lineHeight: 22,
+    marginTop: 5,
+  },
+  homeRecommendationTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
   horizontalCards: {
     marginRight: -spacing.lg,
+  },
+  illustratedEmptyAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderColor: colors.primary,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
+  },
+  illustratedEmptyActionText: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  illustratedEmptyCopy: {
+    padding: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  illustratedEmptyImage: {
+    height: 178,
+    width: '100%',
+  },
+  illustratedEmptyState: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  illustratedEmptyText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+  },
+  illustratedEmptyTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '900',
+    lineHeight: 25,
   },
   icebreakerCard: {
     backgroundColor: colors.background,
@@ -2249,6 +3343,57 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
+  profileAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.infoSoft,
+    borderColor: colors.surface,
+    borderRadius: radius.pill,
+    borderWidth: 3,
+    height: 74,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 74,
+  },
+  profileAvatarImage: { height: '100%', width: '100%' },
+  profileBio: {
+    color: colors.ink,
+    fontSize: typography.body,
+    lineHeight: 24,
+    marginTop: spacing.lg,
+  },
+  profileEditButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    minHeight: 38,
+    paddingHorizontal: spacing.sm,
+  },
+  profileEditText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  profileHandle: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  profileHeaderCopy: { flex: 1, minWidth: 0 },
+  profileName: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '900',
+  },
   profileInterest: {
     backgroundColor: colors.secondarySoft,
     borderRadius: radius.pill,
@@ -2264,6 +3409,38 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
+  profileMenu: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
+  },
+  profileMenuIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  profileMenuLabel: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  profileMenuRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 66,
+    paddingHorizontal: spacing.md,
+  },
+  profileMenuRowLast: { borderBottomWidth: 0 },
   profileLabel: {
     color: colors.muted,
     fontSize: typography.small,
@@ -2294,6 +3471,111 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
     marginTop: spacing.sm,
+  },
+  profileVerification: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+  },
+  profileVerificationIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.success,
+    borderRadius: radius.pill,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  profileVerificationIconPending: {
+    alignItems: 'center',
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.pill,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  profileVerificationText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  profileVerificationTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '900',
+  },
+  hostCreateButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  hostCreateRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  hostCreateText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  hostPathAction: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  hostPathActionText: {
+    color: colors.surface,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  hostPathCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    marginTop: spacing.xl,
+    minHeight: 188,
+    overflow: 'hidden',
+  },
+  hostPathCopy: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    paddingRight: spacing.sm,
+  },
+  hostPathEyebrow: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  hostPathImage: { height: '100%', width: '35%' },
+  hostPathText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+  },
+  hostPathTitle: {
+    color: colors.surface,
+    fontSize: typography.subheading,
+    fontWeight: '900',
+    lineHeight: 25,
+    marginTop: spacing.xs,
   },
   progressFill: {
     backgroundColor: colors.secondary,
@@ -2333,6 +3615,83 @@ const styles = StyleSheet.create({
   },
   ratingTextActive: {
     color: colors.surface,
+  },
+  peopleAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderColor: colors.surface,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  peopleAvatarOverlap: {
+    marginLeft: -10,
+  },
+  peopleAvatarImage: {
+    height: '100%',
+    width: '100%',
+  },
+  peopleAvatars: {
+    flexDirection: 'row',
+    paddingLeft: 2,
+  },
+  peoplePreview: {
+    alignItems: 'center',
+    backgroundColor: colors.glass,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 72,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  peoplePreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  peoplePreviewText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  peoplePreviewTitle: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  peoplePrivacy: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  peoplePrivacyText: {
+    color: colors.secondary,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  recommendationReason: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FCEAF0',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: spacing.sm,
+    maxWidth: '100%',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  recommendationReasonText: {
+    color: colors.primaryDark,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '800',
   },
   screenSubtitle: {
     color: colors.muted,
@@ -2442,6 +3801,53 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  shimmer: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  shimmerCopy: {
+    flex: 1,
+    gap: spacing.sm,
+    justifyContent: 'center',
+  },
+  shimmerHero: {
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.lg,
+    height: 214,
+  },
+  shimmerImage: {
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.md,
+    height: 104,
+    width: 92,
+  },
+  shimmerLine: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.pill,
+    height: 13,
+    width: '72%',
+  },
+  shimmerLineShort: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.pill,
+    height: 13,
+    width: '48%',
+  },
+  shimmerLineWide: {
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.pill,
+    height: 18,
+    width: '92%',
+  },
+  shimmerRow: {
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.sm,
+  },
   subsectionTitle: {
     color: colors.ink,
     fontSize: typography.body,
@@ -2451,26 +3857,35 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderTopWidth: 1,
-    bottom: 0,
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    bottom: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    left: 0,
-    minHeight: 78,
-    paddingBottom: spacing.sm,
+    left: spacing.sm,
+    minHeight: 70,
+    paddingBottom: spacing.xs,
     paddingHorizontal: spacing.xs,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
     position: 'absolute',
-    right: 0,
+    right: spacing.sm,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
   },
   tabButton: {
     alignItems: 'center',
+    borderRadius: radius.md,
     flex: 1,
     gap: 4,
     minHeight: 56,
     justifyContent: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: colors.infoSoft,
   },
   tabIcon: {
     alignItems: 'center',
@@ -2516,10 +3931,8 @@ const styles = StyleSheet.create({
   },
   toast: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    backgroundColor: colors.secondary,
+    borderRadius: 18,
     bottom: 92,
     flexDirection: 'row',
     gap: spacing.sm,
@@ -2528,17 +3941,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.md,
   },
-  toastDismiss: {
-    color: colors.primary,
-    fontSize: typography.small,
-    fontWeight: '800',
+  toastCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  toastIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   toastText: {
-    color: colors.ink,
-    flex: 1,
+    color: '#EAF8F4',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  toastTitle: {
+    color: colors.surface,
     fontSize: typography.small,
-    fontWeight: '800',
-    lineHeight: 18,
+    fontWeight: '900',
   },
   trustCard: {
     backgroundColor: colors.surface,
@@ -2591,6 +4016,50 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
+  },
+  trustDotPending: {
+    alignItems: 'center',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  trustDotVerified: {
+    alignItems: 'center',
+    backgroundColor: colors.success,
+    borderRadius: radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  trustStrip: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  trustStripDivider: {
+    backgroundColor: colors.border,
+    height: 16,
+    width: 1,
+  },
+  trustStripMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  trustStripTitle: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: '900',
   },
   verticalCards: {
     gap: spacing.md,

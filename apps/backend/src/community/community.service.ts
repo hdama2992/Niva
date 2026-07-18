@@ -7,6 +7,7 @@ import {
 import {
   ActivityStatus,
   ChatThreadType,
+  CircleOccurrenceStatus,
   HostApprovalStatus,
   MembershipStatus,
   NotificationType,
@@ -55,7 +56,15 @@ export class CommunityService {
       },
       orderBy: { startsAt: 'asc' },
       include: {
-        host: { select: { id: true, displayName: true, username: true } },
+        host: {
+          select: {
+            id: true,
+            displayName: true,
+            username: true,
+            profile: { select: { bio: true, profilePhotoUrl: true } },
+            trust: { select: { score: true } },
+          },
+        },
         members: {
           where: { userId },
           select: { status: true },
@@ -71,9 +80,17 @@ export class CommunityService {
       },
     });
 
-    return events.map(({ members, ...event }) =>
-      this.hideExactLocationUnlessApproved(userId, event, members[0]?.status),
-    );
+    return events.map(({ members, ...event }) => {
+      const membershipStatus = members[0]?.status;
+      return {
+        ...this.hideExactLocationUnlessApproved(
+          userId,
+          event,
+          membershipStatus,
+        ),
+        membershipStatus,
+      };
+    });
   }
 
   async listCircles(userId: string, city?: string) {
@@ -87,7 +104,15 @@ export class CommunityService {
       },
       orderBy: { startsAt: 'asc' },
       include: {
-        host: { select: { id: true, displayName: true, username: true } },
+        host: {
+          select: {
+            id: true,
+            displayName: true,
+            username: true,
+            profile: { select: { bio: true, profilePhotoUrl: true } },
+            trust: { select: { score: true } },
+          },
+        },
         members: {
           where: { userId },
           select: { status: true },
@@ -100,12 +125,28 @@ export class CommunityService {
             },
           },
         },
+        occurrences: {
+          where: {
+            startsAt: { gte: new Date() },
+            status: CircleOccurrenceStatus.SCHEDULED,
+          },
+          orderBy: { startsAt: 'asc' },
+          take: 16,
+        },
       },
     });
 
-    return circles.map(({ members, ...circle }) =>
-      this.hideExactLocationUnlessApproved(userId, circle, members[0]?.status),
-    );
+    return circles.map(({ members, ...circle }) => {
+      const membershipStatus = members[0]?.status;
+      return {
+        ...this.hideExactLocationUnlessApproved(
+          userId,
+          circle,
+          membershipStatus,
+        ),
+        membershipStatus,
+      };
+    });
   }
 
   private hideExactLocationUnlessApproved<
@@ -146,6 +187,8 @@ export class CommunityService {
         hostId: userId,
         title: dto.title.trim(),
         description: dto.description.trim(),
+        coverImageUrl: dto.coverImageUrl,
+        hostNote: dto.hostNote?.trim() || undefined,
         city: dto.city.trim(),
         locationName: dto.locationName.trim(),
         latitude: dto.latitude,
@@ -170,12 +213,19 @@ export class CommunityService {
       'first session',
     );
     const interests = this.normalizeRequiredList(dto.interests, 'interests');
+    const occurrences = this.buildCircleOccurrences(
+      startsAt,
+      dto.durationWeeks,
+      dto.recurrenceIntervalWeeks,
+    );
 
     return this.prisma.circle.create({
       data: {
         hostId: userId,
         title: dto.title.trim(),
         description: dto.description.trim(),
+        coverImageUrl: dto.coverImageUrl,
+        hostNote: dto.hostNote?.trim() || undefined,
         city: dto.city.trim(),
         locationName: dto.locationName.trim(),
         latitude: dto.latitude,
@@ -183,14 +233,21 @@ export class CommunityService {
         startsAt,
         schedule: dto.schedule.trim(),
         durationWeeks: dto.durationWeeks,
+        recurrenceIntervalWeeks: dto.recurrenceIntervalWeeks,
+        timezone: dto.timezone.trim(),
         capacity: dto.capacity,
         difficulty: dto.difficulty,
         interests,
         chatThread: {
           create: { type: ChatThreadType.CIRCLE },
         },
+        occurrences: {
+          create: occurrences.map((occurrenceStartsAt) => ({
+            startsAt: occurrenceStartsAt,
+          })),
+        },
       },
-      include: { chatThread: true },
+      include: { chatThread: true, occurrences: true },
     });
   }
 
@@ -218,6 +275,9 @@ export class CommunityService {
         capacity: dto.capacity,
         city: dto.city?.trim(),
         description: dto.description?.trim(),
+        coverImageUrl: dto.coverImageUrl,
+        hostNote:
+          dto.hostNote !== undefined ? dto.hostNote.trim() || null : undefined,
         difficulty: dto.difficulty,
         endsAt,
         interests,
@@ -249,10 +309,25 @@ export class CommunityService {
     await this.assertCircleCapacity(circleId, dto.capacity);
     const startsAt = dto.startsAt
       ? this.parseFutureActivityTime(dto.startsAt, 'first session')
-      : undefined;
+      : circle.startsAt;
     const interests = dto.interests
       ? this.normalizeRequiredList(dto.interests, 'interests')
       : undefined;
+    const recurrenceChanged = Boolean(
+      dto.startsAt ||
+      dto.durationWeeks !== undefined ||
+      dto.recurrenceIntervalWeeks !== undefined,
+    );
+    const durationWeeks = dto.durationWeeks ?? circle.durationWeeks;
+    const recurrenceIntervalWeeks =
+      dto.recurrenceIntervalWeeks ?? circle.recurrenceIntervalWeeks;
+    const occurrences = recurrenceChanged
+      ? this.buildCircleOccurrences(
+          startsAt,
+          durationWeeks,
+          recurrenceIntervalWeeks,
+        )
+      : [];
 
     const updated = await this.prisma.circle.update({
       where: { id: circleId },
@@ -260,16 +335,30 @@ export class CommunityService {
         capacity: dto.capacity,
         city: dto.city?.trim(),
         description: dto.description?.trim(),
+        coverImageUrl: dto.coverImageUrl,
+        hostNote:
+          dto.hostNote !== undefined ? dto.hostNote.trim() || null : undefined,
         difficulty: dto.difficulty,
         durationWeeks: dto.durationWeeks,
+        recurrenceIntervalWeeks: dto.recurrenceIntervalWeeks,
+        timezone: dto.timezone?.trim(),
         interests,
         locationName: dto.locationName?.trim(),
         latitude: dto.latitude,
         longitude: dto.longitude,
         schedule: dto.schedule?.trim(),
-        startsAt,
+        startsAt: dto.startsAt ? startsAt : undefined,
         title: dto.title?.trim(),
+        occurrences: recurrenceChanged
+          ? {
+              deleteMany: { startsAt: { gte: new Date() } },
+              create: occurrences.map((occurrenceStartsAt) => ({
+                startsAt: occurrenceStartsAt,
+              })),
+            }
+          : undefined,
       },
+      include: { occurrences: { orderBy: { startsAt: 'asc' } } },
     });
 
     await this.notifyActivityMembers('CIRCLE', circleId, updated.title, {
@@ -521,20 +610,130 @@ export class CommunityService {
   }
 
   async listMyActivities(userId: string) {
-    const [events, circles] = await Promise.all([
+    const [events, circles, hostedEvents, hostedCircles] = await Promise.all([
       this.prisma.eventMember.findMany({
         where: { userId },
         orderBy: { joinedAt: 'desc' },
-        include: { event: true },
+        include: {
+          event: {
+            include: {
+              host: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  username: true,
+                  profile: { select: { bio: true, profilePhotoUrl: true } },
+                  trust: { select: { score: true } },
+                },
+              },
+              _count: {
+                select: {
+                  members: {
+                    where: { status: { in: activeMembershipStatuses } },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
       this.prisma.circleMember.findMany({
         where: { userId },
         orderBy: { joinedAt: 'desc' },
-        include: { circle: true },
+        include: {
+          circle: {
+            include: {
+              host: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  username: true,
+                  profile: { select: { bio: true, profilePhotoUrl: true } },
+                  trust: { select: { score: true } },
+                },
+              },
+              _count: {
+                select: {
+                  members: {
+                    where: { status: { in: activeMembershipStatuses } },
+                  },
+                },
+              },
+              occurrences: {
+                where: {
+                  status: {
+                    in: [
+                      CircleOccurrenceStatus.SCHEDULED,
+                      CircleOccurrenceStatus.COMPLETED,
+                    ],
+                  },
+                },
+                orderBy: { startsAt: 'asc' },
+                take: 32,
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.event.findMany({
+        where: { hostId: userId },
+        orderBy: { startsAt: 'asc' },
+        include: {
+          host: {
+            select: {
+              id: true,
+              displayName: true,
+              username: true,
+              profile: { select: { bio: true, profilePhotoUrl: true } },
+              trust: { select: { score: true } },
+            },
+          },
+          _count: {
+            select: {
+              members: {
+                where: { status: { in: activeMembershipStatuses } },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.circle.findMany({
+        where: { hostId: userId },
+        orderBy: { startsAt: 'asc' },
+        include: {
+          host: {
+            select: {
+              id: true,
+              displayName: true,
+              username: true,
+              profile: { select: { bio: true, profilePhotoUrl: true } },
+              trust: { select: { score: true } },
+            },
+          },
+          _count: {
+            select: {
+              members: {
+                where: { status: { in: activeMembershipStatuses } },
+              },
+            },
+          },
+          occurrences: {
+            where: {
+              status: {
+                in: [
+                  CircleOccurrenceStatus.SCHEDULED,
+                  CircleOccurrenceStatus.COMPLETED,
+                ],
+              },
+            },
+            orderBy: { startsAt: 'asc' },
+            take: 32,
+          },
+        },
       }),
     ]);
 
-    return { events, circles };
+    return { circles, events, hostedCircles, hostedEvents };
   }
 
   async getIcebreakers(
@@ -576,7 +775,9 @@ export class CommunityService {
                 select: {
                   displayName: true,
                   id: true,
-                  profile: { select: { interests: true } },
+                  profile: {
+                    select: { interests: true, profilePhotoUrl: true },
+                  },
                   settings: { select: { showInterestsInIcebreakers: true } },
                 },
               },
@@ -593,7 +794,9 @@ export class CommunityService {
                 select: {
                   displayName: true,
                   id: true,
-                  profile: { select: { interests: true } },
+                  profile: {
+                    select: { interests: true, profilePhotoUrl: true },
+                  },
                   settings: { select: { showInterestsInIcebreakers: true } },
                 },
               },
@@ -613,6 +816,7 @@ export class CommunityService {
         return {
           displayName: membership.user.displayName,
           id: membership.user.id,
+          profilePhotoUrl: membership.user.profile?.profilePhotoUrl ?? null,
           prompts: this.icebreakerPrompts(
             activity.title,
             activity.interests,
@@ -675,7 +879,15 @@ export class CommunityService {
               members: { where: { status: { in: activeMembershipStatuses } } },
             },
           },
-          host: { select: { displayName: true, id: true, username: true } },
+          host: {
+            select: {
+              displayName: true,
+              id: true,
+              username: true,
+              profile: { select: { bio: true, profilePhotoUrl: true } },
+              trust: { select: { score: true } },
+            },
+          },
         },
         take: 40,
       }),
@@ -698,7 +910,15 @@ export class CommunityService {
               members: { where: { status: { in: activeMembershipStatuses } } },
             },
           },
-          host: { select: { displayName: true, id: true, username: true } },
+          host: {
+            select: {
+              displayName: true,
+              id: true,
+              username: true,
+              profile: { select: { bio: true, profilePhotoUrl: true } },
+              trust: { select: { score: true } },
+            },
+          },
         },
         take: 40,
       }),
@@ -1458,6 +1678,21 @@ export class CommunityService {
     type: ChatThreadType,
     activityId: string,
   ) {
+    const activity =
+      type === ChatThreadType.EVENT
+        ? await this.prisma.event.findUnique({
+            where: { id: activityId },
+            select: { hostId: true },
+          })
+        : await this.prisma.circle.findUnique({
+            where: { id: activityId },
+            select: { hostId: true },
+          });
+
+    if (activity?.hostId === userId) {
+      return;
+    }
+
     const membership =
       type === ChatThreadType.EVENT
         ? await this.prisma.eventMember.findUnique({
@@ -1505,7 +1740,14 @@ export class CommunityService {
   private async assertCircleHost(hostId: string, circleId: string) {
     const circle = await this.prisma.circle.findUnique({
       where: { id: circleId },
-      select: { hostId: true, startsAt: true, status: true, title: true },
+      select: {
+        durationWeeks: true,
+        hostId: true,
+        recurrenceIntervalWeeks: true,
+        startsAt: true,
+        status: true,
+        title: true,
+      },
     });
 
     if (!circle) {
@@ -1545,6 +1787,23 @@ export class CommunityService {
       throw new BadRequestException(`Choose a future ${label}.`);
     }
     return parsed;
+  }
+
+  private buildCircleOccurrences(
+    startsAt: Date,
+    durationWeeks: number,
+    recurrenceIntervalWeeks: number,
+  ) {
+    const occurrences: Date[] = [];
+    const interval = recurrenceIntervalWeeks === 2 ? 2 : 1;
+
+    for (let week = 0; week < durationWeeks; week += interval) {
+      const occurrence = new Date(startsAt);
+      occurrence.setUTCDate(occurrence.getUTCDate() + week * 7);
+      occurrences.push(occurrence);
+    }
+
+    return occurrences;
   }
 
   private assertEventTimeRange(startsAt: Date, endsAt?: Date | null) {

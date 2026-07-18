@@ -16,17 +16,21 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import { ActivityCoverSelector } from '../components/ActivityCoverSelector';
 import {
   ActivityLocation,
   LocationSelector,
 } from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
+import { SelectedImage } from '../services/media';
 
 export type CreateEventInput = {
   capacity: number;
   city: string;
+  coverImage?: SelectedImage;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
+  hostNote?: string;
   interests: string[];
   locationName: string;
   latitude?: number;
@@ -55,6 +59,8 @@ export function CreateEventScreen({
 }: CreateEventScreenProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [hostNote, setHostNote] = useState('');
+  const [coverImage, setCoverImage] = useState<SelectedImage>();
   const [location, setLocation] = useState<ActivityLocation>({
     city: user.city,
     locationName: '',
@@ -108,8 +114,10 @@ export function CreateEventScreen({
       await onCreate({
         capacity,
         city: location.city,
+        coverImage,
         description: description.trim(),
         difficulty,
+        hostNote: hostNote.trim() || undefined,
         interests: selectedInterests,
         latitude: location.latitude,
         locationName: location.locationName.trim(),
@@ -151,8 +159,8 @@ export function CreateEventScreen({
         >
           <Text style={styles.title}>Host a small gathering</Text>
           <Text style={styles.subtitle}>
-            Keep the first version simple: a clear plan, a public place, and a
-            small group.
+            Give members a clear plan, a public meeting place, and a comfortable
+            capacity.
           </Text>
 
           <Field label="Event title">
@@ -173,6 +181,27 @@ export function CreateEventScreen({
               style={[styles.input, styles.textArea]}
               textAlignVertical="top"
               value={description}
+            />
+          </Field>
+          <Field label="A note from your host (optional)">
+            <TextInput
+              maxLength={400}
+              multiline
+              onChangeText={setHostNote}
+              placeholder="Share why you’re excited to host and the kind of welcome members can expect."
+              placeholderTextColor={colors.muted}
+              style={[styles.input, styles.textArea]}
+              textAlignVertical="top"
+              value={hostNote}
+            />
+            <Text style={styles.helper}>
+              This appears on the event page as your personal introduction.
+            </Text>
+          </Field>
+          <Field label="Cover photo">
+            <ActivityCoverSelector
+              onChange={setCoverImage}
+              value={coverImage}
             />
           </Field>
           <Field label="Meeting location">

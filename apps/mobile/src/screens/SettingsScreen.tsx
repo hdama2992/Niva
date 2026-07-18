@@ -6,8 +6,7 @@ import {
   CircleHelp,
   Eye,
   FileText,
-  Lightbulb,
-  Repeat2,
+  ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
 import { ReactNode, useState } from 'react';
@@ -31,13 +30,35 @@ const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
 const supportUrl = process.env.EXPO_PUBLIC_SUPPORT_URL;
 const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL;
 
+export type SettingsSection = 'preferences' | 'safety' | 'support';
+
 type SettingsScreenProps = {
   blockedUsers: BlockedUser[];
   onBack: () => void;
   onChange: (settings: CommunitySettings) => void;
   onDeleteAccount: () => Promise<void>;
+  onOpenCommunityPromise: () => void;
   onUnblock: (blockedUserId: string) => void;
+  section: SettingsSection;
   settings: CommunitySettings;
+};
+
+const sectionCopy: Record<
+  SettingsSection,
+  { description: string; title: string }
+> = {
+  preferences: {
+    description: 'Choose the updates you want from Niva.',
+    title: 'Preferences',
+  },
+  safety: {
+    description: 'Control discovery and the people you interact with.',
+    title: 'Safety & privacy',
+  },
+  support: {
+    description: 'Find support, policies, and account controls.',
+    title: 'Support & policies',
+  },
 };
 
 export function SettingsScreen({
@@ -45,12 +66,15 @@ export function SettingsScreen({
   onBack,
   onChange,
   onDeleteAccount,
+  onOpenCommunityPromise,
   onUnblock,
+  section,
   settings,
 }: SettingsScreenProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+  const copy = sectionCopy[section];
 
   const confirmDelete = async () => {
     setDeleting(true);
@@ -79,7 +103,7 @@ export function SettingsScreen({
         >
           <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
         </Pressable>
-        <Text style={styles.topBarTitle}>Settings</Text>
+        <Text style={styles.topBarTitle}>{copy.title}</Text>
         <View style={styles.topBarSpacer} />
       </View>
 
@@ -87,127 +111,135 @@ export function SettingsScreen({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Your preferences</Text>
-        <Text style={styles.subtitle}>
-          Control what Niva uses to keep your discovery and circle experience
-          relevant.
-        </Text>
+        <Text style={styles.title}>{copy.title}</Text>
+        <Text style={styles.subtitle}>{copy.description}</Text>
 
-        <Text style={styles.sectionLabel}>Privacy and discovery</Text>
-        <SettingToggle
-          icon={<Eye color={colors.info} size={20} strokeWidth={2.3} />}
-          label="Appear in recommendations"
-          onChange={(showProfileInRecommendations) =>
-            onChange({ ...settings, showProfileInRecommendations })
-          }
-          text="Let Niva consider your profile for safe, relevant group suggestions."
-          value={settings.showProfileInRecommendations}
-        />
-        <SettingToggle
-          icon={<Bell color={colors.primary} size={20} strokeWidth={2.3} />}
-          label="Push notifications"
-          onChange={(notificationsEnabled) =>
-            onChange({ ...settings, notificationsEnabled })
-          }
-          text="Get plan changes, join updates, and safety notices on this device."
-          value={settings.notificationsEnabled}
-        />
-        <SettingToggle
-          icon={
-            <Lightbulb color={colors.warning} size={20} strokeWidth={2.3} />
-          }
-          label="Show interests in icebreakers"
-          onChange={(showInterestsInIcebreakers) =>
-            onChange({ ...settings, showInterestsInIcebreakers })
-          }
-          text="Use shared interests to make approved group introductions easier."
-          value={settings.showInterestsInIcebreakers}
-        />
-        <SettingToggle
-          icon={
-            <Repeat2 color={colors.secondary} size={20} strokeWidth={2.3} />
-          }
-          label="Suggest circle continuity"
-          onChange={(allowCircleContinuitySuggestions) =>
-            onChange({ ...settings, allowCircleContinuitySuggestions })
-          }
-          text="Suggest another gathering after a group has a positive experience."
-          value={settings.allowCircleContinuitySuggestions}
-        />
-        <Text style={styles.sectionLabel}>Blocked members</Text>
-        {blockedUsers.length ? (
-          <View style={styles.blockList}>
-            {blockedUsers.map((blockedUser) => (
-              <View key={blockedUser.id} style={styles.blockRow}>
-                <View style={styles.blockIcon}>
-                  <Ban color={colors.warning} size={18} strokeWidth={2.4} />
-                </View>
-                <View style={styles.blockCopy}>
-                  <Text style={styles.blockName}>
-                    {blockedUser.blocked.displayName ?? 'Niva member'}
-                  </Text>
-                  <Text style={styles.blockHandle}>
-                    @{blockedUser.blocked.username ?? 'member'}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => onUnblock(blockedUser.blockedId)}
-                  style={styles.unblockButton}
-                >
-                  <Text style={styles.unblockText}>Unblock</Text>
-                </Pressable>
+        {section === 'preferences' ? (
+          <View style={styles.group}>
+            <SettingToggle
+              icon={<Bell color={colors.primary} size={20} strokeWidth={2.3} />}
+              label="Push notifications"
+              onChange={(notificationsEnabled) =>
+                onChange({ ...settings, notificationsEnabled })
+              }
+              text="Plan changes, join updates, and safety notices."
+              value={settings.notificationsEnabled}
+            />
+          </View>
+        ) : null}
+
+        {section === 'safety' ? (
+          <>
+            <View style={styles.group}>
+              <SettingToggle
+                icon={<Eye color={colors.info} size={20} strokeWidth={2.3} />}
+                label="Appear in recommendations"
+                onChange={(showProfileInRecommendations) =>
+                  onChange({ ...settings, showProfileInRecommendations })
+                }
+                text="Allow your profile to appear in relevant plan suggestions."
+                value={settings.showProfileInRecommendations}
+              />
+            </View>
+            <Text style={styles.sectionLabel}>Blocked members</Text>
+            {blockedUsers.length ? (
+              <View style={styles.group}>
+                {blockedUsers.map((blockedUser) => (
+                  <View key={blockedUser.id} style={styles.blockRow}>
+                    <View style={styles.settingIcon}>
+                      <Ban color={colors.warning} size={18} strokeWidth={2.4} />
+                    </View>
+                    <View style={styles.settingCopy}>
+                      <Text style={styles.settingLabel}>
+                        {blockedUser.blocked.displayName ?? 'Niva member'}
+                      </Text>
+                      <Text style={styles.settingText}>
+                        @{blockedUser.blocked.username ?? 'member'}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => onUnblock(blockedUser.blockedId)}
+                      style={styles.unblockButton}
+                    >
+                      <Text style={styles.unblockText}>Unblock</Text>
+                    </Pressable>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyBlocks}>
-            <Ban color={colors.muted} size={20} strokeWidth={2.3} />
-            <Text style={styles.emptyBlocksText}>
-              No blocked members. You can block a host from an activity’s
-              details.
-            </Text>
-          </View>
-        )}
+            ) : (
+              <View style={styles.emptyBlocks}>
+                <ShieldCheck
+                  color={colors.success}
+                  size={20}
+                  strokeWidth={2.3}
+                />
+                <Text style={styles.emptyBlocksText}>
+                  You have no blocked members.
+                </Text>
+              </View>
+            )}
+          </>
+        ) : null}
 
-        <Text style={styles.sectionLabel}>Help and legal</Text>
-        <ExternalRow
-          icon={
-            <FileText color={colors.secondary} size={20} strokeWidth={2.3} />
-          }
-          label="Privacy Policy"
-          onPress={() =>
-            void openRequiredUrl(privacyPolicyUrl, 'Privacy Policy')
-          }
-        />
-        <ExternalRow
-          icon={<FileText color={colors.info} size={20} strokeWidth={2.3} />}
-          label="Terms of Service"
-          onPress={() => void openRequiredUrl(termsUrl, 'Terms of Service')}
-        />
-        <ExternalRow
-          icon={
-            <CircleHelp color={colors.primary} size={20} strokeWidth={2.3} />
-          }
-          label="Help and contact support"
-          onPress={() => void openRequiredUrl(supportUrl, 'Support')}
-        />
-
-        <Text style={styles.sectionLabel}>Account</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setDeleteOpen(true)}
-          style={styles.deleteButton}
-        >
-          <Trash2 color={colors.primaryDark} size={19} strokeWidth={2.4} />
-          <View style={styles.deleteCopy}>
-            <Text style={styles.deleteTitle}>Delete account</Text>
-            <Text style={styles.deleteText}>
-              Permanently remove your profile, memberships, messages, and
-              private images.
-            </Text>
-          </View>
-        </Pressable>
+        {section === 'support' ? (
+          <>
+            <View style={styles.group}>
+              <NavigationRow
+                icon={
+                  <ShieldCheck
+                    color={colors.secondary}
+                    size={20}
+                    strokeWidth={2.3}
+                  />
+                }
+                label="Community Promise"
+                onPress={onOpenCommunityPromise}
+              />
+              <ExternalRow
+                icon={
+                  <CircleHelp
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={2.3}
+                  />
+                }
+                label="Contact support"
+                onPress={() => void openRequiredUrl(supportUrl, 'Support')}
+              />
+              <ExternalRow
+                icon={
+                  <FileText
+                    color={colors.secondary}
+                    size={20}
+                    strokeWidth={2.3}
+                  />
+                }
+                label="Privacy Policy"
+                onPress={() =>
+                  void openRequiredUrl(privacyPolicyUrl, 'Privacy Policy')
+                }
+              />
+              <ExternalRow
+                icon={
+                  <FileText color={colors.info} size={20} strokeWidth={2.3} />
+                }
+                label="Terms of Service"
+                onPress={() =>
+                  void openRequiredUrl(termsUrl, 'Terms of Service')
+                }
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDeleteOpen(true)}
+              style={styles.deleteButton}
+            >
+              <Trash2 color={colors.warning} size={19} strokeWidth={2.4} />
+              <Text style={styles.deleteTitle}>Delete account</Text>
+            </Pressable>
+          </>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -219,14 +251,14 @@ export function SettingsScreen({
         <View style={styles.modalBackdrop}>
           <View style={styles.deleteModal}>
             <View style={styles.deleteModalIcon}>
-              <Trash2 color={colors.primaryDark} size={24} strokeWidth={2.4} />
+              <Trash2 color={colors.warning} size={24} strokeWidth={2.4} />
             </View>
             <Text style={styles.deleteModalTitle}>
               Delete your Niva account?
             </Text>
             <Text style={styles.deleteModalText}>
-              This cannot be undone. Your sign-in identity, profile, activity
-              data, messages, and uploaded photos will be removed.
+              This cannot be undone. Your profile, memberships, messages, and
+              uploaded photos will be removed.
             </Text>
             {deleteError ? (
               <Text style={styles.deleteError}>{deleteError}</Text>
@@ -268,7 +300,6 @@ async function openRequiredUrl(url: string | undefined, label: string) {
     );
     return;
   }
-
   await Linking.openURL(url);
 }
 
@@ -284,6 +315,28 @@ function ExternalRow({
   return (
     <Pressable
       accessibilityRole="link"
+      onPress={onPress}
+      style={styles.externalRow}
+    >
+      <View style={styles.settingIcon}>{icon}</View>
+      <Text style={styles.externalLabel}>{label}</Text>
+      <ChevronRight color={colors.muted} size={20} strokeWidth={2.4} />
+    </Pressable>
+  );
+}
+
+function NavigationRow({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
       onPress={onPress}
       style={styles.externalRow}
     >
@@ -326,6 +379,12 @@ function SettingToggle({
 }
 
 const styles = StyleSheet.create({
+  blockRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
   cancelDeleteButton: {
     alignItems: 'center',
     borderColor: colors.border,
@@ -342,7 +401,7 @@ const styles = StyleSheet.create({
   },
   confirmDeleteButton: {
     alignItems: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.warning,
     borderRadius: radius.md,
     flex: 1.2,
     justifyContent: 'center',
@@ -354,24 +413,24 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '800',
   },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   deleteActions: {
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
   deleteButton: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.primary,
+    alignItems: 'center',
+    borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
+    marginTop: spacing.lg,
     padding: spacing.md,
   },
-  deleteCopy: { flex: 1 },
   deleteError: {
-    color: colors.primaryDark,
+    color: colors.warning,
     fontSize: typography.small,
     fontWeight: '700',
     marginTop: spacing.md,
@@ -386,7 +445,7 @@ const styles = StyleSheet.create({
   },
   deleteModalIcon: {
     alignItems: 'center',
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.warningSoft,
     borderRadius: radius.pill,
     height: 48,
     justifyContent: 'center',
@@ -404,59 +463,10 @@ const styles = StyleSheet.create({
     fontSize: typography.subheading,
     fontWeight: '800',
   },
-  deleteText: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: 2,
-  },
   deleteTitle: {
-    color: colors.primaryDark,
+    color: colors.warning,
     fontSize: typography.body,
     fontWeight: '800',
-  },
-  modalBackdrop: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(36, 23, 28, 0.42)',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  blockCopy: {
-    flex: 1,
-  },
-  blockHandle: {
-    color: colors.muted,
-    fontSize: typography.small,
-    marginTop: 2,
-  },
-  blockIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.pill,
-    height: 38,
-    justifyContent: 'center',
-    width: 38,
-  },
-  blockList: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  blockName: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-  },
-  blockRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
   },
   emptyBlocks: {
     alignItems: 'center',
@@ -468,12 +478,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
   },
-  emptyBlocksText: {
-    color: colors.muted,
-    flex: 1,
-    fontSize: typography.small,
-    lineHeight: 19,
-  },
+  emptyBlocksText: { color: colors.muted, flex: 1, fontSize: typography.small },
   externalLabel: {
     color: colors.ink,
     flex: 1,
@@ -482,13 +487,20 @@ const styles = StyleSheet.create({
   },
   externalRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: spacing.md,
-    minHeight: 60,
+    minHeight: 64,
     paddingHorizontal: spacing.md,
+  },
+  group: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
   },
   iconButton: {
     alignItems: 'center',
@@ -496,10 +508,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  screen: {
-    backgroundColor: colors.background,
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(20,35,52,0.42)',
     flex: 1,
+    justifyContent: 'center',
   },
+  screen: { backgroundColor: colors.background, flex: 1 },
   sectionLabel: {
     color: colors.muted,
     fontSize: typography.small,
@@ -508,9 +523,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     textTransform: 'uppercase',
   },
-  settingCopy: {
-    flex: 1,
-  },
+  settingCopy: { flex: 1 },
   settingIcon: {
     alignItems: 'center',
     backgroundColor: colors.background,
@@ -526,13 +539,9 @@ const styles = StyleSheet.create({
   },
   settingRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    padding: spacing.md,
   },
   settingText: {
     color: colors.muted,
@@ -561,10 +570,7 @@ const styles = StyleSheet.create({
     minHeight: 62,
     paddingHorizontal: spacing.md,
   },
-  topBarSpacer: {
-    height: 44,
-    width: 44,
-  },
+  topBarSpacer: { height: 44, width: 44 },
   topBarTitle: {
     color: colors.ink,
     flex: 1,
@@ -580,7 +586,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   unblockText: {
-    color: colors.primaryDark,
+    color: colors.primary,
     fontSize: typography.small,
     fontWeight: '800',
   },

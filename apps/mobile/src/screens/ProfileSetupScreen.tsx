@@ -56,6 +56,7 @@ const interestOptions = [
   'Coffee',
   'Coding',
   'Painting',
+  'Photography',
   'Trekking',
   'Music',
   'Wellness',
@@ -551,12 +552,15 @@ export function ProfileSetupScreen({
           <View style={styles.customInterestPanel}>
             <TextField
               autoCapitalize="words"
+              autoComplete="off"
+              autoCorrect={false}
               label="Add another interest"
               maxLength={30}
               onChangeText={setCustomInterest}
               onSubmitEditing={addCustomInterest}
               placeholder="For example, photography"
               returnKeyType="done"
+              spellCheck={false}
               value={customInterest}
             />
             <Pressable

@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  IsUrl,
 } from 'class-validator';
 import { ActivityDifficulty } from '@prisma/client';
 import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
@@ -19,10 +20,19 @@ import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
 export class UpdateCircleDto {
   @IsOptional()
   @IsString()
-  @IsIn(SUPPORTED_CITIES)
   @MinLength(1)
   @MaxLength(120)
   title?: string;
+
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  coverImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  hostNote?: string;
 
   @IsOptional()
   @IsString()
@@ -32,6 +42,7 @@ export class UpdateCircleDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(SUPPORTED_CITIES)
   @MinLength(1)
   @MaxLength(80)
   city?: string;
@@ -69,6 +80,16 @@ export class UpdateCircleDto {
   @Min(2)
   @Max(16)
   durationWeeks?: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([1, 2])
+  recurrenceIntervalWeeks?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  timezone?: string;
 
   @IsOptional()
   @IsInt()

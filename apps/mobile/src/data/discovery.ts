@@ -3,12 +3,23 @@ export type DiscoveryItem = {
   category: 'event' | 'circle' | 'workshop' | 'tip';
   remoteId?: string;
   hostId?: string;
+  hostBio?: string;
+  hostNote?: string;
+  hostProfilePhotoUrl?: string;
   activityStatus?: 'CANCELLED' | 'COMPLETED' | 'DRAFT' | 'PUBLISHED';
   cancellationReason?: string | null;
   capacity?: number;
+  coverImageUrl?: string;
   membershipStatus?:
     'REQUESTED' | 'APPROVED' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW';
   startsAt?: string;
+  occurrenceId?: string;
+  occurrences?: Array<{
+    id: string;
+    startsAt: string;
+    status: 'CANCELLED' | 'COMPLETED' | 'SCHEDULED';
+  }>;
+  recurrenceIntervalWeeks?: number;
   title: string;
   location: string;
   city?: string;
@@ -22,6 +33,7 @@ export type DiscoveryItem = {
   interests: string[];
   host: string;
   summary: string;
+  timezone?: string;
 };
 
 export const weeklyEvents: DiscoveryItem[] = [
@@ -35,7 +47,7 @@ export const weeklyEvents: DiscoveryItem[] = [
     difficulty: 'Beginner',
     interests: ['Badminton', 'Fitness'],
     host: 'Hosted by Niva',
-    summary: 'Small doubles rotation for women getting back into sport.',
+    summary: 'Friendly doubles rotation for anyone getting back into sport.',
   },
   {
     id: 'book-coffee',
@@ -75,7 +87,7 @@ export const circles: DiscoveryItem[] = [
     difficulty: 'Beginner',
     interests: ['Running', 'Fitness'],
     host: 'Led by Aditi',
-    summary: 'Same 6 women, same route, every Saturday morning.',
+    summary: 'The same running crew and route every Saturday morning.',
   },
   {
     id: 'makers-night',

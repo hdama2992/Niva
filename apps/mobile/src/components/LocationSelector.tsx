@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { LocateFixed, MapPin } from 'lucide-react-native';
+import { Check, LocateFixed, MapPin } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { supportedCities } from '../constants/locations';
 
 export type ActivityLocation = {
   city: string;
@@ -46,16 +47,21 @@ export function LocationSelector({ onChange, value }: LocationSelectorProps) {
         latitude,
         longitude,
       });
-      const city = address?.city ?? address?.subregion ?? value.city;
+      const detectedCity = address?.city ?? address?.subregion;
+      if (detectedCity && !matchesServiceCity(detectedCity, value.city)) {
+        throw new Error(
+          `Your current location is outside ${value.city}. Choose a venue in the selected service city.`,
+        );
+      }
       const locationName = [address?.name, address?.district, address?.street]
         .filter(Boolean)
         .filter((part, index, parts) => parts.indexOf(part) === index)
         .join(', ');
 
       onChange({
-        city,
+        city: value.city,
         latitude,
-        locationName: locationName || value.locationName || city,
+        locationName: locationName || value.locationName || value.city,
         longitude,
       });
     } catch (locationError) {
@@ -71,6 +77,36 @@ export function LocationSelector({ onChange, value }: LocationSelectorProps) {
 
   return (
     <View style={styles.group}>
+      <View>
+        <Text style={styles.cityLabel}>Service city</Text>
+        <View style={styles.cityOptions}>
+          {supportedCities.map((option) => {
+            const selected = value.city === option.name;
+            return (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                key={option.name}
+                onPress={() =>
+                  onChange({
+                    city: option.name,
+                    locationName: value.locationName,
+                  })
+                }
+                style={[styles.cityOption, selected && styles.cityOptionActive]}
+              >
+                <View style={styles.cityOptionCopy}>
+                  <Text style={styles.cityName}>{option.name}</Text>
+                  <Text style={styles.cityStatus}>{option.status}</Text>
+                </View>
+                {selected ? (
+                  <Check color={colors.primary} size={19} strokeWidth={2.6} />
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
       <View style={styles.inputRow}>
         <MapPin color={colors.secondary} size={19} strokeWidth={2.3} />
         <TextInput
@@ -108,7 +144,41 @@ export function LocationSelector({ onChange, value }: LocationSelectorProps) {
   );
 }
 
+function matchesServiceCity(detectedCity: string, selectedCity: string) {
+  const normalize = (city: string) =>
+    city.trim().toLocaleLowerCase().replace('bengaluru', 'bangalore');
+  return normalize(detectedCity).includes(normalize(selectedCity));
+}
+
 const styles = StyleSheet.create({
+  cityLabel: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '800',
+    marginBottom: spacing.xs,
+  },
+  cityName: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  cityOption: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: 58,
+    paddingHorizontal: spacing.md,
+  },
+  cityOptionActive: {
+    backgroundColor: colors.infoSoft,
+    borderColor: colors.info,
+  },
+  cityOptionCopy: { flex: 1 },
+  cityOptions: { gap: spacing.sm },
+  cityStatus: { color: colors.muted, fontSize: 12, marginTop: 2 },
   confirmedText: {
     color: colors.secondary,
     fontSize: typography.small,

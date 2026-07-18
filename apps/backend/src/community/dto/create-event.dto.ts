@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   Min,
   Max,
@@ -23,6 +24,16 @@ export class CreateEventDto {
   @IsString()
   @MaxLength(1000)
   description!: string;
+
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  coverImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  hostNote?: string;
 
   @IsString()
   @IsIn(SUPPORTED_CITIES)

@@ -1,8 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  ActivityDifficulty,
   ActivityStatus,
+  HostApprovalStatus,
   MembershipStatus,
   NotificationType,
+  TrustTier,
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -43,6 +46,7 @@ describe('CommunityService discovery location privacy', () => {
         latitude: null,
         locationName: 'Bangalore',
         longitude: null,
+        membershipStatus: MembershipStatus.REQUESTED,
       },
     ]);
   });
@@ -53,7 +57,7 @@ describe('CommunityService discovery location privacy', () => {
     ]);
 
     await expect(service.listEvents('member_1', 'Bangalore')).resolves.toEqual([
-      event,
+      { ...event, membershipStatus: MembershipStatus.APPROVED },
     ]);
   });
 });
@@ -209,8 +213,11 @@ describe('CommunityService activity lifecycle', () => {
 describe('CommunityService icebreaker access', () => {
   const eventMemberFindUnique = jest.fn();
   const circleMemberFindUnique = jest.fn();
+  const activityFindUnique = jest.fn();
   const prisma = {
+    circle: { findUnique: activityFindUnique },
     circleMember: { findUnique: circleMemberFindUnique },
+    event: { findUnique: activityFindUnique },
     eventMember: { findUnique: eventMemberFindUnique },
   } as unknown as PrismaService;
   const realtime = {
@@ -226,6 +233,7 @@ describe('CommunityService icebreaker access', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    activityFindUnique.mockResolvedValue({ hostId: 'host_1' });
   });
 
   it('rejects a requested member from icebreakers', async () => {
@@ -264,6 +272,21 @@ describe('CommunityService icebreaker access', () => {
         }
       ).assertIcebreakerAccess('member_1', 'CIRCLE', 'circle_1'),
     ).resolves.toBeUndefined();
+  });
+
+  it('allows the host to view the approved member list without a membership row', async () => {
+    await expect(
+      (
+        service as unknown as {
+          assertIcebreakerAccess: (
+            userId: string,
+            type: 'EVENT',
+            activityId: string,
+          ) => Promise<void>;
+        }
+      ).assertIcebreakerAccess('host_1', 'EVENT', 'event_1'),
+    ).resolves.toBeUndefined();
+    expect(eventMemberFindUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -384,6 +407,72 @@ describe('CommunityService feedback trust policy', () => {
         data: expect.objectContaining({
           eventId: 'event_1',
           userId: 'member_1',
+        }),
+      }),
+    );
+  });
+});
+
+describe('CommunityService recurring circle creation', () => {
+  const circleCreate = jest.fn();
+  const userFindUnique = jest.fn();
+  const prisma = {
+    circle: { create: circleCreate },
+    user: { findUnique: userFindUnique },
+  } as unknown as PrismaService;
+  const service = new CommunityService(
+    prisma,
+    {} as UsersService,
+    {} as NotificationService,
+    {} as RealtimeService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    userFindUnique.mockResolvedValue({
+      hostApproval: { status: HostApprovalStatus.APPROVED },
+      trust: { tier: TrustTier.HOST },
+    });
+    circleCreate.mockResolvedValue({ id: 'circle_1' });
+  });
+
+  it('stores the custom cover and creates one calendar occurrence per weekly session', async () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await service.createCircle('host_1', {
+      capacity: 8,
+      city: 'Bangalore',
+      coverImageUrl: 'https://cdn.example.com/pottery-circle.jpg',
+      description: 'A welcoming weekly pottery practice.',
+      difficulty: ActivityDifficulty.BEGINNER,
+      durationWeeks: 4,
+      interests: ['Pottery'],
+      hostNote:
+        'I’ll have the clay ready and make sure first-timers feel at home.',
+      locationName: 'Indiranagar Studio',
+      recurrenceIntervalWeeks: 1,
+      schedule: 'Saturdays, 10:00 AM',
+      startsAt: startsAt.toISOString(),
+      timezone: 'Asia/Kolkata',
+      title: 'Pottery & Chai',
+    });
+
+    expect(circleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          coverImageUrl: 'https://cdn.example.com/pottery-circle.jpg',
+          hostNote:
+            'I’ll have the clay ready and make sure first-timers feel at home.',
+          occurrences: {
+            create: [
+              { startsAt },
+              { startsAt: new Date(startsAt.getTime() + 7 * 86400000) },
+              { startsAt: new Date(startsAt.getTime() + 14 * 86400000) },
+              { startsAt: new Date(startsAt.getTime() + 21 * 86400000) },
+            ],
+          },
+          recurrenceIntervalWeeks: 1,
+          timezone: 'Asia/Kolkata',
         }),
       }),
     );

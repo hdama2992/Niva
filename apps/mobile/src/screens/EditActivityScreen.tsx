@@ -11,6 +11,7 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DateTimeSelector } from '../components/DateTimeSelector';
+import { ActivityCoverSelector } from '../components/ActivityCoverSelector';
 import {
   cadenceFromSchedule,
   formatRecurringSchedule,
@@ -22,21 +23,26 @@ import {
   LocationSelector,
 } from '../components/LocationSelector';
 import { DiscoveryItem } from '../data/discovery';
+import { SelectedImage } from '../services/media';
 import { NivaUser } from '../types/niva';
 
 export type ActivityEditInput = {
   capacity: number;
   city: string;
+  coverImage?: SelectedImage;
   description: string;
   difficulty: 'BEGINNER' | 'EASY' | 'FOCUSED' | 'SOCIAL';
+  hostNote?: string;
   durationWeeks?: number;
   interests: string[];
   locationName: string;
   latitude?: number;
   longitude?: number;
+  recurrenceIntervalWeeks?: number;
   schedule?: string;
   startsAt: string;
   title: string;
+  timezone?: string;
 };
 
 type EditActivityScreenProps = {
@@ -64,6 +70,10 @@ export function EditActivityScreen({
   const isCircle = activity.category === 'circle';
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.summary);
+  const [hostNote, setHostNote] = useState(
+    activity.hostNote ?? activity.hostBio ?? '',
+  );
+  const [coverImage, setCoverImage] = useState<SelectedImage>();
   const [location, setLocation] = useState<ActivityLocation>({
     city: activity.city ?? user.city,
     latitude: activity.latitude,
@@ -113,18 +123,28 @@ export function EditActivityScreen({
       await onSave({
         capacity,
         city: location.city,
+        coverImage,
         description: description.trim(),
         difficulty,
+        hostNote: hostNote.trim(),
         durationWeeks: isCircle ? durationWeeks : undefined,
         interests,
         latitude: location.latitude,
         locationName: location.locationName.trim(),
         longitude: location.longitude,
+        recurrenceIntervalWeeks: isCircle
+          ? cadence === 'FORTNIGHTLY'
+            ? 2
+            : 1
+          : undefined,
         schedule: isCircle
           ? formatRecurringSchedule(startsAt, cadence)
           : undefined,
         startsAt: startsAt.toISOString(),
         title: title.trim(),
+        timezone: isCircle
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata'
+          : undefined,
       });
     } catch (saveError) {
       setError(
@@ -198,6 +218,25 @@ export function EditActivityScreen({
             style={[styles.input, styles.textArea]}
             textAlignVertical="top"
             value={description}
+          />
+        </Field>
+        <Field label="A note from your host (optional)">
+          <TextInput
+            maxLength={400}
+            multiline
+            onChangeText={setHostNote}
+            placeholder="Tell members why you’re hosting and how you’ll welcome them."
+            placeholderTextColor={colors.muted}
+            style={[styles.input, styles.textArea]}
+            textAlignVertical="top"
+            value={hostNote}
+          />
+        </Field>
+        <Field label="Cover photo">
+          <ActivityCoverSelector
+            existingUri={activity.coverImageUrl}
+            onChange={setCoverImage}
+            value={coverImage}
           />
         </Field>
         <Field label="Meeting location">

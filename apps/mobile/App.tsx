@@ -1,6 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, SafeAreaView, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  SafeAreaView,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { colors } from './src/constants/theme';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -90,6 +97,11 @@ export default function App() {
     let isActive = true;
 
     const restoreSession = async () => {
+      if (authMode === 'beta') {
+        setRoute({ name: 'login' });
+        return;
+      }
+
       try {
         const idToken = await restoreFirebaseIdToken();
 
@@ -106,25 +118,17 @@ export default function App() {
         console.warn('Unable to restore the Niva session.', error);
       }
 
-      const timer = setTimeout(() => {
-        if (isActive) {
-          setRoute({ name: 'login' });
-        }
-      }, 900);
-
-      return () => clearTimeout(timer);
+      if (isActive) {
+        setRoute({ name: 'login' });
+      }
     };
 
-    let clearTimer: (() => void) | undefined;
-    void restoreSession().then((cleanup) => {
-      clearTimer = cleanup;
-    });
+    void restoreSession();
 
     return () => {
       isActive = false;
-      clearTimer?.();
     };
-  }, []);
+  }, [authMode]);
 
   useEffect(() => {
     let isActive = true;
@@ -569,11 +573,12 @@ function mapTrustTier(tier?: string): NivaUser['trustTier'] {
 
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1,
     backgroundColor: colors.background,
+    flex: 1,
+    paddingBottom: Platform.OS === 'android' ? 24 : 0,
+    paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight : 0,
   },
   app: {
     flex: 1,
-    paddingBottom: Platform.OS === 'android' ? 24 : 0,
   },
 });

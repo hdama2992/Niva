@@ -1,30 +1,38 @@
 import {
   ArrowLeft,
+  ArrowRight,
   Ban,
+  Bookmark,
   CalendarDays,
-  CheckCircle2,
-  CircleAlert,
-  Clock3,
+  Check,
   Flag,
+  LockKeyhole,
   MapPin,
   MessageCircle,
+  Share2,
   ShieldCheck,
+  Sparkles,
   UsersRound,
 } from 'lucide-react-native';
-import { ReactNode } from 'react';
 import {
+  Image,
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
+import { resolveActivityArtwork } from '../constants/activity-artwork';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
+import { IcebreakerMember } from '../services/community';
 
 type ActivityDetailScreenProps = {
+  attendees: IcebreakerMember[];
   blocked: boolean;
   isHost: boolean;
   item: DiscoveryItem;
@@ -40,6 +48,7 @@ type ActivityDetailScreenProps = {
 };
 
 export function ActivityDetailScreen({
+  attendees,
   blocked,
   isHost,
   item,
@@ -53,396 +62,645 @@ export function ActivityDetailScreen({
   onLeave,
   onManage,
 }: ActivityDetailScreenProps) {
-  const membershipLabel = formatMembershipStatus(item.membershipStatus);
+  const approved =
+    isHost ||
+    item.membershipStatus === 'APPROVED' ||
+    item.membershipStatus === 'ATTENDED';
+  const pending = item.membershipStatus === 'REQUESTED';
   const cancelled = item.activityStatus === 'CANCELLED';
   const canJoin =
     !cancelled &&
     Boolean(item.remoteId) &&
     item.seats !== 0 &&
-    !item.membershipStatus;
+    !item.membershipStatus &&
+    !isHost;
   const canLeave =
-    !cancelled &&
-    (item.membershipStatus === 'REQUESTED' ||
-      item.membershipStatus === 'APPROVED');
-  const canOpenIcebreakers =
-    item.membershipStatus === 'APPROVED' ||
-    item.membershipStatus === 'ATTENDED';
-  const canOpenChat = canOpenIcebreakers;
-  const canViewDirections =
-    isHost ||
-    item.membershipStatus === 'APPROVED' ||
-    item.membershipStatus === 'ATTENDED';
+    !isHost && !cancelled && (pending || item.membershipStatus === 'APPROVED');
+  const formattedDate = formatDetailDate(item.startsAt, item.time);
+  const hostName = item.host.replace('Hosted by ', '').replace('Led by ', '');
+  const hostIntroduction = item.hostNote ?? item.hostBio;
+
+  const openMaps = () => {
+    if (item.latitude !== undefined && item.longitude !== undefined) {
+      return Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`,
+      );
+    }
+    return Linking.openURL(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.location}, ${item.city ?? ''}`)}`,
+    );
+  };
+
+  const addToCalendar = () => {
+    const startsAt = item.startsAt ? new Date(item.startsAt) : new Date();
+    const endsAt = new Date(startsAt.getTime() + 90 * 60 * 1000);
+    const date = (value: Date) =>
+      value
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d{3}Z$/, 'Z');
+    return Linking.openURL(
+      `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.title)}&dates=${date(startsAt)}/${date(endsAt)}&location=${encodeURIComponent(item.location)}&details=${encodeURIComponent(item.summary)}`,
+    );
+  };
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.topBarTitle} numberOfLines={1}>
-          {item.category === 'circle' ? 'Circle details' : 'Event details'}
-        </Text>
-        <View style={styles.topBarSpacer} />
-      </View>
-
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.category}>
-          {item.category === 'circle' ? 'Recurring circle' : 'Small event'}
-        </Text>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.summary}>{item.summary}</Text>
-
-        {cancelled ? (
-          <View style={styles.cancelledBanner}>
-            <CircleAlert color={colors.primary} size={21} strokeWidth={2.4} />
-            <View style={styles.statusCopy}>
-              <Text style={styles.cancelledTitle}>
-                This activity was cancelled
-              </Text>
-              <Text style={styles.statusText}>
-                {item.cancellationReason ??
-                  'The host will share a new plan if one is available.'}
-              </Text>
-            </View>
+        <View style={[styles.hero, approved && styles.heroApproved]}>
+          <Image
+            resizeMode="contain"
+            source={resolveActivityArtwork(item)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.heroShade} />
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            onPress={onBack}
+            style={[styles.glassIcon, styles.backButton]}
+          >
+            <ArrowLeft color={colors.surface} size={25} strokeWidth={2.5} />
+          </Pressable>
+          <View style={styles.heroActions}>
+            <Pressable
+              accessibilityLabel="Save activity"
+              accessibilityRole="button"
+              style={styles.glassIcon}
+            >
+              <Bookmark color={colors.surface} size={21} strokeWidth={2.3} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Share activity"
+              accessibilityRole="button"
+              onPress={() =>
+                void Share.share({
+                  message: `${item.title} · ${formattedDate} · ${item.location}`,
+                  title: item.title,
+                })
+              }
+              style={styles.glassIcon}
+            >
+              <Share2 color={colors.surface} size={21} strokeWidth={2.3} />
+            </Pressable>
           </View>
-        ) : null}
+        </View>
 
-        {membershipLabel ? (
-          <View style={styles.statusBanner}>
-            <CheckCircle2
-              color={colors.secondary}
-              size={20}
-              strokeWidth={2.4}
-            />
-            <View style={styles.statusCopy}>
-              <Text style={styles.statusTitle}>{membershipLabel}</Text>
-              <Text style={styles.statusText}>
-                {item.membershipStatus === 'REQUESTED'
-                  ? 'The host will review your request before cohort chat opens.'
-                  : 'This activity is saved in your plans.'}
-              </Text>
+        <View style={styles.content}>
+          {approved && !isHost ? (
+            <View style={styles.approvedBanner}>
+              <View style={styles.approvedIcon}>
+                <Check color={colors.surface} size={24} strokeWidth={3} />
+              </View>
+              <View>
+                <Text style={styles.approvedTitle}>You’re going</Text>
+                <Text style={styles.approvedText}>Approved by {hostName}</Text>
+              </View>
             </View>
-          </View>
-        ) : null}
+          ) : pending ? (
+            <View style={styles.pendingBanner}>
+              <ShieldCheck color={colors.warning} size={22} strokeWidth={2.4} />
+              <View style={styles.flex}>
+                <Text style={styles.pendingTitle}>Request pending</Text>
+                <Text style={styles.pendingText}>
+                  The host will review it before profiles and chat unlock.
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
-        <View style={styles.metaGrid}>
-          <InfoTile
-            icon={
-              <CalendarDays
-                color={colors.primary}
-                size={20}
+          <Text style={styles.title}>{item.title}</Text>
+          <View style={styles.primaryMeta}>
+            <CalendarDays color={colors.warning} size={22} strokeWidth={2.3} />
+            <Text style={styles.primaryMetaText}>{formattedDate}</Text>
+          </View>
+          <View style={styles.locationRow}>
+            <MapPin color={colors.info} size={23} strokeWidth={2.3} />
+            <View style={styles.flex}>
+              <Text numberOfLines={2} style={styles.location}>
+                {item.location}
+              </Text>
+              {!approved ? (
+                <View style={styles.lockRow}>
+                  <LockKeyhole
+                    color={colors.muted}
+                    size={13}
+                    strokeWidth={2.2}
+                  />
+                  <Text style={styles.lockText}>
+                    Exact location unlocks after approval
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {approved ? (
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => void openMaps()}
+                style={styles.outlineAction}
+              >
+                <Text style={styles.outlineActionText}>Open in Maps</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {!approved ? (
+            <View style={styles.capacityRow}>
+              <UsersRound
+                color={colors.secondary}
+                size={21}
                 strokeWidth={2.3}
               />
-            }
-            label="When"
-            value={item.time}
-          />
-          <InfoTile
-            icon={
-              <MapPin color={colors.secondary} size={20} strokeWidth={2.3} />
-            }
-            label="Where"
-            value={item.location}
-          />
-          <InfoTile
-            icon={
-              <UsersRound color={colors.info} size={20} strokeWidth={2.3} />
-            }
-            label="Availability"
-            value={
-              item.seats === undefined
-                ? 'Check with host'
-                : `${item.seats} spots left`
-            }
-          />
-          <InfoTile
-            icon={<Clock3 color={colors.warning} size={20} strokeWidth={2.3} />}
-            label="Format"
-            value={item.duration ?? item.difficulty ?? 'Social'}
-          />
-        </View>
-
-        {canViewDirections &&
-        item.latitude !== undefined &&
-        item.longitude !== undefined ? (
-          <Pressable
-            accessibilityRole="link"
-            onPress={() =>
-              void Linking.openURL(
-                `https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`,
-              )
-            }
-            style={styles.directionsAction}
-          >
-            <MapPin color={colors.secondary} size={18} strokeWidth={2.4} />
-            <Text style={styles.directionsText}>Open directions</Text>
-          </Pressable>
-        ) : item.latitude !== undefined && item.longitude !== undefined ? (
-          <Text style={styles.locationPrivacyText}>
-            Exact directions unlock after your join request is approved.
-          </Text>
-        ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Designed around</Text>
-          <View style={styles.interestList}>
-            {item.interests.map((interest) => (
-              <Text key={interest} style={styles.interest}>
-                {interest}
-              </Text>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.hostPanel}>
-          <View style={styles.hostIcon}>
-            <ShieldCheck color={colors.secondary} size={22} strokeWidth={2.4} />
-          </View>
-          <View style={styles.hostCopy}>
-            <Text style={styles.hostTitle}>{item.host}</Text>
-            <Text style={styles.hostText}>
-              Member details and the cohort chat are shared only after your
-              request is approved.
-            </Text>
-          </View>
-        </View>
-
-        {item.hostId && !isHost ? (
-          <View style={styles.safetyActions}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={blocked}
-              onPress={onBlock}
-              style={styles.blockAction}
-            >
-              <Ban color={colors.warning} size={18} strokeWidth={2.4} />
-              <Text style={styles.blockText}>
-                {blocked ? 'Host blocked' : 'Block this host'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onReport}
-              style={styles.blockAction}
-            >
-              <Flag color={colors.primaryDark} size={18} strokeWidth={2.4} />
-              <Text style={styles.reportText}>Report this host</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {isHost &&
-        !cancelled &&
-        (item.category === 'event' || item.category === 'circle') ? (
-          <View style={styles.hostActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onManage}
-              style={styles.manageAction}
-            >
-              <UsersRound color={colors.surface} size={19} strokeWidth={2.4} />
-              <Text style={styles.manageActionText}>
-                {item.category === 'circle'
-                  ? 'Manage circle'
-                  : 'Manage members'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onEdit}
-              style={styles.editAction}
-            >
-              <Text style={styles.editActionText}>Edit details</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {canOpenIcebreakers && !cancelled ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onIcebreakers}
-            style={styles.icebreakerAction}
-          >
-            <UsersRound color={colors.secondary} size={20} strokeWidth={2.4} />
-            <View style={styles.icebreakerCopy}>
-              <Text style={styles.icebreakerTitle}>
-                People you&apos;ll meet
-              </Text>
-              <Text style={styles.icebreakerText}>
-                See all interests you share with approved members.
+              <Text style={styles.capacityText}>
+                {item.capacity && item.seats !== undefined
+                  ? `${item.capacity - item.seats} of ${item.capacity} going`
+                  : item.seats !== undefined
+                    ? `${item.seats} spots left`
+                    : 'Availability with host'}
               </Text>
             </View>
-          </Pressable>
-        ) : null}
+          ) : null}
 
-        {canOpenChat && !cancelled ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onOpenChat}
-            style={styles.chatAction}
-          >
-            <MessageCircle color={colors.surface} size={20} strokeWidth={2.4} />
-            <Text style={styles.chatActionText}>Open group chat</Text>
-          </Pressable>
-        ) : null}
+          {!approved ? (
+            <Text style={styles.summary}>{item.summary}</Text>
+          ) : null}
 
-        {canJoin ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onJoin}
-            style={styles.primaryAction}
-          >
-            <Text style={styles.primaryActionText}>Request to join</Text>
-          </Pressable>
-        ) : null}
-        {canLeave ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onLeave}
-            style={styles.secondaryAction}
-          >
-            <Text style={styles.secondaryActionText}>
-              {item.membershipStatus === 'REQUESTED'
-                ? 'Withdraw request'
-                : 'Leave activity'}
-            </Text>
-          </Pressable>
-        ) : null}
+          <View style={styles.hostRow}>
+            <Avatar label={hostName} size={52} uri={item.hostProfilePhotoUrl} />
+            <View style={styles.flex}>
+              <Text style={styles.hostTitle}>Hosted by {hostName}</Text>
+              <View style={styles.verifiedRow}>
+                <ShieldCheck
+                  color={colors.success}
+                  size={16}
+                  strokeWidth={2.4}
+                />
+                <Text style={styles.verifiedText}>
+                  Verified member
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {hostIntroduction ? (
+            <View style={styles.hostNote}>
+              <View style={styles.hostNoteIcon}>
+                <Sparkles color={colors.warning} size={20} strokeWidth={2.2} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.hostNoteLabel}>A note from {hostName}</Text>
+                <Text style={styles.hostNoteText}>{hostIntroduction}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {approved ? (
+            <ApprovedContent
+              attendees={attendees}
+              onAddToCalendar={() => void addToCalendar()}
+              onChat={onOpenChat}
+              onPeople={onIcebreakers}
+            />
+          ) : (
+            <LockedAttendees capacity={item.capacity} seats={item.seats} />
+          )}
+
+          {!approved ? (
+            <View style={styles.interests}>
+              {item.interests.slice(0, 4).map((interest) => (
+                <View key={interest} style={styles.interest}>
+                  <Text style={styles.interestText}>{interest}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {isHost && !cancelled ? (
+            <View style={styles.hostActions}>
+              <Pressable onPress={onManage} style={styles.hostPrimaryAction}>
+                <UsersRound
+                  color={colors.surface}
+                  size={18}
+                  strokeWidth={2.4}
+                />
+                <Text style={styles.hostPrimaryText}>Manage members</Text>
+              </Pressable>
+              <Pressable onPress={onEdit} style={styles.hostSecondaryAction}>
+                <Text style={styles.hostSecondaryText}>Edit details</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {item.hostId && !isHost ? (
+            <View style={styles.safetyActions}>
+              <Pressable
+                disabled={blocked}
+                onPress={onBlock}
+                style={styles.safetyAction}
+              >
+                <Ban color={colors.warning} size={16} strokeWidth={2.3} />
+                <Text style={styles.safetyText}>
+                  {blocked ? 'Host blocked' : 'Block host'}
+                </Text>
+              </Pressable>
+              <Pressable onPress={onReport} style={styles.safetyAction}>
+                <Flag color={colors.primary} size={16} strokeWidth={2.3} />
+                <Text style={styles.safetyText}>Report</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
+
+      {!isHost && !cancelled ? (
+        <View style={styles.stickyGlass}>
+          {approved ? (
+            <Pressable onPress={onOpenChat} style={styles.primaryAction}>
+              <MessageCircle
+                color={colors.surface}
+                size={21}
+                strokeWidth={2.4}
+              />
+              <Text style={styles.primaryActionText}>Open group chat</Text>
+              <ArrowRight color={colors.surface} size={20} strokeWidth={2.5} />
+            </Pressable>
+          ) : canJoin ? (
+            <Pressable onPress={onJoin} style={styles.primaryAction}>
+              <Text style={styles.primaryActionText}>Request to join</Text>
+              <ArrowRight color={colors.surface} size={20} strokeWidth={2.5} />
+            </Pressable>
+          ) : null}
+          {canJoin ? (
+            <Text style={styles.stickyHelper}>
+              Usually reviewed within a few hours
+            </Text>
+          ) : canLeave ? (
+            <Pressable onPress={onLeave} style={styles.leaveAction}>
+              <Text style={styles.leaveText}>
+                {pending ? 'Withdraw request' : 'Can’t make it? Leave plan'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function InfoTile({
-  icon,
-  label,
-  value,
+function ApprovedContent({
+  attendees,
+  onAddToCalendar,
+  onChat,
+  onPeople,
 }: {
-  icon: ReactNode;
-  label: string;
-  value: string;
+  attendees: IcebreakerMember[];
+  onAddToCalendar: () => void;
+  onChat: () => void;
+  onPeople: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const visible = attendees.slice(0, 4);
+  const avatarSize = width < 380 ? 54 : 68;
+
   return (
-    <View style={styles.infoTile}>
-      {icon}
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <>
+      <View style={styles.sectionDivider} />
+      <Text style={styles.sectionTitle}>Your circle</Text>
+      {visible.length ? (
+        <View style={styles.attendees}>
+          {visible.map((member) => (
+            <View key={member.id} style={styles.attendee}>
+              <Avatar
+                label={member.displayName ?? 'Member'}
+                size={avatarSize}
+                uri={member.profilePhotoUrl ?? undefined}
+              />
+              <Text numberOfLines={1} style={styles.attendeeName}>
+                {(member.displayName ?? 'Member').split(' ')[0]}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.attendeesEmpty}>
+          <UsersRound color={colors.secondary} size={22} strokeWidth={2.2} />
+          <Text style={styles.attendeesEmptyText}>
+            Approved member profiles will appear here as the plan fills.
+          </Text>
+        </View>
+      )}
+      <View style={styles.approvedProfilesRow}>
+        <ShieldCheck color={colors.success} size={16} strokeWidth={2.4} />
+        <Text style={styles.approvedProfilesText}>
+          Profiles approved by Niva
+        </Text>
+      </View>
+      <View style={styles.actionTiles}>
+        <Pressable onPress={onChat} style={styles.actionTile}>
+          <MessageCircle color={colors.info} size={24} strokeWidth={2.2} />
+          <View style={styles.flex}>
+            <Text style={styles.actionTileTitle}>Group chat</Text>
+            <Text style={styles.actionTileText}>Coordinate with the group</Text>
+          </View>
+          <ArrowRight color={colors.muted} size={18} strokeWidth={2.3} />
+        </Pressable>
+        <Pressable onPress={onPeople} style={styles.actionTile}>
+          <Sparkles color={colors.warning} size={24} strokeWidth={2.2} />
+          <View style={styles.flex}>
+            <Text style={styles.actionTileTitle}>Meet your circle</Text>
+            <Text style={styles.actionTileText}>
+              Shared interests & prompts
+            </Text>
+          </View>
+          <ArrowRight color={colors.muted} size={18} strokeWidth={2.3} />
+        </Pressable>
+      </View>
+      <Pressable onPress={onAddToCalendar} style={styles.calendarRow}>
+        <CalendarDays color={colors.secondary} size={20} strokeWidth={2.3} />
+        <Text style={styles.calendarCopy}>Reminder · 1 hour before</Text>
+        <Text style={styles.calendarAction}>Add to calendar</Text>
+      </Pressable>
+    </>
+  );
+}
+
+function LockedAttendees({
+  capacity,
+  seats,
+}: {
+  capacity?: number;
+  seats?: number;
+}) {
+  const going = capacity && seats !== undefined ? capacity - seats : 4;
+  return (
+    <View style={styles.lockedAttendees}>
+      <View style={styles.lockedAvatarStack}>
+        {[0, 1, 2, 3].map((index) => (
+          <View
+            key={index}
+            style={[
+              styles.lockedAvatar,
+              index > 0 && styles.lockedAvatarOverlap,
+            ]}
+          >
+            <UsersRound color={colors.secondary} size={18} strokeWidth={2.1} />
+          </View>
+        ))}
+      </View>
+      <View style={styles.flex}>
+        <Text style={styles.lockedAttendeesTitle}>
+          {going} approved members are going
+        </Text>
+        <View style={styles.lockRow}>
+          <LockKeyhole color={colors.muted} size={13} strokeWidth={2.2} />
+          <Text style={styles.lockText}>Profiles unlock after approval</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
-function formatMembershipStatus(status: DiscoveryItem['membershipStatus']) {
-  switch (status) {
-    case 'APPROVED':
-      return 'You are going';
-    case 'ATTENDED':
-      return 'Attended';
-    case 'CANCELLED':
-      return 'Cancelled';
-    case 'NO_SHOW':
-      return 'Marked no-show';
-    case 'REQUESTED':
-      return 'Request pending';
-    default:
-      return undefined;
+function Avatar({
+  label,
+  size,
+  uri,
+}: {
+  label: string;
+  size: number;
+  uri?: string;
+}) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ borderRadius: size / 2, height: size, width: size }}
+      />
+    );
   }
+
+  return (
+    <View
+      style={[
+        styles.initialAvatar,
+        { borderRadius: size / 2, height: size, width: size },
+      ]}
+    >
+      <Text style={styles.initialAvatarText}>
+        {label.trim().charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+function formatDetailDate(startsAt?: string, fallback?: string) {
+  if (!startsAt) {
+    return fallback ?? 'Time with host';
+  }
+  return new Date(startsAt).toLocaleString(undefined, {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    weekday: 'short',
+  });
 }
 
 const styles = StyleSheet.create({
-  chatAction: {
+  actionTile: {
     alignItems: 'center',
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    minHeight: 50,
-    paddingHorizontal: spacing.md,
+    minHeight: 84,
+    padding: spacing.md,
   },
-  chatActionText: {
-    color: colors.surface,
+  actionTileText: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  actionTileTitle: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  actionTiles: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  approvedBanner: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  approvedIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.success,
+    borderRadius: radius.pill,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  approvedProfilesRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  approvedProfilesText: { color: colors.muted, fontSize: typography.small },
+  approvedText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 2,
+  },
+  approvedTitle: {
+    color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
   },
-  directionsAction: {
+  attendee: { alignItems: 'center', flex: 1, gap: spacing.xs, minWidth: 0 },
+  attendeeName: { color: colors.ink, fontSize: typography.small, maxWidth: 72 },
+  attendees: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  attendeesEmpty: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.md,
     flexDirection: 'row',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    minHeight: 40,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md,
   },
-  directionsText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  locationPrivacyText: {
+  attendeesEmptyText: {
     color: colors.muted,
+    flex: 1,
     fontSize: typography.small,
     lineHeight: 19,
-    marginTop: spacing.sm,
   },
-  blockAction: {
+  backButton: { left: spacing.md, position: 'absolute', top: spacing.lg },
+  calendarAction: {
+    color: colors.info,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  calendarCopy: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  calendarRow: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
     flexDirection: 'row',
-    gap: spacing.xs,
-    marginTop: spacing.xl,
-    paddingVertical: spacing.sm,
-  },
-  blockText: {
-    color: colors.warning,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  reportText: {
-    color: colors.primaryDark,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  safetyActions: {
-    alignItems: 'flex-start',
-    gap: spacing.xs,
+    gap: spacing.sm,
     marginTop: spacing.lg,
+    minHeight: 58,
   },
-  cancelledBanner: {
+  capacityRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  capacityText: {
+    color: colors.success,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  content: { padding: spacing.lg },
+  flex: { flex: 1 },
+  glassIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(23,52,91,0.42)',
+    borderColor: 'rgba(255,255,255,0.8)',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  hero: { aspectRatio: 3 / 2, backgroundColor: colors.primary, justifyContent: 'flex-start', overflow: 'hidden' },
+  heroActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.lg,
+  },
+  heroApproved: {},
+  heroShade: {
+    backgroundColor: 'rgba(16,39,66,0.12)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  hostActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  hostNote: {
     alignItems: 'flex-start',
     backgroundColor: colors.accentSoft,
-    borderColor: colors.primary,
+    borderColor: colors.accent,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     padding: spacing.md,
   },
-  cancelledTitle: {
-    color: colors.primaryDark,
-    fontSize: typography.body,
-    fontWeight: '800',
+  hostNoteIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
   },
-  category: {
-    color: colors.secondary,
+  hostNoteLabel: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '900',
+  },
+  hostNoteText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  hostPrimaryAction: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  hostPrimaryText: {
+    color: colors.surface,
     fontSize: typography.small,
     fontWeight: '800',
-    textTransform: 'uppercase',
   },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+  hostRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
-  editAction: {
+  hostSecondaryAction: {
     alignItems: 'center',
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -451,230 +709,218 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 48,
   },
-  editActionText: {
-    color: colors.ink,
+  hostSecondaryText: {
+    color: colors.primary,
     fontSize: typography.small,
     fontWeight: '800',
-  },
-  hostCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  hostActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
-  hostIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.pill,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  hostPanel: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.xl,
-    padding: spacing.md,
-  },
-  hostText: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 19,
   },
   hostTitle: {
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
   },
-  icebreakerAction: {
+  initialAvatar: {
     alignItems: 'center',
     backgroundColor: colors.secondarySoft,
-    borderColor: colors.secondary,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    padding: spacing.md,
-  },
-  icebreakerCopy: { flex: 1 },
-  icebreakerText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: 2,
-  },
-  icebreakerTitle: {
-    color: colors.secondary,
-    fontSize: typography.body,
-    fontWeight: '800',
-  },
-  iconButton: {
-    alignItems: 'center',
-    height: 44,
     justifyContent: 'center',
-    width: 44,
   },
-  infoLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: spacing.sm,
-  },
-  infoTile: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexBasis: '47%',
-    flexGrow: 1,
-    minHeight: 122,
-    padding: spacing.md,
-  },
-  infoValue: {
-    color: colors.ink,
-    fontSize: typography.small,
+  initialAvatarText: {
+    color: colors.primary,
+    fontSize: typography.subheading,
     fontWeight: '800',
-    lineHeight: 19,
-    marginTop: 3,
   },
   interest: {
     backgroundColor: colors.secondarySoft,
     borderRadius: radius.pill,
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  interestList: {
+  interests: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    marginTop: spacing.lg,
   },
-  metaGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
+  interestText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '700',
   },
-  manageAction: {
+  leaveAction: {
     alignItems: 'center',
-    backgroundColor: colors.secondary,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  leaveText: {
+    color: colors.info,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  location: { color: colors.ink, fontSize: typography.body, fontWeight: '800' },
+  locationRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  lockRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: 4,
+  },
+  lockedAttendees: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  lockedAttendeesTitle: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  lockedAvatar: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderColor: colors.surface,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  lockedAvatarOverlap: { marginLeft: -12 },
+  lockedAvatarStack: { flexDirection: 'row' },
+  lockText: { color: colors.muted, fontSize: 12 },
+  outlineAction: {
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  outlineActionText: { color: colors.info, fontSize: 12, fontWeight: '800' },
+  pendingBanner: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.warningSoft,
     borderRadius: radius.md,
     flexDirection: 'row',
     gap: spacing.sm,
-    justifyContent: 'center',
-    flex: 1,
-    minHeight: 50,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
   },
-  manageActionText: {
-    color: colors.surface,
+  pendingText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  pendingTitle: {
+    color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
   },
   primaryAction: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'center',
-    marginTop: spacing.lg,
-    minHeight: 54,
+    minHeight: 58,
+    paddingHorizontal: spacing.lg,
   },
   primaryActionText: {
     color: colors.surface,
     fontSize: typography.body,
     fontWeight: '800',
   },
-  screen: {
-    backgroundColor: colors.background,
-    flex: 1,
-  },
-  section: {
-    marginTop: spacing.xl,
-  },
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-    marginBottom: spacing.md,
-  },
-  secondaryAction: {
+  primaryMeta: {
     alignItems: 'center',
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    minHeight: 52,
-  },
-  secondaryActionText: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-  },
-  statusBanner: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.md,
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.lg,
-    padding: spacing.md,
   },
-  statusCopy: {
-    flex: 1,
-  },
-  statusText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: 3,
-  },
-  statusTitle: {
+  primaryMetaText: {
     color: colors.ink,
-    fontSize: typography.small,
+    fontSize: typography.body,
     fontWeight: '800',
   },
-  summary: {
+  safetyAction: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    minHeight: 44,
+  },
+  safetyActions: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    marginTop: spacing.xl,
+  },
+  safetyText: {
     color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  screen: { backgroundColor: colors.background, flex: 1 },
+  scrollContent: { paddingBottom: 150 },
+  sectionDivider: {
+    backgroundColor: colors.border,
+    height: 1,
+    marginTop: spacing.lg,
+  },
+  sectionTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '800',
+    marginTop: spacing.lg,
+  },
+  stickyGlass: {
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    bottom: spacing.sm,
+    gap: spacing.xs,
+    left: spacing.md,
+    padding: spacing.sm,
+    position: 'absolute',
+    right: spacing.md,
+    shadowColor: colors.primary,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+  },
+  stickyHelper: { color: colors.muted, fontSize: 12, textAlign: 'center' },
+  summary: {
+    color: colors.ink,
     fontSize: typography.body,
-    lineHeight: 25,
-    marginTop: spacing.md,
+    lineHeight: 24,
+    marginTop: spacing.lg,
   },
   title: {
-    color: colors.ink,
-    fontSize: typography.title,
+    color: colors.primaryDark,
+    fontSize: 34,
     fontWeight: '800',
-    lineHeight: 44,
-    marginTop: spacing.xs,
+    letterSpacing: -0.8,
+    lineHeight: 40,
   },
-  topBar: {
+  verifiedRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    minHeight: 62,
-    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
+    marginTop: 4,
   },
-  topBarSpacer: {
-    height: 44,
-    width: 44,
-  },
-  topBarTitle: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: typography.body,
-    fontWeight: '800',
-    textAlign: 'center',
+  verifiedText: {
+    color: colors.success,
+    fontSize: typography.small,
+    fontWeight: '700',
   },
 });
