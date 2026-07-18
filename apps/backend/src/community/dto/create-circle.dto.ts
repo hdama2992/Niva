@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -12,6 +13,7 @@ import {
   Min,
 } from 'class-validator';
 import { ActivityDifficulty } from '@prisma/client';
+import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
 
 export class CreateCircleDto {
   @IsString()
@@ -23,6 +25,7 @@ export class CreateCircleDto {
   description!: string;
 
   @IsString()
+  @IsIn(SUPPORTED_CITIES)
   @MaxLength(80)
   city!: string;
 

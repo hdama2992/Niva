@@ -472,7 +472,7 @@ model NotificationDelivery {
 model UserSettings {
   userId                           String   @id
   user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notificationsEnabled             Boolean  @default(true)
+  notificationsEnabled             Boolean  @default(false)
   showProfileInRecommendations     Boolean  @default(true)
   allowCircleContinuitySuggestions Boolean  @default(true)
   showInterestsInIcebreakers       Boolean  @default(true)

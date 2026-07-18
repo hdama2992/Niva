@@ -1,8 +1,10 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
   Camera,
+  ChevronDown,
   ImagePlus,
   Save,
   X,
@@ -25,6 +27,7 @@ import {
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { supportedCities } from '../constants/locations';
 import { pickProfilePhoto, takeProfilePhoto } from '../services/media';
 import { ProfileDraft, SelectedProfilePhoto } from '../types/niva';
 
@@ -88,6 +91,7 @@ export function ProfileSetupScreen({
     initialProfile?.displayName ?? username,
   );
   const [city, setCity] = useState(initialProfile?.city ?? '');
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [age, setAge] = useState<number | undefined>(initialProfile?.age);
   const [bio, setBio] = useState(initialProfile?.bio ?? '');
   const [languages, setLanguages] = useState<string[]>(
@@ -408,22 +412,31 @@ export function ProfileSetupScreen({
             value={age?.toString() ?? ''}
           />
 
-          <TextField
-            error={
-              attempted && city.trim().length < 2
-                ? 'Enter your city.'
-                : undefined
-            }
-            helperText="Used to show nearby events and circles."
-            label="City *"
-            maxLength={60}
-            onChangeText={(value) => {
-              setCity(value);
-              setError(undefined);
-            }}
-            placeholder="Bengaluru"
-            value={city}
-          />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>City *</Text>
+            <Text style={styles.fieldMeta}>
+              Choose a city where Niva currently has activities.
+            </Text>
+            <Pressable
+              accessibilityLabel="Select city"
+              accessibilityRole="button"
+              onPress={() => setCityPickerOpen(true)}
+              style={[
+                styles.selectField,
+                attempted && !city && styles.selectFieldError,
+              ]}
+            >
+              <Text
+                style={city ? styles.selectValue : styles.selectPlaceholder}
+              >
+                {city || 'Select your city'}
+              </Text>
+              <ChevronDown color={colors.muted} size={20} strokeWidth={2.4} />
+            </Pressable>
+            {attempted && !city ? (
+              <Text style={styles.fieldError}>Select your city.</Text>
+            ) : null}
+          </View>
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Languages *</Text>
@@ -650,6 +663,52 @@ export function ProfileSetupScreen({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setCityPickerOpen(false)}
+        transparent
+        visible={cityPickerOpen}
+      >
+        <Pressable
+          onPress={() => setCityPickerOpen(false)}
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.citySheet}>
+            <Text style={styles.sheetTitle}>Select your city</Text>
+            <Text style={styles.sheetSubtitle}>
+              Only cities with active Niva operations are available.
+            </Text>
+            {supportedCities.map((option) => {
+              const selected = city === option.name;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  key={option.name}
+                  onPress={() => {
+                    setCity(option.name);
+                    setCityPickerOpen(false);
+                    setError(undefined);
+                  }}
+                  style={styles.cityOption}
+                >
+                  <View>
+                    <Text style={styles.cityOptionName}>{option.name}</Text>
+                    <Text style={styles.cityOptionStatus}>{option.status}</Text>
+                  </View>
+                  {selected ? (
+                    <Check color={colors.primary} size={22} strokeWidth={2.5} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            <Text style={styles.cityComingSoon}>
+              More cities will appear here as Niva launches locally.
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -747,6 +806,39 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
+  cityComingSoon: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    padding: spacing.lg,
+  },
+  cityOption: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 68,
+    paddingHorizontal: spacing.lg,
+  },
+  cityOptionName: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  cityOptionStatus: {
+    color: colors.secondary,
+    fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  citySheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
+  },
   container: {
     flex: 1,
   },
@@ -839,6 +931,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(33, 26, 29, 0.36)',
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  selectField: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 56,
+    paddingHorizontal: spacing.md,
+  },
+  selectFieldError: {
+    borderColor: colors.primaryDark,
+  },
+  selectPlaceholder: {
+    color: colors.muted,
+    fontSize: typography.body,
+  },
+  selectValue: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  sheetSubtitle: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  sheetTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '800',
+    paddingHorizontal: spacing.lg,
   },
   photoOption: {
     alignItems: 'center',

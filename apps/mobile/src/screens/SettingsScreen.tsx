@@ -1,12 +1,20 @@
 import {
   ArrowLeft,
   Ban,
+  Bell,
+  ChevronRight,
+  CircleHelp,
   Eye,
+  FileText,
+  Lightbulb,
+  Repeat2,
   Trash2,
 } from 'lucide-react-native';
 import { ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -18,6 +26,10 @@ import {
 
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { BlockedUser, CommunitySettings } from '../services/community';
+
+const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
+const supportUrl = process.env.EXPO_PUBLIC_SUPPORT_URL;
+const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL;
 
 type SettingsScreenProps = {
   blockedUsers: BlockedUser[];
@@ -91,6 +103,37 @@ export function SettingsScreen({
           text="Let Niva consider your profile for safe, relevant group suggestions."
           value={settings.showProfileInRecommendations}
         />
+        <SettingToggle
+          icon={<Bell color={colors.primary} size={20} strokeWidth={2.3} />}
+          label="Push notifications"
+          onChange={(notificationsEnabled) =>
+            onChange({ ...settings, notificationsEnabled })
+          }
+          text="Get plan changes, join updates, and safety notices on this device."
+          value={settings.notificationsEnabled}
+        />
+        <SettingToggle
+          icon={
+            <Lightbulb color={colors.warning} size={20} strokeWidth={2.3} />
+          }
+          label="Show interests in icebreakers"
+          onChange={(showInterestsInIcebreakers) =>
+            onChange({ ...settings, showInterestsInIcebreakers })
+          }
+          text="Use shared interests to make approved group introductions easier."
+          value={settings.showInterestsInIcebreakers}
+        />
+        <SettingToggle
+          icon={
+            <Repeat2 color={colors.secondary} size={20} strokeWidth={2.3} />
+          }
+          label="Suggest circle continuity"
+          onChange={(allowCircleContinuitySuggestions) =>
+            onChange({ ...settings, allowCircleContinuitySuggestions })
+          }
+          text="Suggest another gathering after a group has a positive experience."
+          value={settings.allowCircleContinuitySuggestions}
+        />
         <Text style={styles.sectionLabel}>Blocked members</Text>
         {blockedUsers.length ? (
           <View style={styles.blockList}>
@@ -126,6 +169,29 @@ export function SettingsScreen({
             </Text>
           </View>
         )}
+
+        <Text style={styles.sectionLabel}>Help and legal</Text>
+        <ExternalRow
+          icon={
+            <FileText color={colors.secondary} size={20} strokeWidth={2.3} />
+          }
+          label="Privacy Policy"
+          onPress={() =>
+            void openRequiredUrl(privacyPolicyUrl, 'Privacy Policy')
+          }
+        />
+        <ExternalRow
+          icon={<FileText color={colors.info} size={20} strokeWidth={2.3} />}
+          label="Terms of Service"
+          onPress={() => void openRequiredUrl(termsUrl, 'Terms of Service')}
+        />
+        <ExternalRow
+          icon={
+            <CircleHelp color={colors.primary} size={20} strokeWidth={2.3} />
+          }
+          label="Help and contact support"
+          onPress={() => void openRequiredUrl(supportUrl, 'Support')}
+        />
 
         <Text style={styles.sectionLabel}>Account</Text>
         <Pressable
@@ -191,6 +257,40 @@ export function SettingsScreen({
         </View>
       </Modal>
     </View>
+  );
+}
+
+async function openRequiredUrl(url: string | undefined, label: string) {
+  if (!url) {
+    Alert.alert(
+      `${label} unavailable`,
+      'This link has not been configured for this development build.',
+    );
+    return;
+  }
+
+  await Linking.openURL(url);
+}
+
+function ExternalRow({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={onPress}
+      style={styles.externalRow}
+    >
+      <View style={styles.settingIcon}>{icon}</View>
+      <Text style={styles.externalLabel}>{label}</Text>
+      <ChevronRight color={colors.muted} size={20} strokeWidth={2.4} />
+    </Pressable>
   );
 }
 
@@ -373,6 +473,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.small,
     lineHeight: 19,
+  },
+  externalLabel: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  externalRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 60,
+    paddingHorizontal: spacing.md,
   },
   iconButton: {
     alignItems: 'center',

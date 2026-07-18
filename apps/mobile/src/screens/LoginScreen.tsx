@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -76,6 +77,8 @@ const countries: Country[] = [
     placeholder: '8123 4567',
   },
 ];
+const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
+const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL;
 
 export function LoginScreen({
   authMode,
@@ -229,6 +232,33 @@ export function LoginScreen({
           }
           onPress={() => void continueToOtp()}
         />
+        <Text style={styles.consentText}>
+          By continuing, you agree to receive an authentication SMS. Firebase
+          may process your phone number to prevent abuse. Standard SMS rates may
+          apply.{' '}
+          <Text
+            accessibilityRole="link"
+            onPress={
+              privacyPolicyUrl
+                ? () => void Linking.openURL(privacyPolicyUrl)
+                : undefined
+            }
+            style={styles.consentLink}
+          >
+            Privacy Policy
+          </Text>{' '}
+          and{' '}
+          <Text
+            accessibilityRole="link"
+            onPress={
+              termsUrl ? () => void Linking.openURL(termsUrl) : undefined
+            }
+            style={styles.consentLink}
+          >
+            Terms
+          </Text>
+          .
+        </Text>
       </View>
 
       <Modal
@@ -291,6 +321,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: spacing.lg,
+  },
+  consentLink: {
+    color: colors.secondary,
+    fontWeight: '800',
+  },
+  consentText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
   copy: {
     gap: spacing.sm,

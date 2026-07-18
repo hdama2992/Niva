@@ -26,6 +26,8 @@ import {
   useState,
 } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -50,6 +52,7 @@ import { ManageCircleScreen } from './ManageCircleScreen';
 import { MyActivitiesScreen } from './MyActivitiesScreen';
 import { ManageEventScreen } from './ManageEventScreen';
 import { NotificationsScreen } from './NotificationsScreen';
+import { ReportReason, ReportScreen } from './ReportScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { acceptCommunityGuidelines } from '../services/session';
 import {
@@ -76,6 +79,7 @@ import {
   listNotifications,
   markNotificationRead,
   NotificationItem,
+  reportUser,
   requestHostApproval,
   submitEventFeedback,
   unblockUser,
@@ -150,6 +154,7 @@ export function HomeScreen({
   const [feedbackEvent, setFeedbackEvent] = useState<DiscoveryItem>();
   const [editingActivity, setEditingActivity] = useState<DiscoveryItem>();
   const [selectedItem, setSelectedItem] = useState<DiscoveryItem>();
+  const [reportItem, setReportItem] = useState<DiscoveryItem>();
   const [blockedHosts, setBlockedHosts] = useState<string[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [apiEvents, setApiEvents] = useState<DiscoveryItem[]>([]);
@@ -165,6 +170,8 @@ export function HomeScreen({
     user.communityGuidelinesAccepted,
   );
   const [apiError, setApiError] = useState<string>();
+  const [loadError, setLoadError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(true);
   const [secondaryScreen, setSecondaryScreen] = useState<SecondaryScreen>();
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState(filters[0]);
@@ -211,19 +218,6 @@ export function HomeScreen({
     void loadCommunityData();
   }, [idToken, user.city]);
 
-  useEffect(() => {
-    if (!settings?.notificationsEnabled) {
-      return;
-    }
-
-    void registerForPushNotifications(idToken).catch((error) => {
-      console.warn(
-        'Unable to register this device for push notifications.',
-        error,
-      );
-    });
-  }, [idToken, settings?.notificationsEnabled]);
-
   useEffect(
     () =>
       subscribeToPushNotificationResponses(() => {
@@ -235,7 +229,7 @@ export function HomeScreen({
 
   const loadCommunityData = async () => {
     try {
-      setApiError(undefined);
+      setLoadError(undefined);
       const [
         eventsPayload,
         circlesPayload,
@@ -300,12 +294,19 @@ export function HomeScreen({
       setBlockedUsers(blocksPayload.blocks);
       setHostApproval(hostApprovalPayload.approval);
     } catch (error) {
-      setApiError(
+      setLoadError(
         error instanceof Error
           ? error.message
           : 'Unable to load live Niva data.',
       );
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const retryCommunityData = async () => {
+    setIsLoading(true);
+    await loadCommunityData();
   };
 
   useEffect(() => {
@@ -604,6 +605,17 @@ export function HomeScreen({
 
   const updateMemberSettings = async (nextSettings: CommunitySettings) => {
     try {
+      if (
+        nextSettings.notificationsEnabled &&
+        !settings?.notificationsEnabled
+      ) {
+        const registration = await registerForPushNotifications(idToken);
+        if (!registration.registered) {
+          throw new Error(
+            registration.reason ?? 'Push notifications could not be enabled.',
+          );
+        }
+      }
       const payload = await updateSettings(idToken, nextSettings);
       setSettings(payload.settings);
     } catch (error) {
@@ -645,6 +657,53 @@ export function HomeScreen({
     }
   };
 
+  const openNotification = (notification: NotificationItem) => {
+    if (!notification.readAt) {
+      void readNotification(notification.id);
+    }
+
+    const activityId =
+      notification.metadata?.eventId ?? notification.metadata?.circleId;
+    const activity = activityId
+      ? allItems.find((item) => item.remoteId === activityId)
+      : undefined;
+    if (activity) {
+      setSecondaryScreen(undefined);
+      setSelectedItem(activity);
+    }
+  };
+
+  const submitReport = async (
+    item: DiscoveryItem,
+    input: { details?: string; reason: ReportReason },
+  ) => {
+    await reportUser(idToken, {
+      circleId: item.category === 'circle' ? item.remoteId : undefined,
+      details: input.details,
+      eventId: item.category === 'event' ? item.remoteId : undefined,
+      reason: input.reason,
+      reportedUserId: item.hostId,
+    });
+    setReportItem(undefined);
+    Alert.alert(
+      'Report submitted',
+      'Your report is private. Niva moderation will review it.',
+    );
+    await loadCommunityData();
+  };
+
+  if (reportItem) {
+    return (
+      <ReportScreen
+        onBack={() => setReportItem(undefined)}
+        onSubmit={(input) => submitReport(reportItem, input)}
+        targetName={reportItem.host
+          .replace('Hosted by ', '')
+          .replace('Led by ', '')}
+      />
+    );
+  }
+
   if (selectedItem) {
     const hostName = selectedItem.host
       .replace('Hosted by ', '')
@@ -667,6 +726,10 @@ export function HomeScreen({
         }}
         onOpenChat={() => {
           setChatItem(selectedItem);
+          setSelectedItem(undefined);
+        }}
+        onReport={() => {
+          setReportItem(selectedItem);
           setSelectedItem(undefined);
         }}
         onLeave={() => void leaveActivity(selectedItem)}
@@ -769,7 +832,7 @@ export function HomeScreen({
       <NotificationsScreen
         notifications={notifications}
         onBack={() => setSecondaryScreen(undefined)}
-        onRead={(notificationId) => void readNotification(notificationId)}
+        onOpen={openNotification}
       />
     );
   }
@@ -820,6 +883,26 @@ export function HomeScreen({
             {apiError ? (
               <View style={styles.apiBanner}>
                 <Text style={styles.apiBannerText}>{apiError}</Text>
+              </View>
+            ) : null}
+            {loadError ? (
+              <View style={styles.apiBanner}>
+                <Text style={styles.apiBannerText}>{loadError}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void retryCommunityData()}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {isLoading ? (
+              <View style={styles.loadingPanel}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={styles.loadingText}>
+                  Loading your Niva plans...
+                </Text>
               </View>
             ) : null}
             <Section title="Your next plan">
@@ -972,7 +1055,12 @@ export function HomeScreen({
                 </Pressable>
               ))}
             </ScrollView>
-            {exploreResults.length ? (
+            {isLoading ? (
+              <View style={styles.loadingPanel}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={styles.loadingText}>Loading nearby plans...</Text>
+              </View>
+            ) : exploreResults.length ? (
               <VerticalCards
                 items={exploreResults}
                 onJoin={requestJoin}
@@ -990,7 +1078,12 @@ export function HomeScreen({
           </>
         );
       case 'plans':
-        return (
+        return isLoading ? (
+          <View style={styles.loadingPanel}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.loadingText}>Loading your plans...</Text>
+          </View>
+        ) : (
           <MyActivitiesScreen
             embedded
             items={myActivities}
@@ -1636,6 +1729,36 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '700',
     lineHeight: 19,
+  },
+  loadingPanel: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+  },
+  loadingText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    borderColor: colors.warning,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  retryButtonText: {
+    color: colors.ink,
+    fontSize: typography.small,
+    fontWeight: '800',
   },
   blockedModal: {
     backgroundColor: colors.surface,

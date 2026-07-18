@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   Camera,
-  Image as ImageIcon,
   ShieldCheck,
   UploadCloud,
 } from 'lucide-react-native';
@@ -17,7 +16,7 @@ import {
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
-import { chooseSelfie, SelectedImage, takeSelfie } from '../services/media';
+import { SelectedImage, takeSelfie } from '../services/media';
 
 type SelfieUploadScreenProps = {
   displayName: string;
@@ -36,10 +35,9 @@ export function SelfieUploadScreen({
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
-  const selectSelfie = async (source: 'camera' | 'library') => {
+  const selectSelfie = async () => {
     try {
-      const selected =
-        source === 'camera' ? await takeSelfie() : await chooseSelfie();
+      const selected = await takeSelfie();
       setSelfie(selected);
       setError(undefined);
     } catch (selectionError) {
@@ -96,7 +94,7 @@ export function SelfieUploadScreen({
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => void selectSelfie('camera')}
+        onPress={() => void selectSelfie()}
         style={[styles.uploadBox, selfie && styles.uploadBoxSelected]}
       >
         {selfie ? (
@@ -114,15 +112,6 @@ export function SelfieUploadScreen({
               : 'Use a clear, recent photo with your face visible.'}
           </Text>
         </View>
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => void selectSelfie('library')}
-        style={styles.libraryButton}
-      >
-        <ImageIcon color={colors.secondary} size={18} strokeWidth={2.3} />
-        <Text style={styles.libraryButtonText}>Choose from library</Text>
       </Pressable>
 
       <View style={styles.privacyNote}>
@@ -212,19 +201,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.lg,
     width: 70,
-  },
-  libraryButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    marginTop: spacing.md,
-    minHeight: 40,
-  },
-  libraryButtonText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
   },
   privacyNote: {
     alignItems: 'flex-start',

@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -13,10 +14,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { ActivityDifficulty } from '@prisma/client';
+import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
 
 export class UpdateCircleDto {
   @IsOptional()
   @IsString()
+  @IsIn(SUPPORTED_CITIES)
   @MinLength(1)
   @MaxLength(120)
   title?: string;

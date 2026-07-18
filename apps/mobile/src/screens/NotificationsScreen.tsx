@@ -7,13 +7,13 @@ import { NotificationItem } from '../services/community';
 type NotificationsScreenProps = {
   notifications: NotificationItem[];
   onBack: () => void;
-  onRead: (notificationId: string) => void;
+  onOpen: (notification: NotificationItem) => void;
 };
 
 export function NotificationsScreen({
   notifications,
   onBack,
-  onRead,
+  onOpen,
 }: NotificationsScreenProps) {
   const unreadCount = notifications.filter(
     (notification) => !notification.readAt,
@@ -62,11 +62,7 @@ export function NotificationsScreen({
                 <Pressable
                   accessibilityRole="button"
                   key={notification.id}
-                  onPress={() => {
-                    if (unread) {
-                      onRead(notification.id);
-                    }
-                  }}
+                  onPress={() => onOpen(notification)}
                   style={[
                     styles.notification,
                     unread && styles.notificationUnread,

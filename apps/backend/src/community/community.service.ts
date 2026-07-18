@@ -46,7 +46,7 @@ export class CommunityService {
   async listEvents(userId: string, city?: string) {
     const blockedHostIds = await this.listMutuallyBlockedUserIds(userId);
 
-    return this.prisma.event.findMany({
+    const events = await this.prisma.event.findMany({
       where: {
         status: ActivityStatus.PUBLISHED,
         startsAt: { gte: new Date() },
@@ -56,6 +56,11 @@ export class CommunityService {
       orderBy: { startsAt: 'asc' },
       include: {
         host: { select: { id: true, displayName: true, username: true } },
+        members: {
+          where: { userId },
+          select: { status: true },
+          take: 1,
+        },
         _count: {
           select: {
             members: {
@@ -65,12 +70,16 @@ export class CommunityService {
         },
       },
     });
+
+    return events.map(({ members, ...event }) =>
+      this.hideExactLocationUnlessApproved(userId, event, members[0]?.status),
+    );
   }
 
   async listCircles(userId: string, city?: string) {
     const blockedHostIds = await this.listMutuallyBlockedUserIds(userId);
 
-    return this.prisma.circle.findMany({
+    const circles = await this.prisma.circle.findMany({
       where: {
         status: ActivityStatus.PUBLISHED,
         city: city ? { equals: city, mode: 'insensitive' } : undefined,
@@ -79,6 +88,11 @@ export class CommunityService {
       orderBy: { startsAt: 'asc' },
       include: {
         host: { select: { id: true, displayName: true, username: true } },
+        members: {
+          where: { userId },
+          select: { status: true },
+          take: 1,
+        },
         _count: {
           select: {
             members: {
@@ -88,6 +102,34 @@ export class CommunityService {
         },
       },
     });
+
+    return circles.map(({ members, ...circle }) =>
+      this.hideExactLocationUnlessApproved(userId, circle, members[0]?.status),
+    );
+  }
+
+  private hideExactLocationUnlessApproved<
+    T extends {
+      city: string;
+      hostId: string | null;
+      latitude: number | null;
+      locationName: string;
+      longitude: number | null;
+    },
+  >(userId: string, activity: T, membershipStatus?: MembershipStatus): T {
+    const canViewExactLocation =
+      activity.hostId === userId ||
+      membershipStatus === MembershipStatus.APPROVED ||
+      membershipStatus === MembershipStatus.ATTENDED;
+
+    return canViewExactLocation
+      ? activity
+      : {
+          ...activity,
+          latitude: null,
+          locationName: activity.city,
+          longitude: null,
+        };
   }
 
   async createEvent(userId: string, dto: CreateEventDto) {
@@ -1248,7 +1290,7 @@ export class CommunityService {
       where: { userId },
       create: {
         userId,
-        notificationsEnabled: dto.notificationsEnabled ?? true,
+        notificationsEnabled: dto.notificationsEnabled ?? false,
         showProfileInRecommendations: dto.showProfileInRecommendations ?? true,
         allowCircleContinuitySuggestions:
           dto.allowCircleContinuitySuggestions ?? true,

@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -12,6 +13,7 @@ import {
   Max,
 } from 'class-validator';
 import { ActivityDifficulty } from '@prisma/client';
+import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
 
 export class CreateEventDto {
   @IsString()
@@ -23,6 +25,7 @@ export class CreateEventDto {
   description!: string;
 
   @IsString()
+  @IsIn(SUPPORTED_CITIES)
   @MaxLength(80)
   city!: string;
 

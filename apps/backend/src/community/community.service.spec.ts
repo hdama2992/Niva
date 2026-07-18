@@ -11,6 +11,53 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { UsersService } from '../users/users.service';
 import { CommunityService } from './community.service';
 
+describe('CommunityService discovery location privacy', () => {
+  const eventFindMany = jest.fn();
+  const prisma = {
+    event: { findMany: eventFindMany },
+    userBlock: { findMany: jest.fn().mockResolvedValue([]) },
+  } as unknown as PrismaService;
+  const service = new CommunityService(
+    prisma,
+    {} as UsersService,
+    {} as NotificationService,
+    {} as RealtimeService,
+  );
+  const event = {
+    city: 'Bangalore',
+    hostId: 'host_1',
+    id: 'event_1',
+    latitude: 12.9716,
+    locationName: 'Exact cafe address',
+    longitude: 77.5946,
+  };
+
+  it('hides the exact location before a member is approved', async () => {
+    eventFindMany.mockResolvedValue([
+      { ...event, members: [{ status: MembershipStatus.REQUESTED }] },
+    ]);
+
+    await expect(service.listEvents('member_1', 'Bangalore')).resolves.toEqual([
+      {
+        ...event,
+        latitude: null,
+        locationName: 'Bangalore',
+        longitude: null,
+      },
+    ]);
+  });
+
+  it('reveals the exact location to an approved member', async () => {
+    eventFindMany.mockResolvedValue([
+      { ...event, members: [{ status: MembershipStatus.APPROVED }] },
+    ]);
+
+    await expect(service.listEvents('member_1', 'Bangalore')).resolves.toEqual([
+      event,
+    ]);
+  });
+});
+
 describe('CommunityService join capacity', () => {
   type TransactionCallback = (client: unknown) => Promise<unknown>;
 

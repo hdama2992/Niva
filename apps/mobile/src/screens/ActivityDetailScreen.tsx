@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Flag,
   MapPin,
   MessageCircle,
   ShieldCheck,
@@ -33,6 +34,7 @@ type ActivityDetailScreenProps = {
   onIcebreakers: () => void;
   onJoin: () => void;
   onOpenChat: () => void;
+  onReport: () => void;
   onLeave: () => void;
   onManage: () => void;
 };
@@ -47,6 +49,7 @@ export function ActivityDetailScreen({
   onIcebreakers,
   onJoin,
   onOpenChat,
+  onReport,
   onLeave,
   onManage,
 }: ActivityDetailScreenProps) {
@@ -65,6 +68,10 @@ export function ActivityDetailScreen({
     item.membershipStatus === 'APPROVED' ||
     item.membershipStatus === 'ATTENDED';
   const canOpenChat = canOpenIcebreakers;
+  const canViewDirections =
+    isHost ||
+    item.membershipStatus === 'APPROVED' ||
+    item.membershipStatus === 'ATTENDED';
 
   return (
     <View style={styles.screen}>
@@ -164,7 +171,9 @@ export function ActivityDetailScreen({
           />
         </View>
 
-        {item.latitude !== undefined && item.longitude !== undefined ? (
+        {canViewDirections &&
+        item.latitude !== undefined &&
+        item.longitude !== undefined ? (
           <Pressable
             accessibilityRole="link"
             onPress={() =>
@@ -177,6 +186,10 @@ export function ActivityDetailScreen({
             <MapPin color={colors.secondary} size={18} strokeWidth={2.4} />
             <Text style={styles.directionsText}>Open directions</Text>
           </Pressable>
+        ) : item.latitude !== undefined && item.longitude !== undefined ? (
+          <Text style={styles.locationPrivacyText}>
+            Exact directions unlock after your join request is approved.
+          </Text>
         ) : null}
 
         <View style={styles.section}>
@@ -204,16 +217,27 @@ export function ActivityDetailScreen({
         </View>
 
         {item.hostId && !isHost ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBlock}
-            style={styles.blockAction}
-          >
-            <Ban color={colors.warning} size={18} strokeWidth={2.4} />
-            <Text style={styles.blockText}>
-              {blocked ? 'Host blocked' : 'Block this host'}
-            </Text>
-          </Pressable>
+          <View style={styles.safetyActions}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={blocked}
+              onPress={onBlock}
+              style={styles.blockAction}
+            >
+              <Ban color={colors.warning} size={18} strokeWidth={2.4} />
+              <Text style={styles.blockText}>
+                {blocked ? 'Host blocked' : 'Block this host'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onReport}
+              style={styles.blockAction}
+            >
+              <Flag color={colors.primaryDark} size={18} strokeWidth={2.4} />
+              <Text style={styles.reportText}>Report this host</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {isHost &&
@@ -363,6 +387,12 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '800',
   },
+  locationPrivacyText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginTop: spacing.sm,
+  },
   blockAction: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -375,6 +405,16 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: typography.small,
     fontWeight: '800',
+  },
+  reportText: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  safetyActions: {
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
   },
   cancelledBanner: {
     alignItems: 'flex-start',

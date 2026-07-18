@@ -61,6 +61,7 @@ export type NotificationItem = {
   body: string;
   readAt: string | null;
   createdAt: string;
+  metadata?: { circleId?: string; eventId?: string } | null;
 };
 
 export type CommunitySettings = {

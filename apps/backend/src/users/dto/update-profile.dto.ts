@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { SUPPORTED_CITIES } from '../../common/constants/supported-cities';
 
 export class UpdateProfileDto {
   @IsString()
@@ -17,6 +19,9 @@ export class UpdateProfileDto {
   displayName!: string;
 
   @IsString()
+  @IsIn(SUPPORTED_CITIES, {
+    message: 'city must be one of the currently supported Niva cities',
+  })
   @MaxLength(80)
   city!: string;
 
