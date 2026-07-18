@@ -125,7 +125,13 @@ export type EventMember = {
   user: {
     displayName: string | null;
     id: string;
-    profile: { interests: string[] } | null;
+    profile: {
+      bio: string | null;
+      city: string;
+      interests: string[];
+      profilePhotoUrl: string | null;
+    } | null;
+    trust: { verificationStatus: string } | null;
     username: string | null;
   };
 };

@@ -1,0 +1,9 @@
+appId: com.niva.niva
+name: Niva selfie guidance and camera action
+---
+- assertVisible: "Take a verification selfie"
+- assertVisible: "Face centred"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/verification-selfie-android
+- tapOn: "Open camera for verification selfie"
+- pressKey: back
+- assertVisible: "Take a verification selfie"

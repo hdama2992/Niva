@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { PolicyChrome, policyLinks } from '../components/PolicyChrome';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -35,13 +35,14 @@ export default function DeleteAccountPage() {
   };
 
   return (
-    <main className="legal-page">
-      <nav>
-        <Link href="/">niva.</Link>
-      </nav>
-      <article>
-        <p className="eyebrow">Account deletion</p>
-        <h1>Remove your Niva account and data.</h1>
+    <PolicyChrome activeHref="/delete-account" links={policyLinks}>
+      <p className="policy-kicker">Account deletion</p>
+      <h1>Remove your Niva account and data.</h1>
+      <p className="policy-lead">
+        You stay in control. Delete immediately inside the app, or ask the care
+        team to help if you cannot sign in.
+      </p>
+      <div className="policy-prose">
         <h2>Delete immediately in the app</h2>
         <p>
           Open Profile, choose Settings, select Delete account, and confirm.
@@ -91,7 +92,7 @@ export default function DeleteAccountPage() {
             </button>
           </form>
         )}
-      </article>
-    </main>
+      </div>
+    </PolicyChrome>
   );
 }

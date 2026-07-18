@@ -128,7 +128,7 @@ export function LoginScreen({
         <ImageBackground
           imageStyle={styles.heroImage}
           resizeMode="cover"
-          source={require('../../assets/home/coffee-books-hero.webp')}
+          source={require('../../assets/login-friends-hero.webp')}
           style={styles.hero}
         >
           <View style={styles.brandGlass}>
@@ -136,143 +136,143 @@ export function LoginScreen({
           </View>
         </ImageBackground>
         <View style={styles.content}>
-        <View style={styles.copy}>
-          <Text style={styles.title}>Find plans you’ll look forward to.</Text>
-          <Text style={styles.subtitle}>
-            Meet people through thoughtful plans near you.
-          </Text>
-        </View>
+          <View style={styles.copy}>
+            <Text style={styles.title}>Find plans you’ll look forward to.</Text>
+            <Text style={styles.subtitle}>
+              Meet people through thoughtful plans near you.
+            </Text>
+          </View>
 
-        {pnvAvailable ? (
-          <View style={styles.pnvSection}>
-            <View style={styles.pnvCopy}>
-              <View style={styles.pnvIcon}>
-                <Smartphone
-                  color={colors.secondary}
-                  size={20}
-                  strokeWidth={2.4}
-                />
+          {pnvAvailable ? (
+            <View style={styles.pnvSection}>
+              <View style={styles.pnvCopy}>
+                <View style={styles.pnvIcon}>
+                  <Smartphone
+                    color={colors.secondary}
+                    size={20}
+                    strokeWidth={2.4}
+                  />
+                </View>
+                <View style={styles.pnvTextGroup}>
+                  <Text style={styles.pnvTitle}>Verify from your SIM</Text>
+                  <Text style={styles.pnvText}>
+                    Your mobile carrier confirms the number after you consent.
+                    No SMS code is needed.
+                  </Text>
+                </View>
               </View>
-              <View style={styles.pnvTextGroup}>
-                <Text style={styles.pnvTitle}>Verify from your SIM</Text>
-                <Text style={styles.pnvText}>
-                  Your mobile carrier confirms the number after you consent. No
-                  SMS code is needed.
-                </Text>
+              <PrimaryButton
+                icon={
+                  <ShieldCheck
+                    color={colors.surface}
+                    size={20}
+                    strokeWidth={2.4}
+                  />
+                }
+                label="Verify my phone number"
+                onPress={onVerifyPhoneNumber}
+              />
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerLabel}>or use SMS</Text>
+                <View style={styles.dividerLine} />
               </View>
             </View>
-            <PrimaryButton
-              icon={
-                <ShieldCheck
+          ) : null}
+
+          <View style={styles.phoneGroup}>
+            <Text style={styles.label}>Log in or sign up</Text>
+            <View style={[styles.phoneRow, error && styles.phoneRowError]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCountryPickerOpen(true)}
+                style={styles.countryButton}
+              >
+                <Text style={styles.countryCode}>{selectedCountry.code}</Text>
+                <Text style={styles.dialCode}>{selectedCountry.dialCode}</Text>
+                <ChevronDown color={colors.muted} size={18} strokeWidth={2.4} />
+              </Pressable>
+
+              <TextInput
+                accessibilityLabel="Phone number"
+                autoComplete="tel"
+                keyboardType="number-pad"
+                maxLength={selectedCountry.localDigits}
+                onChangeText={(value) => {
+                  setPhone(
+                    cleanPhone(value).slice(0, selectedCountry.localDigits),
+                  );
+                  if (error) {
+                    setError(undefined);
+                  }
+                }}
+                placeholder={selectedCountry.placeholder}
+                placeholderTextColor={colors.muted}
+                selectionColor={colors.primary}
+                style={styles.phoneInput}
+                textContentType="telephoneNumber"
+                value={phone}
+              />
+            </View>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+          </View>
+
+          <PrimaryButton
+            disabled={submitting}
+            icon={
+              submitting ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <MessageSquareText
                   color={colors.surface}
                   size={20}
                   strokeWidth={2.4}
                 />
-              }
-              label="Verify my phone number"
-              onPress={onVerifyPhoneNumber}
-            />
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerLabel}>or use SMS</Text>
-              <View style={styles.dividerLine} />
+              )
+            }
+            label={
+              submitting
+                ? 'Starting verification...'
+                : pnvAvailable
+                  ? 'Text me a code'
+                  : 'Continue'
+            }
+            onPress={() => void continueToOtp()}
+          />
+          <View style={styles.securityNote}>
+            <View style={styles.securityIcon}>
+              <LockKeyhole color={colors.success} size={19} strokeWidth={2.3} />
             </View>
+            <Text style={styles.securityText}>
+              Your number is used to sign in and protect your account. It isn’t
+              shown on your profile.
+            </Text>
           </View>
-        ) : null}
-
-        <View style={styles.phoneGroup}>
-          <Text style={styles.label}>Log in or sign up</Text>
-          <View style={[styles.phoneRow, error && styles.phoneRowError]}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setCountryPickerOpen(true)}
-              style={styles.countryButton}
+          <Text style={styles.consentText}>
+            By continuing, you agree to our{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={
+                privacyPolicyUrl
+                  ? () => void Linking.openURL(privacyPolicyUrl)
+                  : undefined
+              }
+              style={styles.consentLink}
             >
-              <Text style={styles.countryCode}>{selectedCountry.code}</Text>
-              <Text style={styles.dialCode}>{selectedCountry.dialCode}</Text>
-              <ChevronDown color={colors.muted} size={18} strokeWidth={2.4} />
-            </Pressable>
-
-            <TextInput
-              accessibilityLabel="Phone number"
-              autoComplete="tel"
-              keyboardType="number-pad"
-              maxLength={selectedCountry.localDigits}
-              onChangeText={(value) => {
-                setPhone(
-                  cleanPhone(value).slice(0, selectedCountry.localDigits),
-                );
-                if (error) {
-                  setError(undefined);
-                }
-              }}
-              placeholder={selectedCountry.placeholder}
-              placeholderTextColor={colors.muted}
-              selectionColor={colors.primary}
-              style={styles.phoneInput}
-              textContentType="telephoneNumber"
-              value={phone}
-            />
-          </View>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
-
-        <PrimaryButton
-          disabled={submitting}
-          icon={
-            submitting ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <MessageSquareText
-                color={colors.surface}
-                size={20}
-                strokeWidth={2.4}
-              />
-            )
-          }
-          label={
-            submitting
-              ? 'Starting verification...'
-              : pnvAvailable
-                ? 'Text me a code'
-                : 'Continue'
-          }
-          onPress={() => void continueToOtp()}
-        />
-        <View style={styles.securityNote}>
-          <View style={styles.securityIcon}>
-            <LockKeyhole color={colors.success} size={19} strokeWidth={2.3} />
-          </View>
-          <Text style={styles.securityText}>
-            Your number is used to sign in and protect your account. It isn’t
-            shown on your profile.
+              Privacy Policy
+            </Text>{' '}
+            and{' '}
+            <Text
+              accessibilityRole="link"
+              onPress={
+                termsUrl ? () => void Linking.openURL(termsUrl) : undefined
+              }
+              style={styles.consentLink}
+            >
+              Terms
+            </Text>
+            .
           </Text>
-        </View>
-        <Text style={styles.consentText}>
-          By continuing, you agree to our{' '}
-          <Text
-            accessibilityRole="link"
-            onPress={
-              privacyPolicyUrl
-                ? () => void Linking.openURL(privacyPolicyUrl)
-                : undefined
-            }
-            style={styles.consentLink}
-          >
-            Privacy Policy
-          </Text>{' '}
-          and{' '}
-          <Text
-            accessibilityRole="link"
-            onPress={
-              termsUrl ? () => void Linking.openURL(termsUrl) : undefined
-            }
-            style={styles.consentLink}
-          >
-            Terms
-          </Text>
-          .
-        </Text>
         </View>
       </ScrollView>
 

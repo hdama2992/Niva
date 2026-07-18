@@ -1023,6 +1023,14 @@ export function HomeScreen({
         event={managedEvent}
         idToken={idToken}
         onBack={() => setManagedEvent(undefined)}
+        onEdit={() => {
+          setEditingActivity(managedEvent);
+          setManagedEvent(undefined);
+        }}
+        onOpenChat={() => {
+          setChatItem(managedEvent);
+          setManagedEvent(undefined);
+        }}
       />
     );
   }
@@ -1033,6 +1041,14 @@ export function HomeScreen({
         circle={managedCircle}
         idToken={idToken}
         onBack={() => setManagedCircle(undefined)}
+        onEdit={() => {
+          setEditingActivity(managedCircle);
+          setManagedCircle(undefined);
+        }}
+        onOpenChat={() => {
+          setChatItem(managedCircle);
+          setManagedCircle(undefined);
+        }}
       />
     );
   }
@@ -1054,6 +1070,11 @@ export function HomeScreen({
         activity={icebreakerActivity}
         idToken={idToken}
         onBack={() => setIcebreakerActivity(undefined)}
+        onOpenChat={() => {
+          setIcebreakerActivity(undefined);
+          setChatItem(icebreakerActivity);
+        }}
+        onViewPlan={() => setIcebreakerActivity(undefined)}
       />
     );
   }
@@ -1074,6 +1095,11 @@ export function HomeScreen({
       <NotificationsScreen
         notifications={notifications}
         onBack={() => setSecondaryScreen(undefined)}
+        onMarkAllRead={() => {
+          notifications
+            .filter((notification) => !notification.readAt)
+            .forEach((notification) => void readNotification(notification.id));
+        }}
         onOpen={openNotification}
       />
     );
@@ -1120,6 +1146,7 @@ export function HomeScreen({
   if (secondaryScreen === 'create-event') {
     return (
       <CreateEventScreen
+        hostApproved={hostApproval?.status === 'APPROVED'}
         onBack={() => setSecondaryScreen(undefined)}
         onCreate={createHostedEvent}
         user={user}

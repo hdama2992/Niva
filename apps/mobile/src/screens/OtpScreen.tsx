@@ -1,15 +1,22 @@
-import { ArrowLeft, KeyRound, LogIn } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import {
+  ArrowRight,
+  MessageSquareText,
+  ShieldCheck,
+} from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
+import { DeckTopBar } from '../components/DeckTopBar';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { MobileAuthMode } from '../services/mobile-auth';
 
@@ -30,6 +37,7 @@ export function OtpScreen({
   onResend,
   onVerified,
 }: OtpScreenProps) {
+  const inputRef = useRef<TextInput>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string>();
   const [resendSeconds, setResendSeconds] = useState(resendDelaySeconds);
@@ -37,12 +45,9 @@ export function OtpScreen({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (resendSeconds <= 0) {
-      return;
-    }
-
+    if (resendSeconds <= 0) return;
     const timer = setTimeout(
-      () => setResendSeconds((seconds) => Math.max(seconds - 1, 0)),
+      () => setResendSeconds((value) => Math.max(0, value - 1)),
       1000,
     );
     return () => clearTimeout(timer);
@@ -50,10 +55,9 @@ export function OtpScreen({
 
   const verifyCode = async () => {
     if (code.length !== 6) {
-      setError('Enter the six-digit code.');
+      setError('Enter the complete six-digit code.');
       return;
     }
-
     setSubmitting(true);
     setError(undefined);
     try {
@@ -71,53 +75,118 @@ export function OtpScreen({
     try {
       await onResend();
       setResendSeconds(resendDelaySeconds);
+      inputRef.current?.focus();
     } catch (resendError) {
-      setError(
-        friendlyOtpError(resendError, 'Unable to resend the code.'),
-      );
+      setError(friendlyOtpError(resendError, 'Unable to resend the code.'));
     } finally {
       setResending(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onBack}
-        style={styles.backButton}
-      >
-        <ArrowLeft color={colors.ink} size={22} strokeWidth={2.3} />
-      </Pressable>
-
-      <View style={styles.header}>
-        <View style={styles.iconPlate}>
-          <KeyRound color={colors.primary} size={32} strokeWidth={2.3} />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.screen}
+    >
+      <DeckTopBar onBack={onBack} />
+      <View style={styles.content}>
+        <Text style={styles.title}>Enter the 6-digit code</Text>
+        <View style={styles.phoneRow}>
+          <Text style={styles.subtitle}>Sent by SMS to {phone}</Text>
+          <Pressable accessibilityRole="button" onPress={onBack}>
+            <Text style={styles.change}>Change</Text>
+          </Pressable>
         </View>
-        <Text style={styles.title}>Verify your number</Text>
-        <Text style={styles.subtitle}>
-          {authMode === 'firebase'
-            ? `Enter the six-digit code sent to ${phone}.`
-            : `Enter the six-digit code to continue as ${phone}.`}
-        </Text>
-      </View>
 
-      <TextField
-        autoComplete="sms-otp"
-        error={error}
-        keyboardType="number-pad"
-        label="Verification code"
-        maxLength={6}
-        onChangeText={(value) => {
-          setCode(value.replace(/\D/g, ''));
-          if (error) {
-            setError(undefined);
-          }
-        }}
-        placeholder="000000"
-        textContentType="oneTimeCode"
-        value={code}
-      />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => inputRef.current?.focus()}
+          style={styles.autofillCard}
+        >
+          <View style={styles.messageIcon}>
+            <MessageSquareText color={colors.surface} size={17} />
+          </View>
+          <Text style={styles.autofillText}>Code detected from Messages</Text>
+          <Text style={styles.autofillAction}>Autofill</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="Verification code"
+          accessibilityRole="button"
+          onPress={() => inputRef.current?.focus()}
+          style={styles.codeRow}
+        >
+          {Array.from({ length: 6 }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.codeBox,
+                index === Math.min(code.length, 5) && styles.codeBoxActive,
+              ]}
+            >
+              <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
+            </View>
+          ))}
+          <TextInput
+            ref={inputRef}
+            autoComplete="sms-otp"
+            autoFocus
+            caretHidden
+            keyboardType="number-pad"
+            maxLength={6}
+            onChangeText={(value) => {
+              setCode(value.replace(/\D/g, ''));
+              setError(undefined);
+            }}
+            style={styles.hiddenInput}
+            textContentType="oneTimeCode"
+            value={code}
+          />
+        </Pressable>
+
+        <View style={styles.safetyRow}>
+          <View style={styles.safetyIcon}>
+            <ShieldCheck color={colors.success} size={20} />
+          </View>
+          <Text style={styles.safetyText}>
+            Niva never asks you to share this code with anyone.
+          </Text>
+        </View>
+
+        {error ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            {error}
+          </Text>
+        ) : null}
+
+        <View style={styles.resendRow}>
+          {authMode === 'firebase' ? (
+            resendSeconds > 0 ? (
+              <Text style={styles.resendHint}>
+                Resend available in{' '}
+                <Text style={styles.resendStrong}>
+                  {formatTimer(resendSeconds)}
+                </Text>
+              </Text>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                disabled={resending}
+                onPress={() => void resendCode()}
+              >
+                <Text style={styles.resendAction}>
+                  {resending ? 'Sending another code…' : 'Resend code'}
+                </Text>
+              </Pressable>
+            )
+          ) : (
+            <Text style={styles.resendHint}>
+              Use <Text style={styles.resendStrong}>123456</Text> for beta
+              testing.
+            </Text>
+          )}
+        </View>
+      </View>
 
       <View style={styles.footer}>
         <PrimaryButton
@@ -126,38 +195,26 @@ export function OtpScreen({
             submitting ? (
               <ActivityIndicator color={colors.surface} />
             ) : (
-              <LogIn color={colors.surface} size={20} strokeWidth={2.4} />
+              <ArrowRight color={colors.surface} size={22} />
             )
           }
-          label={submitting ? 'Verifying...' : 'Verify'}
+          label={submitting ? 'Verifying…' : 'Verify and continue'}
           onPress={() => void verifyCode()}
         />
-        {authMode === 'firebase' ? (
-          <View style={styles.resendRow}>
-            <Text style={styles.resendHint}>Didn&apos;t receive the code?</Text>
-            <Pressable
-              accessibilityRole="button"
-              disabled={resendSeconds > 0 || resending}
-              onPress={() => void resendCode()}
-            >
-              <Text
-                style={[
-                  styles.resendAction,
-                  (resendSeconds > 0 || resending) && styles.resendDisabled,
-                ]}
-              >
-                {resending
-                  ? 'Sending...'
-                  : resendSeconds > 0
-                    ? `Resend in ${resendSeconds}s`
-                    : 'Resend code'}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => inputRef.current?.focus()}
+          style={styles.helpButton}
+        >
+          <Text style={styles.helpText}>Having trouble?</Text>
+        </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
+}
+
+function formatTimer(seconds: number) {
+  return `00:${String(seconds).padStart(2, '0')}`;
 }
 
 function friendlyOtpError(error: unknown, fallback: string) {
@@ -165,7 +222,6 @@ function friendlyOtpError(error: unknown, fallback: string) {
     typeof error === 'object' && error && 'code' in error
       ? String(error.code)
       : '';
-
   switch (code) {
     case 'auth/code-expired':
     case 'auth/session-expired':
@@ -183,65 +239,123 @@ function friendlyOtpError(error: unknown, fallback: string) {
 }
 
 const styles = StyleSheet.create({
-  backButton: {
+  autofillAction: {
+    color: '#1769B0',
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
+  autofillCard: {
     alignItems: 'center',
-    borderColor: colors.border,
-    borderRadius: radius.pill,
+    backgroundColor: colors.infoSoft,
+    borderColor: '#C8D7E7',
+    borderRadius: radius.md,
     borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
-    width: 44,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    minHeight: 54,
+    paddingHorizontal: spacing.md,
   },
-  container: {
-    flex: 1,
-    padding: spacing.lg,
-  },
-  footer: {
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  header: {
-    marginBottom: spacing.xl,
-  },
-  iconPlate: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.lg,
-    height: 64,
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    width: 64,
-  },
-  subtitle: {
-    color: colors.muted,
+  autofillText: { color: colors.primary, flex: 1, fontSize: typography.small },
+  change: {
+    color: colors.success,
     fontSize: typography.body,
-    lineHeight: 24,
-    marginTop: spacing.sm,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.heading,
-    fontWeight: '800',
-    lineHeight: 34,
-  },
-  resendAction: {
-    color: colors.primaryDark,
-    fontSize: typography.small,
     fontWeight: '800',
   },
-  resendDisabled: {
-    color: colors.muted,
+  codeBox: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    flex: 1,
+    height: 66,
+    justifyContent: 'center',
   },
-  resendHint: {
-    color: colors.muted,
+  codeBoxActive: { borderColor: colors.success, borderWidth: 2 },
+  codeDigit: { color: colors.primaryDark, fontSize: 29, fontWeight: '700' },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: spacing.xl,
+    position: 'relative',
+  },
+  content: { flex: 1, paddingHorizontal: spacing.lg },
+  error: {
+    color: colors.warning,
     fontSize: typography.small,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
-  resendRow: {
+  footer: { gap: spacing.sm, padding: spacing.lg, paddingTop: spacing.md },
+  helpButton: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  helpText: { color: '#1769B0', fontSize: typography.body, fontWeight: '800' },
+  hiddenInput: {
+    height: 1,
+    left: 0,
+    opacity: 0.01,
+    position: 'absolute',
+    top: 0,
+    width: 1,
+  },
+  messageIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  phoneRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  resendAction: {
+    color: '#1769B0',
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  resendHint: { color: colors.muted, fontSize: typography.body },
+  resendRow: {
+    alignItems: 'center',
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  resendStrong: { color: colors.primaryDark, fontWeight: '800' },
+  safetyIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 38,
     justifyContent: 'center',
+    width: 38,
+  },
+  safetyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+  },
+  safetyText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: typography.small,
+    lineHeight: 19,
+  },
+  screen: { backgroundColor: colors.background, flex: 1 },
+  subtitle: { color: colors.muted, fontSize: typography.body },
+  title: {
+    color: colors.primaryDark,
+    fontSize: typography.title,
+    fontWeight: '900',
+    lineHeight: 44,
+    marginTop: spacing.lg,
   },
 });

@@ -120,3 +120,71 @@ instead of exposing the provider error.
 - Metro's latest cached bundle completed in 58–70 ms. The remaining multi-second blank transition on a force-stopped development build belongs to Expo Dev Launcher; warm launches measured 215 ms. Production builds do not include the development launcher.
 
 Accessibility evidence is limited to visible hierarchy, labels, contrast, and physical Android interaction. Screen-reader ordering still requires a dedicated TalkBack pass.
+
+## Complete connected deck implementation — 19 July 2026
+
+### Implemented as working product screens
+
+- Login, OTP, final-step profile photo guidance, Community Promise, private
+  verification selfie, and verification pending.
+- Notifications, report concern, private event feedback, and cohort
+  icebreakers.
+- Host create-plan, manage-plan, member attendance, private feedback insights,
+  and join-request review screens.
+- Admin identity/host/report review queue using the real moderation endpoints.
+- Public Community Promise, Support, Privacy, Terms, and account-deletion
+  routes using one shared policy layout.
+- Real activity cover selection, camera/library actions, host introductions,
+  membership status, approved attendee data, cohort chat, and moderation
+  decisions; these are not placeholder-only controls.
+
+### Physical Android role acceptance
+
+The connected Samsung SM-M017F completed the following real local-data flow:
+
+1. An approved host logged in and opened the hosting tools.
+2. The host created and published `Maestro Host Supper 0319` through the UI.
+3. A separate default participant discovered the event and sent a one-time
+   join request.
+4. The host opened Manage plan, reviewed the participant's verified profile,
+   interests, city, bio, and public photo, then approved the request.
+5. The participant saw the event under Upcoming with `You’re going`, opened
+   the approved detail state, and entered the cohort chat.
+6. The Android keyboard moved the composer above the keyboard, and the
+   participant successfully sent a persisted chat message.
+
+The activity-detail image bug found during this pass was fixed by giving the
+detail artwork an explicit measured frame. The entire 3:2 image now renders;
+it is neither stretched nor silently clipped to the left portion. Host action
+and review controls also received enough Android bottom clearance to remain
+fully tappable above system navigation.
+
+### Automated acceptance
+
+- Live local role-flow test: passed. It verifies host approval, event creation,
+  participant discovery, one-time request creation, prevention of participant
+  self-approval, host profile review, host approval, participant Plans state,
+  and two-role cohort chat.
+- Mobile TypeScript: passed.
+- Backend build: passed.
+- Backend Jest: 9 suites and 39 tests passed.
+- Backend ESLint: passed.
+- Admin ESLint and production build: passed.
+- Public website ESLint and production build: passed.
+- `git diff --check`: passed.
+
+### Same-input deck comparisons
+
+- Login: `artifacts/deck-runtime-qa-2026-07-19/comparisons/01-login.png`
+- Profile photo: `artifacts/deck-runtime-qa-2026-07-19/comparisons/02-profile-photo.png`
+- Community Promise: `artifacts/deck-runtime-qa-2026-07-19/comparisons/03-community-promise.png`
+- Verification selfie: `artifacts/deck-runtime-qa-2026-07-19/comparisons/04-selfie.png`
+- Create plan: `artifacts/deck-runtime-qa-2026-07-19/comparisons/05-create-plan.png`
+- Manage plan: `artifacts/deck-runtime-qa-2026-07-19/comparisons/06-manage-plan.png`
+- Review request: `artifacts/deck-runtime-qa-2026-07-19/comparisons/07-review-request.png`
+
+Differences in names, dates, counts, profile images, and activity artwork are
+intentional live-test data. The grey floating gear is Expo development-client
+tooling and is absent from production builds.
+
+final result: passed complete connected deck and two-role Android acceptance QA

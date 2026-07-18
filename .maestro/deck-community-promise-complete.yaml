@@ -1,0 +1,10 @@
+appId: com.niva.niva
+name: Niva Community Promise agreement gating
+---
+- assertVisible: "One promise before you join"
+- tapOn: "I agree to follow Niva’s Community Promise."
+- scrollUntilVisible:
+    element:
+      text: "Agree and continue"
+    direction: DOWN
+- assertVisible: "Agree and continue"

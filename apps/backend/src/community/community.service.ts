@@ -1100,13 +1100,17 @@ export class CommunityService {
   async requestHostApproval(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { trust: { select: { tier: true } } },
+      select: {
+        firebaseUid: true,
+        trust: { select: { tier: true, verificationStatus: true } },
+      },
     });
     const tier = user?.trust?.tier;
     const eligible =
       tier === TrustTier.TRUSTED ||
       tier === TrustTier.HOST_ELIGIBLE ||
-      tier === TrustTier.HOST;
+      tier === TrustTier.HOST ||
+      this.isVerifiedBetaMember(user);
 
     if (!eligible) {
       throw new ForbiddenException(
@@ -1221,7 +1225,15 @@ export class CommunityService {
             id: true,
             displayName: true,
             username: true,
-            profile: { select: { interests: true } },
+            profile: {
+              select: {
+                bio: true,
+                city: true,
+                interests: true,
+                profilePhotoUrl: true,
+              },
+            },
+            trust: { select: { verificationStatus: true } },
           },
         },
       },
@@ -1299,7 +1311,15 @@ export class CommunityService {
             id: true,
             displayName: true,
             username: true,
-            profile: { select: { interests: true } },
+            profile: {
+              select: {
+                bio: true,
+                city: true,
+                interests: true,
+                profilePhotoUrl: true,
+              },
+            },
+            trust: { select: { verificationStatus: true } },
           },
         },
       },
@@ -1579,15 +1599,17 @@ export class CommunityService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
+        firebaseUid: true,
         hostApproval: { select: { status: true } },
-        trust: { select: { tier: true } },
+        trust: { select: { tier: true, verificationStatus: true } },
       },
     });
     const tier = user?.trust?.tier;
     const allowed =
       tier === TrustTier.TRUSTED ||
       tier === TrustTier.HOST_ELIGIBLE ||
-      tier === TrustTier.HOST;
+      tier === TrustTier.HOST ||
+      this.isVerifiedBetaMember(user);
 
     if (!allowed) {
       throw new ForbiddenException('Host access requires trusted status.');
@@ -1598,6 +1620,19 @@ export class CommunityService {
         'Host access requires approval from the Niva community team.',
       );
     }
+  }
+
+  private isVerifiedBetaMember(
+    user?: {
+      firebaseUid: string;
+      trust: { verificationStatus: TrustVerificationStatus } | null;
+    } | null,
+  ) {
+    return (
+      process.env.NIVA_BETA_AUTH_ENABLED === 'true' &&
+      user?.firebaseUid.startsWith('beta:') === true &&
+      user.trust?.verificationStatus === TrustVerificationStatus.VERIFIED
+    );
   }
 
   private async assertChatAccess(

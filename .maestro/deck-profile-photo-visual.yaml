@@ -1,0 +1,8 @@
+appId: com.niva.niva
+name: Niva approved-deck profile photo visual
+---
+- assertVisible: "Finish with a profile photo"
+- assertVisible: "Public profile photo"
+- assertVisible: "Take a photo"
+- assertVisible: "Choose a photo"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/profile-photo-android

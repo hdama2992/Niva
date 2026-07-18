@@ -1,0 +1,13 @@
+appId: com.niva.niva
+name: Niva beta login reaches profile setup
+---
+- tapOn: "Phone number"
+- eraseText
+- inputText: "9876500319"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- assertVisible: "Tell us about you"

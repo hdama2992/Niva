@@ -1,0 +1,45 @@
+appId: com.niva.niva
+name: Niva host creates and sees a real event through the UI
+---
+- assertVisible: "Complete your plan"
+- scrollUntilVisible:
+    element:
+      text: "Event title"
+    direction: DOWN
+- tapOn: "Sunday pottery table"
+- inputText: "Maestro Host Supper 0319"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Tell members what to bring, what to expect, and how the session flows."
+    direction: DOWN
+- tapOn: "Tell members what to bring, what to expect, and how the session flows."
+- inputText: "A relaxed hosted supper with introductions and an easy shared table."
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Share why you’re excited to host and the kind of welcome members can expect."
+    direction: DOWN
+- tapOn: "Share why you’re excited to host and the kind of welcome members can expect."
+- inputText: "I will welcome everyone, make introductions, and keep the conversation inclusive."
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Venue or public meeting point"
+    direction: DOWN
+- tapOn: "Venue or public meeting point"
+- inputText: "Indiranagar Community Cafe"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Finish setup and publish"
+    direction: DOWN
+- tapOn: "Finish setup and publish"
+- assertVisible: "Your hosting tools"
+- tapOn: "Plans"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Host Supper 0319"
+    direction: DOWN
+- assertVisible: "Maestro Host Supper 0319"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/host-created-plan-android

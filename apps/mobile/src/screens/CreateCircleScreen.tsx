@@ -1,7 +1,16 @@
-import { ArrowLeft, CircleMinus, CirclePlus } from 'lucide-react-native';
+import {
+  CalendarDays,
+  CheckCircle2,
+  CircleMinus,
+  CirclePlus,
+  MapPin,
+  ShieldCheck,
+  UsersRound,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Pressable,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +32,8 @@ import {
 } from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
 import { SelectedImage } from '../services/media';
+import { DeckTopBar } from '../components/DeckTopBar';
+import { resolveActivityArtwork } from '../constants/activity-artwork';
 
 export type CreateCircleInput = {
   capacity: number;
@@ -78,6 +89,13 @@ export function CreateCircleScreen({
   const [interests, setInterests] = useState(user.interests.slice(0, 3));
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const basicsReady = Boolean(
+    title.trim() && description.trim() && interests.length,
+  );
+  const timeReady = Boolean(
+    location.locationName.trim() && startsAt.getTime() > Date.now(),
+  );
+  const safetyReady = Boolean(hostNote.trim());
 
   const toggleInterest = (interest: string) => {
     setInterests((current) =>
@@ -136,28 +154,94 @@ export function CreateCircleScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.topBarTitle}>Create circle</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <DeckTopBar
+        onBack={onBack}
+        right={
+          <Text style={styles.previewStatus}>
+            {saving ? 'Publishing…' : 'Preview'}
+          </Text>
+        }
+        title="New recurring plan"
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Build a recurring group</Text>
-        <Text style={styles.subtitle}>
-          Use a reliable rhythm and a small cohort so members can return to the
-          same people.
+        <ImageBackground
+          imageStyle={styles.previewImage}
+          source={
+            coverImage
+              ? { uri: coverImage.uri }
+              : resolveActivityArtwork({
+                  interests,
+                  title: title || 'Recurring creative circle',
+                })
+          }
+          style={styles.previewCard}
+        >
+          <View style={styles.previewShade} />
+          <View style={styles.previewBadge}>
+            <Text style={styles.previewBadgeText}>RECURRING PREVIEW</Text>
+          </View>
+          <View style={styles.previewCopy}>
+            <Text numberOfLines={2} style={styles.previewTitle}>
+              {title.trim() || 'Your recurring plan'}
+            </Text>
+            <View style={styles.previewMetaRow}>
+              <MapPin color={colors.surface} size={17} />
+              <Text numberOfLines={1} style={styles.previewMeta}>
+                {location.locationName ||
+                  location.city ||
+                  'Choose a meeting place'}
+              </Text>
+            </View>
+            <View style={styles.previewMetaRow}>
+              <CalendarDays color={colors.surface} size={17} />
+              <Text style={styles.previewMeta}>
+                {formatRecurringSchedule(startsAt, cadence)} · {durationWeeks}{' '}
+                weeks
+              </Text>
+            </View>
+            <View style={styles.previewMetaRow}>
+              <UsersRound color={colors.surface} size={17} />
+              <Text style={styles.previewMeta}>
+                Same group · Up to {capacity}
+              </Text>
+            </View>
+          </View>
+        </ImageBackground>
+        <Text style={styles.photoHelper}>
+          Add a real photo of the experience. If you skip this, Niva uses a
+          category image.
         </Text>
+        <ActivityCoverSelector onChange={setCoverImage} value={coverImage} />
+        <View style={styles.completionHeader}>
+          <Text style={styles.title}>Complete your plan</Text>
+          <Text style={styles.subtitle}>
+            {[basicsReady, timeReady, safetyReady].filter(Boolean).length} of 3
+            ready
+          </Text>
+        </View>
+        <View style={styles.readinessCard}>
+          <ReadinessRow
+            Icon={CheckCircle2}
+            ready={basicsReady}
+            text="Name, rhythm and interests"
+            title="Basics"
+          />
+          <ReadinessRow
+            Icon={MapPin}
+            ready={timeReady}
+            text="First session and venue"
+            title="Time & place"
+          />
+          <ReadinessRow
+            Icon={ShieldCheck}
+            ready={safetyReady}
+            text="Host note and group guidance"
+            title="Welcome & safety"
+          />
+        </View>
         <Field label="Circle title">
           <TextInput
             onChangeText={setTitle}
@@ -192,9 +276,6 @@ export function CreateCircleScreen({
           <Text style={styles.helper}>
             This introduction stays with every session in the circle.
           </Text>
-        </Field>
-        <Field label="Cover photo">
-          <ActivityCoverSelector onChange={setCoverImage} value={coverImage} />
         </Field>
         <Field label="Meeting location">
           <LocationSelector onChange={setLocation} value={location} />
@@ -264,7 +345,7 @@ export function CreateCircleScreen({
           style={[styles.submitButton, saving && styles.disabled]}
         >
           <Text style={styles.submitText}>
-            {saving ? 'Creating...' : 'Publish circle'}
+            {saving ? 'Creating…' : 'Finish setup and publish'}
           </Text>
         </Pressable>
       </ScrollView>
@@ -283,6 +364,33 @@ function Field({
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       {children}
+    </View>
+  );
+}
+
+function ReadinessRow({
+  Icon,
+  ready,
+  text,
+  title,
+}: {
+  Icon: typeof CheckCircle2;
+  ready: boolean;
+  text: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.readinessRow}>
+      <View
+        style={[styles.readinessIcon, !ready && styles.readinessIconPending]}
+      >
+        <Icon color={ready ? colors.success : colors.warning} size={22} />
+      </View>
+      <View style={styles.readinessCopy}>
+        <Text style={styles.readinessTitle}>{title}</Text>
+        <Text style={styles.readinessText}>{text}</Text>
+      </View>
+      <CheckCircle2 color={ready ? colors.success : colors.border} size={23} />
     </View>
   );
 }
@@ -384,6 +492,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   choiceTextSelected: { color: colors.surface },
+  completionHeader: { marginTop: spacing.xl },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   disabled: { opacity: 0.55 },
   error: {
@@ -429,6 +538,98 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   screen: { backgroundColor: colors.background, flex: 1 },
+  photoHelper: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginVertical: spacing.md,
+    textAlign: 'center',
+  },
+  previewBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    margin: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  previewBadgeText: {
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  previewCard: { height: 330, justifyContent: 'flex-end', overflow: 'hidden' },
+  previewCopy: { padding: spacing.lg },
+  previewImage: { borderRadius: radius.lg },
+  previewMeta: {
+    color: colors.surface,
+    flex: 1,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  previewMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  previewShade: {
+    backgroundColor: 'rgba(5,35,65,0.58)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: '42%',
+  },
+  previewStatus: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  previewTitle: {
+    color: colors.surface,
+    fontSize: 31,
+    fontWeight: '900',
+    lineHeight: 35,
+  },
+  readinessCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  readinessCopy: { flex: 1 },
+  readinessIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  readinessIconPending: { backgroundColor: colors.warningSoft },
+  readinessRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 76,
+  },
+  readinessText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 3,
+  },
+  readinessTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '900',
+  },
   stepper: {
     alignItems: 'center',
     backgroundColor: colors.surface,

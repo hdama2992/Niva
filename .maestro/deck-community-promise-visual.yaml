@@ -1,0 +1,15 @@
+appId: com.niva.niva
+name: Niva Community Promise interaction and visual
+---
+- assertVisible: "One promise before you join"
+- assertVisible: "I agree to follow Niva’s Community Promise."
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/community-promise-android
+- tapOn: "Read the full guidelines"
+- assertVisible: "Community guidelines"
+- tapOn: "Close guidelines"
+- tapOn: "I agree to follow Niva’s Community Promise."
+- scrollUntilVisible:
+    element:
+      text: "Agree and continue"
+    direction: DOWN
+- assertVisible: "Agree and continue"

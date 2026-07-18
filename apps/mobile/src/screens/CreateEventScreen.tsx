@@ -1,12 +1,17 @@
 import {
-  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
   CircleMinus,
   CirclePlus,
   LockKeyhole,
+  MapPin,
+  ShieldCheck,
+  UsersRound,
 } from 'lucide-react-native';
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   Pressable,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +28,8 @@ import {
 } from '../components/LocationSelector';
 import { NivaUser } from '../types/niva';
 import { SelectedImage } from '../services/media';
+import { DeckTopBar } from '../components/DeckTopBar';
+import { resolveActivityArtwork } from '../constants/activity-artwork';
 
 export type CreateEventInput = {
   capacity: number;
@@ -40,6 +47,7 @@ export type CreateEventInput = {
 };
 
 type CreateEventScreenProps = {
+  hostApproved: boolean;
   onBack: () => void;
   onCreate: (input: CreateEventInput) => Promise<void>;
   user: NivaUser;
@@ -53,6 +61,7 @@ const difficulties: Array<CreateEventInput['difficulty']> = [
 ];
 
 export function CreateEventScreen({
+  hostApproved,
   onBack,
   onCreate,
   user,
@@ -74,13 +83,13 @@ export function CreateEventScreen({
   );
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
-  const canHost = useMemo(
-    () =>
-      user.trustTier === 'trusted' ||
-      user.trustTier === 'host_eligible' ||
-      user.trustTier === 'host',
-    [user.trustTier],
+  const basicsReady = Boolean(
+    title.trim() && description.trim() && selectedInterests.length,
   );
+  const timeReady = Boolean(
+    location.locationName.trim() && startsAt.getTime() > Date.now(),
+  );
+  const safetyReady = Boolean(hostNote.trim());
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((current) => {
@@ -138,30 +147,97 @@ export function CreateEventScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.topBarTitle}>Create event</Text>
-        <View style={styles.topBarSpacer} />
-      </View>
+      <DeckTopBar
+        onBack={onBack}
+        right={
+          <Text style={styles.previewStatus}>
+            {saving ? 'Publishing…' : 'Preview'}
+          </Text>
+        }
+        title="New plan"
+      />
 
-      {canHost ? (
+      {hostApproved ? (
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Host a small gathering</Text>
-          <Text style={styles.subtitle}>
-            Give members a clear plan, a public meeting place, and a comfortable
-            capacity.
+          <ImageBackground
+            imageStyle={styles.previewImage}
+            source={
+              coverImage
+                ? { uri: coverImage.uri }
+                : resolveActivityArtwork({
+                    interests: selectedInterests,
+                    title: title || 'Sunday pottery table',
+                  })
+            }
+            style={styles.previewCard}
+          >
+            <View style={styles.previewShade} />
+            <View style={styles.previewBadge}>
+              <Text style={styles.previewBadgeText}>PREVIEW</Text>
+            </View>
+            <View style={styles.previewCopy}>
+              <Text numberOfLines={2} style={styles.previewTitle}>
+                {title.trim() || 'Your plan title'}
+              </Text>
+              <View style={styles.previewMetaRow}>
+                <MapPin color={colors.surface} size={17} />
+                <Text numberOfLines={1} style={styles.previewMeta}>
+                  {location.locationName ||
+                    location.city ||
+                    'Choose a meeting place'}
+                </Text>
+              </View>
+              <View style={styles.previewMetaRow}>
+                <CalendarDays color={colors.surface} size={17} />
+                <Text style={styles.previewMeta}>
+                  {formatPreviewDate(startsAt)}
+                </Text>
+              </View>
+              <View style={styles.previewMetaRow}>
+                <UsersRound color={colors.surface} size={17} />
+                <Text style={styles.previewMeta}>Up to {capacity}</Text>
+              </View>
+            </View>
+          </ImageBackground>
+
+          <Text style={styles.photoHelper}>
+            Add a real photo of the experience. If you skip this, Niva uses a
+            category image.
           </Text>
+          <ActivityCoverSelector onChange={setCoverImage} value={coverImage} />
+
+          <View style={styles.completionHeader}>
+            <View>
+              <Text style={styles.title}>Complete your plan</Text>
+              <Text style={styles.subtitle}>
+                {[basicsReady, timeReady, safetyReady].filter(Boolean).length}{' '}
+                of 3 ready
+              </Text>
+            </View>
+          </View>
+          <View style={styles.readinessCard}>
+            <ReadinessRow
+              Icon={CheckCircle2}
+              ready={basicsReady}
+              text="Name, description and interests"
+              title="Basics"
+            />
+            <ReadinessRow
+              Icon={MapPin}
+              ready={timeReady}
+              text="Date, time and venue"
+              title="Time & place"
+            />
+            <ReadinessRow
+              Icon={ShieldCheck}
+              ready={safetyReady}
+              text="Host note and gathering guidance"
+              title="Welcome & safety"
+            />
+          </View>
 
           <Field label="Event title">
             <TextInput
@@ -197,12 +273,6 @@ export function CreateEventScreen({
             <Text style={styles.helper}>
               This appears on the event page as your personal introduction.
             </Text>
-          </Field>
-          <Field label="Cover photo">
-            <ActivityCoverSelector
-              onChange={setCoverImage}
-              value={coverImage}
-            />
           </Field>
           <Field label="Meeting location">
             <LocationSelector onChange={setLocation} value={location} />
@@ -299,7 +369,7 @@ export function CreateEventScreen({
             style={[styles.submitButton, saving && styles.submitButtonDisabled]}
           >
             <Text style={styles.submitText}>
-              {saving ? 'Creating...' : 'Publish event'}
+              {saving ? 'Creating…' : 'Finish setup and publish'}
             </Text>
           </Pressable>
         </ScrollView>
@@ -327,6 +397,33 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
+function ReadinessRow({
+  Icon,
+  ready,
+  text,
+  title,
+}: {
+  Icon: typeof CheckCircle2;
+  ready: boolean;
+  text: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.readinessRow}>
+      <View
+        style={[styles.readinessIcon, !ready && styles.readinessIconPending]}
+      >
+        <Icon color={ready ? colors.success : colors.warning} size={22} />
+      </View>
+      <View style={styles.readinessCopy}>
+        <Text style={styles.readinessTitle}>{title}</Text>
+        <Text style={styles.readinessText}>{text}</Text>
+      </View>
+      <CheckCircle2 color={ready ? colors.success : colors.border} size={23} />
+    </View>
+  );
+}
+
 function defaultStartTime() {
   const date = new Date();
   date.setDate(date.getDate() + 7);
@@ -336,6 +433,16 @@ function defaultStartTime() {
 
 function formatDifficulty(value: CreateEventInput['difficulty']) {
   return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
+function formatPreviewDate(value: Date) {
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    weekday: 'short',
+  }).format(value);
 }
 
 const styles = StyleSheet.create({
@@ -374,6 +481,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
+  completionHeader: { marginTop: spacing.xl },
   error: {
     color: colors.primaryDark,
     fontSize: typography.small,
@@ -455,6 +563,98 @@ const styles = StyleSheet.create({
     fontSize: typography.subheading,
     fontWeight: '800',
     marginTop: spacing.lg,
+  },
+  photoHelper: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 19,
+    marginVertical: spacing.md,
+    textAlign: 'center',
+  },
+  previewBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    margin: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  previewBadgeText: {
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  previewCard: { height: 330, justifyContent: 'flex-end', overflow: 'hidden' },
+  previewCopy: { padding: spacing.lg },
+  previewImage: { borderRadius: radius.lg },
+  previewMeta: {
+    color: colors.surface,
+    flex: 1,
+    fontSize: typography.small,
+    fontWeight: '700',
+  },
+  previewMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  previewShade: {
+    backgroundColor: 'rgba(5,35,65,0.56)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: '42%',
+  },
+  previewStatus: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  previewTitle: {
+    color: colors.surface,
+    fontSize: 32,
+    fontWeight: '900',
+    lineHeight: 36,
+  },
+  readinessCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  readinessCopy: { flex: 1 },
+  readinessIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  readinessIconPending: { backgroundColor: colors.warningSoft },
+  readinessRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 76,
+  },
+  readinessText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 3,
+  },
+  readinessTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '900',
   },
   screen: {
     backgroundColor: colors.background,

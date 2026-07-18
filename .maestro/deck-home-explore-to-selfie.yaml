@@ -1,0 +1,16 @@
+appId: com.niva.niva
+name: Niva real Home to verification selfie gate
+---
+- assertVisible: "Verification starts when you join"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/home-unverified-android
+- tapOn: "Explore"
+- scrollUntilVisible:
+    element:
+      text: "Acceptance Coffee & Photo Walk 09531657"
+    direction: DOWN
+- tapOn: "Acceptance Coffee & Photo Walk 09531657"
+- assertVisible: "Request to join"
+- tapOn: "Request to join"
+- assertVisible: "Take a verification selfie"
+- assertVisible: "Only Niva’s review team sees this selfie."
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/verification-selfie-android

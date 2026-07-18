@@ -1,15 +1,15 @@
-import Link from 'next/link';
+import { PolicyChrome, policyLinks } from '../components/PolicyChrome';
 
 export default function TermsPage() {
   return (
-    <main className="legal-page">
-      <nav>
-        <Link href="/">niva.</Link>
-      </nav>
-      <article>
-        <p className="eyebrow">Beta terms</p>
-        <h1>Participation with clear expectations.</h1>
-        <p>Last updated: 17 July 2026</p>
+    <PolicyChrome activeHref="/terms" links={policyLinks}>
+      <p className="policy-kicker">Terms of participation</p>
+      <h1>Clear expectations for taking part.</h1>
+      <p className="policy-lead">
+        The practical rules that keep Niva plans respectful, accurate, and safe
+        for members and hosts.
+      </p>
+      <div className="policy-prose">
         <h2>Closed beta</h2>
         <p>
           Niva is an early closed-beta service. Availability, activities, and
@@ -43,7 +43,8 @@ export default function TermsPage() {
           Questions can be sent to{' '}
           <a href="mailto:care@niva.community">care@niva.community</a>.
         </p>
-      </article>
-    </main>
+        <p className="policy-updated">Last updated 19 July 2026</p>
+      </div>
+    </PolicyChrome>
   );
 }

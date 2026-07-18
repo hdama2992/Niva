@@ -312,6 +312,14 @@ export default function App() {
         return (
           <SelfDeclarationScreen
             displayName={route.profile.displayName}
+            onBack={() =>
+              setRoute({
+                idToken: route.idToken,
+                name: 'profile',
+                phone: route.phone,
+                username: route.username,
+              })
+            }
             onAccept={() => handleDeclaration(route.idToken)}
           />
         );
@@ -337,6 +345,14 @@ export default function App() {
         return (
           <VerificationPendingScreen
             displayName={route.user.displayName}
+            onBack={() =>
+              setRoute({
+                idToken: route.idToken,
+                initialTab: route.returnTab ?? 'home',
+                name: 'home',
+                user: route.user,
+              })
+            }
             onContinue={() =>
               setRoute({
                 idToken: route.idToken,

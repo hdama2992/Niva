@@ -1,0 +1,32 @@
+appId: com.niva.niva
+name: Niva host reviews and approves the participant request
+---
+- tapOn: "98765 43210"
+- inputText: "9409531657"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- tapOn: "Plans"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Host Supper 0319"
+    direction: DOWN
+- tapOn: "Maestro Host Supper 0319"
+- scrollUntilVisible:
+    element:
+      text: "Manage members"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Manage members"
+- assertVisible: "1 join request need a response"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/manage-plan-pending-android
+- tapOn: "Review"
+- assertVisible: "Niva Test Participant"
+- assertVisible: "Profile verified"
+- assertVisible: "I enjoy books, photography, and meeting people through shared plans."
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/review-join-request-android
+- tapOn: "Approve request"
+- assertVisible: "All caught up"

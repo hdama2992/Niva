@@ -1,0 +1,14 @@
+appId: com.niva.niva
+name: Niva Community Promise real-state visual
+---
+- tapOn: "98765 43210"
+- inputText: "9876500519"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- assertVisible: "One promise before you join"
+- assertVisible: "I agree to follow Niva’s Community Promise."
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/community-promise-android

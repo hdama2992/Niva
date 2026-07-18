@@ -1,0 +1,16 @@
+appId: com.niva.niva
+name: Niva participant filters and requests the host event
+---
+- scrollUntilVisible:
+    element:
+      text: "Search by activity or area"
+    direction: UP
+- tapOn: "Search by activity or area"
+- inputText: "Maestro Host Supper 0319"
+- hideKeyboard
+- assertVisible: "Maestro Host Supper 0319"
+- tapOn: "Join"
+- assertVisible: "Request to join Maestro Host Supper 0319?"
+- tapOn: "Request"
+- assertVisible: "Request sent"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-request-sent-android

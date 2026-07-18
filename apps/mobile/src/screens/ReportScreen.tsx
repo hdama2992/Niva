@@ -1,4 +1,4 @@
-import { ArrowLeft, Flag } from 'lucide-react-native';
+import { ChevronRight, ShieldAlert, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { DeckTopBar } from '../components/DeckTopBar';
 import { colors, radius, spacing, typography } from '../constants/theme';
 
 export type ReportReason =
@@ -24,32 +25,12 @@ type ReportScreenProps = {
   targetName: string;
 };
 
-const reasons: Array<{ id: ReportReason; label: string; text: string }> = [
-  {
-    id: 'SPAM',
-    label: 'Spam',
-    text: 'Unwanted promotions or repeated content.',
-  },
-  {
-    id: 'FAKE_PROFILE',
-    label: 'Fake profile',
-    text: 'A misleading or impersonated identity.',
-  },
-  {
-    id: 'HARASSMENT',
-    label: 'Harassment',
-    text: 'Threatening, pressuring, or unwanted conduct.',
-  },
-  {
-    id: 'INAPPROPRIATE_BEHAVIOUR',
-    label: 'Inappropriate behaviour',
-    text: 'Conduct that violates community boundaries.',
-  },
-  {
-    id: 'OTHER',
-    label: 'Other',
-    text: 'Something else the moderation team should review.',
-  },
+const reasons: Array<{ id: ReportReason; label: string }> = [
+  { id: 'INAPPROPRIATE_BEHAVIOUR', label: 'Unsafe or threatening behaviour' },
+  { id: 'HARASSMENT', label: 'Harassment or unwanted contact' },
+  { id: 'FAKE_PROFILE', label: 'Misleading identity or profile' },
+  { id: 'SPAM', label: 'Problem with a plan or host' },
+  { id: 'OTHER', label: 'Something else' },
 ];
 
 export function ReportScreen({
@@ -79,73 +60,84 @@ export function ReportScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.topBarTitle}>Report</Text>
-        <View style={styles.iconButton} />
-      </View>
+      <DeckTopBar onBack={onBack} title="Report a concern" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.iconWrap}>
-          <Flag color={colors.primary} size={27} strokeWidth={2.3} />
+        <View style={styles.privateCard}>
+          <ShieldCheck color={colors.success} size={35} />
+          <View style={styles.privateCopy}>
+            <Text style={styles.privateTitle}>Your report is private.</Text>
+            <Text style={styles.privateText}>
+              {targetName} won’t be told who submitted it.
+            </Text>
+          </View>
         </View>
-        <Text style={styles.title}>Tell us what happened</Text>
-        <Text style={styles.subtitle}>
-          Your report about {targetName} is private. A moderator will review it.
-        </Text>
+
+        <Text style={styles.sectionTitle}>What happened?</Text>
         <View style={styles.reasonList}>
-          {reasons.map((item) => (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: reason === item.id }}
-              key={item.id}
-              onPress={() => setReason(item.id)}
-              style={[
-                styles.reason,
-                reason === item.id && styles.reasonSelected,
-              ]}
-            >
-              <View
+          {reasons.map((item, index) => {
+            const selected = reason === item.id;
+            return (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                key={item.id}
+                onPress={() => setReason(item.id)}
                 style={[
-                  styles.radio,
-                  reason === item.id && styles.radioSelected,
+                  styles.reasonRow,
+                  index > 0 && styles.reasonDivider,
+                  selected && styles.reasonSelected,
                 ]}
-              />
-              <View style={styles.reasonCopy}>
+              >
+                <View
+                  style={[styles.radio, selected && styles.radioSelected]}
+                />
                 <Text style={styles.reasonLabel}>{item.label}</Text>
-                <Text style={styles.reasonText}>{item.text}</Text>
-              </View>
-            </Pressable>
-          ))}
+                <ChevronRight color={colors.muted} size={21} />
+              </Pressable>
+            );
+          })}
         </View>
-        <Text style={styles.fieldLabel}>Anything else we should know?</Text>
-        <TextInput
-          maxLength={1000}
-          multiline
-          onChangeText={setDetails}
-          placeholder="Share only details that help a moderator understand the situation."
-          placeholderTextColor={colors.muted}
-          style={styles.input}
-          value={details}
-        />
-      </ScrollView>
-      <View style={styles.footer}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Text style={styles.fieldLabel}>
+          Add details that help us understand{' '}
+          <Text style={styles.optional}>(optional)</Text>
+        </Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            accessibilityLabel="Report details"
+            maxLength={500}
+            multiline
+            onChangeText={setDetails}
+            placeholder="Share what happened. Avoid including sensitive information that isn’t needed."
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            textAlignVertical="top"
+            value={details}
+          />
+          <Text style={styles.counter}>{details.length}/500</Text>
+        </View>
+
+        <View style={styles.dangerCard}>
+          <ShieldAlert color={colors.warning} size={30} />
+          <Text style={styles.dangerText}>
+            If you’re in immediate danger, contact local emergency services.
+          </Text>
+        </View>
+        {error ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            {error}
+          </Text>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           disabled={submitting}
           onPress={() => void submit()}
-          style={[styles.submitButton, submitting && styles.submitDisabled]}
+          style={[styles.submitButton, submitting && styles.disabled]}
         >
           {submitting ? (
             <ActivityIndicator color={colors.surface} />
@@ -153,133 +145,149 @@ export function ReportScreen({
             <Text style={styles.submitText}>Submit report</Text>
           )}
         </Pressable>
-      </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.cancelButton}
+        >
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  fieldLabel: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-    marginTop: spacing.xl,
+  cancelButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
   },
-  footer: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
+  cancelText: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '900',
+  },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  counter: {
+    bottom: spacing.sm,
+    color: colors.muted,
+    fontSize: typography.small,
+    position: 'absolute',
+    right: spacing.md,
+  },
+  dangerCard: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.warningSoft,
+    borderColor: '#EFCFC2',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
     padding: spacing.md,
   },
+  dangerText: {
+    color: colors.warning,
+    flex: 1,
+    fontSize: typography.small,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  disabled: { opacity: 0.6 },
   error: {
-    color: colors.primaryDark,
+    color: colors.warning,
     fontSize: typography.small,
     fontWeight: '700',
-    marginBottom: spacing.sm,
+    marginTop: spacing.md,
   },
-  iconButton: {
-    alignItems: 'center',
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  iconWrap: {
-    alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.pill,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
+  fieldLabel: {
+    color: colors.primaryDark,
+    fontSize: typography.subheading,
+    fontWeight: '900',
+    marginTop: spacing.xl,
   },
   input: {
+    color: colors.ink,
+    fontSize: typography.body,
+    lineHeight: 23,
+    minHeight: 132,
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  inputWrap: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
-    color: colors.ink,
+    marginTop: spacing.md,
+    position: 'relative',
+  },
+  optional: { color: colors.muted, fontWeight: '500' },
+  privateCard: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.successSoft,
+    borderColor: '#C9DCCF',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  privateCopy: { flex: 1 },
+  privateText: {
+    color: '#386749',
     fontSize: typography.body,
-    lineHeight: 22,
-    marginTop: spacing.sm,
-    minHeight: 132,
-    padding: spacing.md,
-    textAlignVertical: 'top',
+    lineHeight: 24,
+    marginTop: 4,
+  },
+  privateTitle: {
+    color: '#386749',
+    fontSize: typography.subheading,
+    fontWeight: '900',
   },
   radio: {
     borderColor: colors.muted,
     borderRadius: radius.pill,
-    borderWidth: 1.5,
-    height: 18,
-    marginTop: 2,
-    width: 18,
+    borderWidth: 2,
+    height: 22,
+    width: 22,
   },
-  radioSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    borderWidth: 5,
-  },
-  reason: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  reasonCopy: { flex: 1 },
+  radioSelected: { borderColor: colors.primary, borderWidth: 7 },
+  reasonDivider: { borderTopColor: colors.border, borderTopWidth: 1 },
   reasonLabel: {
-    color: colors.ink,
+    color: colors.primaryDark,
+    flex: 1,
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '700',
   },
-  reasonList: { gap: spacing.sm, marginTop: spacing.xl },
-  reasonSelected: { borderColor: colors.primary, borderWidth: 2 },
-  reasonText: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: 3,
+  reasonList: { marginTop: spacing.md },
+  reasonRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 64,
+    paddingHorizontal: spacing.sm,
   },
+  reasonSelected: { backgroundColor: colors.infoSoft },
   screen: { backgroundColor: colors.background, flex: 1 },
+  sectionTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.heading,
+    fontWeight: '900',
+    marginTop: spacing.xl,
+  },
   submitButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: radius.md,
     justifyContent: 'center',
-    minHeight: 54,
+    marginTop: spacing.lg,
+    minHeight: 56,
   },
-  submitDisabled: { opacity: 0.6 },
   submitText: {
     color: colors.surface,
     fontSize: typography.body,
-    fontWeight: '800',
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 24,
-    marginTop: spacing.md,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.heading,
-    fontWeight: '800',
-    marginTop: spacing.xl,
-  },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 60,
-    paddingHorizontal: spacing.sm,
-  },
-  topBarTitle: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 });

@@ -114,7 +114,7 @@ export function ActivityDetailScreen({
           <Image
             resizeMode="contain"
             source={resolveActivityArtwork(item)}
-            style={StyleSheet.absoluteFill}
+            style={styles.heroImage}
           />
           <View style={styles.heroShade} />
           <Pressable
@@ -280,7 +280,11 @@ export function ActivityDetailScreen({
 
           {isHost && !cancelled ? (
             <View style={styles.hostActions}>
-              <Pressable onPress={onManage} style={styles.hostPrimaryAction}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onManage}
+                style={styles.hostPrimaryAction}
+              >
                 <UsersRound
                   color={colors.surface}
                   size={18}
@@ -288,7 +292,11 @@ export function ActivityDetailScreen({
                 />
                 <Text style={styles.hostPrimaryText}>Manage members</Text>
               </Pressable>
-              <Pressable onPress={onEdit} style={styles.hostSecondaryAction}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onEdit}
+                style={styles.hostSecondaryAction}
+              >
                 <Text style={styles.hostSecondaryText}>Edit details</Text>
               </Pressable>
             </View>
@@ -640,6 +648,7 @@ const styles = StyleSheet.create({
     top: spacing.lg,
   },
   heroApproved: {},
+  heroImage: { height: '100%', width: '100%' },
   heroShade: {
     backgroundColor: 'rgba(16,39,66,0.12)',
     bottom: 0,
@@ -648,7 +657,12 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  hostActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  hostActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: 72,
+    marginTop: spacing.lg,
+  },
   hostNote: {
     alignItems: 'flex-start',
     backgroundColor: colors.accentSoft,

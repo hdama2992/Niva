@@ -1,116 +1,107 @@
-import { ArrowLeft, Bell, CheckCircle2 } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Bell,
+  CalendarCheck2,
+  CheckCircle2,
+  ChevronRight,
+  ShieldCheck,
+} from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import { DeckTopBar } from '../components/DeckTopBar';
+import { resolveActivityCardArtwork } from '../constants/activity-artwork';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { NotificationItem } from '../services/community';
 
 type NotificationsScreenProps = {
   notifications: NotificationItem[];
   onBack: () => void;
+  onMarkAllRead?: () => void;
   onOpen: (notification: NotificationItem) => void;
 };
 
 export function NotificationsScreen({
   notifications,
   onBack,
+  onMarkAllRead,
   onOpen,
 }: NotificationsScreenProps) {
-  const unreadCount = notifications.filter(
-    (notification) => !notification.readAt,
-  ).length;
+  const [filter, setFilter] = useState<'all' | 'action'>('all');
+  const visible = useMemo(
+    () =>
+      filter === 'all' ? notifications : notifications.filter(needsAction),
+    [filter, notifications],
+  );
+  const unreadCount = notifications.filter((item) => !item.readAt).length;
+  const today = visible.filter((item) => isRecent(item.createdAt));
+  const earlier = visible.filter((item) => !isRecent(item.createdAt));
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text style={styles.topBarTitle}>Notifications</Text>
-        <View style={styles.topBarSpacer} />
-      </View>
-
+      <DeckTopBar
+        onBack={onBack}
+        right={
+          onMarkAllRead && unreadCount ? (
+            <Pressable accessibilityRole="button" onPress={onMarkAllRead}>
+              <Text style={styles.markRead}>Mark all read</Text>
+            </Pressable>
+          ) : undefined
+        }
+        title="Updates"
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headingRow}>
-          <View>
-            <Text style={styles.title}>Your updates</Text>
-            <Text style={styles.subtitle}>
-              Verification, join requests, and event changes stay here.
-            </Text>
-          </View>
-          {unreadCount ? (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{unreadCount} new</Text>
-            </View>
-          ) : null}
+        <View style={styles.segmented}>
+          <FilterButton
+            active={filter === 'all'}
+            label={`All${unreadCount ? `  ${unreadCount}` : ''}`}
+            onPress={() => setFilter('all')}
+          />
+          <FilterButton
+            active={filter === 'action'}
+            label="Needs action"
+            onPress={() => setFilter('action')}
+          />
         </View>
 
-        {notifications.length ? (
-          <View style={styles.list}>
-            {notifications.map((notification) => {
-              const unread = !notification.readAt;
-
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  key={notification.id}
-                  onPress={() => onOpen(notification)}
-                  style={[
-                    styles.notification,
-                    unread && styles.notificationUnread,
-                  ]}
-                >
-                  <View
-                    style={[styles.iconWrap, unread && styles.iconWrapUnread]}
-                  >
-                    {unread ? (
-                      <Bell
-                        color={colors.primary}
-                        size={20}
-                        strokeWidth={2.4}
-                      />
-                    ) : (
-                      <CheckCircle2
-                        color={colors.secondary}
-                        size={20}
-                        strokeWidth={2.4}
-                      />
-                    )}
-                  </View>
-                  <View style={styles.notificationCopy}>
-                    <View style={styles.notificationHeading}>
-                      <Text style={styles.notificationTitle}>
-                        {notification.title}
-                      </Text>
-                      {unread ? <View style={styles.dot} /> : null}
-                    </View>
-                    <Text style={styles.notificationBody}>
-                      {notification.body}
-                    </Text>
-                    <Text style={styles.timestamp}>
-                      {formatDate(notification.createdAt)}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+        {visible.length ? (
+          <>
+            {today.length ? (
+              <NotificationGroup
+                label={`Today · ${formatDay(new Date())}`}
+                notifications={today}
+                onOpen={onOpen}
+              />
+            ) : null}
+            {earlier.length ? (
+              <NotificationGroup
+                label="Earlier"
+                notifications={earlier}
+                onOpen={onOpen}
+              />
+            ) : null}
+          </>
         ) : (
-          <View style={styles.emptyState}>
+          <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Bell color={colors.info} size={25} strokeWidth={2.3} />
+              <Bell color={colors.info} size={25} />
             </View>
-            <Text style={styles.emptyTitle}>Nothing new</Text>
+            <Text style={styles.emptyTitle}>
+              {filter === 'action'
+                ? 'Nothing needs your attention'
+                : 'Nothing new'}
+            </Text>
             <Text style={styles.emptyText}>
-              Once you take part in an activity, its updates will appear here.
+              Verification, plan and membership updates will appear here.
             </Text>
           </View>
         )}
@@ -119,90 +110,219 @@ export function NotificationsScreen({
   );
 }
 
-function formatDate(value: string) {
+function FilterButton({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterButton, active && styles.filterActive]}
+    >
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function NotificationGroup({
+  label,
+  notifications,
+  onOpen,
+}: {
+  label: string;
+  notifications: NotificationItem[];
+  onOpen: (item: NotificationItem) => void;
+}) {
+  return (
+    <View style={styles.group}>
+      <Text style={styles.groupLabel}>{label}</Text>
+      {notifications.map((item, index) => (
+        <NotificationRow
+          item={item}
+          key={item.id}
+          onOpen={() => onOpen(item)}
+          showDivider={index > 0}
+        />
+      ))}
+    </View>
+  );
+}
+
+function NotificationRow({
+  item,
+  onOpen,
+  showDivider,
+}: {
+  item: NotificationItem;
+  onOpen: () => void;
+  showDivider: boolean;
+}) {
+  const planRelated = Boolean(
+    item.metadata?.eventId || item.metadata?.circleId,
+  );
+  const action = needsAction(item);
+  const Icon = item.title.toLowerCase().includes('profile')
+    ? ShieldCheck
+    : item.title.toLowerCase().includes('reminder')
+      ? CalendarCheck2
+      : CheckCircle2;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={[styles.notification, showDivider && styles.notificationDivider]}
+    >
+      {!item.readAt ? (
+        <View style={styles.unreadDot} />
+      ) : (
+        <View style={styles.dotSpacer} />
+      )}
+      {planRelated ? (
+        <Image
+          source={resolveActivityCardArtwork({
+            interests: [],
+            title: `${item.title} ${item.body}`,
+          })}
+          style={styles.thumbnail}
+        />
+      ) : (
+        <View style={styles.iconWrap}>
+          <Icon color={colors.success} size={23} />
+        </View>
+      )}
+      <View style={styles.notificationCopy}>
+        <Text style={styles.notificationTitle}>{item.title}</Text>
+        <Text style={styles.notificationBody}>{item.body}</Text>
+        <Text style={styles.timestamp}>{formatTimestamp(item.createdAt)}</Text>
+      </View>
+      {action ? (
+        <Text style={styles.actionText}>Respond</Text>
+      ) : planRelated ? (
+        <View style={styles.viewPill}>
+          <Text style={styles.viewText}>View plan</Text>
+        </View>
+      ) : (
+        <ChevronRight color={colors.muted} size={20} />
+      )}
+    </Pressable>
+  );
+}
+
+function needsAction(item: NotificationItem) {
+  return (
+    /needs|respond|pending|request|invited/i.test(
+      `${item.title} ${item.body}`,
+    ) && !/approved|received/i.test(`${item.title} ${item.body}`)
+  );
+}
+
+function isRecent(value: string) {
+  return Date.now() - new Date(value).getTime() < 24 * 60 * 60 * 1000;
+}
+
+function formatDay(value: Date) {
   return new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
     month: 'short',
-  }).format(new Date(value));
+    weekday: 'short',
+  }).format(value);
+}
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  return isRecent(value)
+    ? new Intl.DateTimeFormat('en-IN', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(date)
+    : new Intl.DateTimeFormat('en-IN', {
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        month: 'short',
+      }).format(date);
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+  actionText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '900',
   },
-  dot: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    height: 8,
-    width: 8,
-  },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  dotSpacer: { width: 8 },
+  empty: { alignItems: 'center', padding: spacing.xxl },
   emptyIcon: {
     alignItems: 'center',
     backgroundColor: colors.infoSoft,
+    borderRadius: radius.pill,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 20,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyTitle: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '900',
+    marginTop: spacing.md,
+  },
+  filterActive: { backgroundColor: colors.primary },
+  filterButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  filterText: {
+    color: colors.primaryDark,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  filterTextActive: { color: colors.surface },
+  group: { marginTop: spacing.xl },
+  groupLabel: {
+    color: colors.muted,
+    fontSize: typography.body,
+    fontWeight: '800',
+    marginBottom: spacing.md,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
     borderRadius: radius.pill,
     height: 48,
     justifyContent: 'center',
     width: 48,
   },
-  emptyState: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.xl,
-    padding: spacing.xl,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 19,
-    marginTop: spacing.xs,
+  markRead: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '900',
     textAlign: 'center',
   },
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-    marginTop: spacing.md,
-  },
-  headingRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: spacing.md,
-    justifyContent: 'space-between',
-  },
-  iconButton: {
-    alignItems: 'center',
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  iconWrap: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.pill,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  iconWrapUnread: {
-    backgroundColor: colors.surfaceStrong,
-  },
-  list: {
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
   notification: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing.sm,
+    minHeight: 108,
+    paddingVertical: spacing.md,
   },
   notificationBody: {
     color: colors.muted,
@@ -210,76 +330,34 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 3,
   },
-  notificationCopy: {
-    flex: 1,
-  },
-  notificationHeading: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
+  notificationCopy: { flex: 1 },
+  notificationDivider: { borderTopColor: colors.border, borderTopWidth: 1 },
   notificationTitle: {
-    color: colors.ink,
-    flex: 1,
+    color: colors.primaryDark,
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
   },
-  notificationUnread: {
-    borderColor: colors.primary,
-  },
-  screen: {
-    backgroundColor: colors.background,
-    flex: 1,
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 23,
-    marginTop: spacing.xs,
-    maxWidth: 276,
-  },
-  timestamp: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: spacing.sm,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.heading,
-    fontWeight: '800',
-    lineHeight: 34,
-  },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    minHeight: 62,
-    paddingHorizontal: spacing.md,
-  },
-  topBarSpacer: {
-    height: 44,
-    width: 44,
-  },
-  topBarTitle: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: typography.body,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  unreadBadge: {
-    backgroundColor: colors.accentSoft,
+  screen: { backgroundColor: colors.background, flex: 1 },
+  segmented: {
+    backgroundColor: colors.surfaceStrong,
     borderRadius: radius.pill,
+    flexDirection: 'row',
+    padding: 3,
+  },
+  thumbnail: { borderRadius: radius.pill, height: 52, width: 52 },
+  timestamp: { color: '#8B96A4', fontSize: 12, marginTop: spacing.xs },
+  unreadDot: {
+    backgroundColor: '#12528B',
+    borderRadius: radius.pill,
+    height: 8,
+    width: 8,
+  },
+  viewPill: {
+    borderColor: colors.primary,
+    borderRadius: radius.pill,
+    borderWidth: 1,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 7,
   },
-  unreadText: {
-    color: colors.warning,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
+  viewText: { color: colors.primary, fontSize: 12, fontWeight: '900' },
 });

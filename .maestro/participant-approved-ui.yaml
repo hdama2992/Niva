@@ -1,0 +1,31 @@
+appId: com.niva.niva
+name: Participant sees the approved plan and uses cohort chat
+---
+- tapOn: "98765 43210"
+- inputText: "9509531657"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- tapOn: "Plans"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Host Supper 0319"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-approved-plan-android
+- tapOn: "Maestro Host Supper 0319"
+- assertVisible: "You’re going"
+- assertVisible: "Open group chat"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-approved-detail-android
+- tapOn: "Open group chat"
+- assertVisible: "Message the cohort"
+- tapOn: "Message the cohort"
+- inputText: "Excited to meet everyone at the supper!"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/chat-keyboard-shift-android
+- tapOn: "Send message"
+- hideKeyboard
+- assertVisible: "Excited to meet everyone at the supper!"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-chat-message-android

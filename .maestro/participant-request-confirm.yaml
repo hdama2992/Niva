@@ -1,0 +1,13 @@
+appId: com.niva.niva
+name: Niva participant confirms the filtered event request
+---
+- assertVisible: "Maestro Host Supper 0319"
+- scrollUntilVisible:
+    element:
+      text: "Join"
+    direction: DOWN
+- tapOn: "Join"
+- assertVisible: "Request to join Maestro Host Supper 0319?"
+- tapOn: "Request"
+- assertVisible: "Request sent"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-request-sent-android

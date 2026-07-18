@@ -1,0 +1,32 @@
+appId: com.niva.niva
+name: Niva profile details and interests reach final photo step
+---
+- assertVisible: "Tell us about you"
+- tapOn: "yourname"
+- inputText: "niva_deck_0319"
+- tapOn: "Himaja"
+- eraseText
+- inputText: "Niva Deck Tester"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Enter age"
+    direction: DOWN
+- tapOn: "Enter age"
+- inputText: "28"
+- hideKeyboard
+- tapOn: "Select your city"
+- tapOn: "Bangalore"
+- tapOn: "English"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+- tapOn: "Continue"
+- assertVisible: "What are you into?"
+- tapOn: "Books"
+- tapOn: "Photography"
+- tapOn: "Wellness"
+- tapOn: "Continue"
+- assertVisible: "Finish with a profile photo"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/profile-photo-android

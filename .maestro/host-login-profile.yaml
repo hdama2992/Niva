@@ -1,0 +1,19 @@
+appId: com.niva.niva
+name: Niva approved host reaches real hosting tools
+---
+- tapOn: "98765 43210"
+- inputText: "9409531657"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- assertVisible: "Verified member"
+- tapOn: "Profile"
+- assertVisible: "Your hosting tools"
+- assertVisible: "Create event"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/host-profile-android
+- tapOn: "Create event"
+- assertVisible: "Complete your plan"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/create-plan-android

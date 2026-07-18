@@ -1,0 +1,24 @@
+appId: com.niva.niva
+name: Niva participant requests the host-created event
+---
+- tapOn: "98765 43210"
+- inputText: "9509531657"
+- hideKeyboard
+- tapOn: "Continue"
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- assertVisible: "Verified member"
+- tapOn: "Explore"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Host Supper 0319"
+    direction: DOWN
+- tapOn: "Maestro Host Supper 0319"
+- assertVisible: "Request to join"
+- tapOn: "Request to join"
+- assertVisible: "Request to join Maestro Host Supper 0319?"
+- tapOn: "Request"
+- assertVisible: "Request sent"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/participant-request-sent-android

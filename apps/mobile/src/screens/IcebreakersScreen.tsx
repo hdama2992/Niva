@@ -1,11 +1,15 @@
 import {
-  ArrowLeft,
-  HeartHandshake,
-  MessageCircleQuestion,
+  BookOpen,
+  Camera,
+  Coffee,
+  MessageCircle,
+  ShieldCheck,
+  UsersRound,
 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +17,7 @@ import {
   View,
 } from 'react-native';
 
+import { DeckTopBar } from '../components/DeckTopBar';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
 import { IcebreakerMember, listIcebreakers } from '../services/community';
@@ -21,12 +26,16 @@ type IcebreakersScreenProps = {
   activity: DiscoveryItem;
   idToken: string;
   onBack: () => void;
+  onOpenChat?: () => void;
+  onViewPlan?: () => void;
 };
 
 export function IcebreakersScreen({
   activity,
   idToken,
   onBack,
+  onOpenChat,
+  onViewPlan,
 }: IcebreakersScreenProps) {
   const [activityTitle, setActivityTitle] = useState(activity.title);
   const [error, setError] = useState<string>();
@@ -37,158 +46,180 @@ export function IcebreakersScreen({
 
   useEffect(() => {
     let active = true;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        const payload = await listIcebreakers(idToken, type, activityId);
-        if (!active) {
-          return;
-        }
-        setActivityTitle(payload.activityTitle);
-        setMembers(payload.members);
-        setError(undefined);
-      } catch (loadError) {
+    void listIcebreakers(idToken, type, activityId)
+      .then((payload) => {
         if (active) {
+          setActivityTitle(payload.activityTitle);
+          setMembers(payload.members);
+          setError(undefined);
+        }
+      })
+      .catch((loadError) => {
+        if (active)
           setError(
             loadError instanceof Error
               ? loadError.message
               : 'Unable to load people for this activity.',
           );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
   }, [activityId, idToken, type]);
 
+  const interests = useMemo(
+    () =>
+      Array.from(
+        new Set(members.flatMap((member) => member.sharedInterests)),
+      ).slice(0, 6),
+    [members],
+  );
+  const prompts = useMemo(
+    () =>
+      Array.from(new Set(members.flatMap((member) => member.prompts))).slice(
+        0,
+        3,
+      ),
+    [members],
+  );
+
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={onBack}
-          style={styles.iconButton}
-        >
-          <ArrowLeft color={colors.ink} size={22} strokeWidth={2.4} />
-        </Pressable>
-        <Text numberOfLines={1} style={styles.topBarTitle}>
-          People you&apos;ll meet
-        </Text>
-        <View style={styles.iconButton} />
-      </View>
-
+      <DeckTopBar onBack={onBack} title={`Before ${activityTitle}`} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.intro}>
-          <View style={styles.introIcon}>
-            <HeartHandshake
-              color={colors.secondary}
-              size={24}
-              strokeWidth={2.3}
-            />
-          </View>
-          <Text style={styles.title}>{activityTitle}</Text>
-          <Text style={styles.subtitle}>
-            These are all the interests you and each approved member have in
-            common. No full profile or direct messaging is shown here.
-          </Text>
-        </View>
-
         {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
             <Text style={styles.loadingText}>
-              Finding your shared interests...
+              Finding what your group has in common…
             </Text>
           </View>
         ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text accessibilityLiveRegion="polite" style={styles.error}>
+            {error}
+          </Text>
+        ) : null}
         {!loading && !error && !members.length ? (
           <View style={styles.empty}>
-            <UsersPlaceholder />
-            <Text style={styles.emptyTitle}>No approved members yet</Text>
+            <View style={styles.emptyIcon}>
+              <UsersRound color={colors.muted} size={28} />
+            </View>
+            <Text style={styles.emptyTitle}>No other approved members yet</Text>
             <Text style={styles.emptyText}>
-              Icebreakers become available when other join requests are
-              approved.
+              This page fills in as the host approves join requests.
             </Text>
           </View>
         ) : null}
-        {!loading && !error
-          ? members.map((member) => (
-              <IcebreakerCard key={member.id} member={member} />
-            ))
-          : null}
+        {!loading && members.length ? (
+          <>
+            <Text style={styles.intro}>
+              You already have a few things in common.
+            </Text>
+            <View style={styles.avatarRow}>
+              {members.slice(0, 5).map((member, index) => (
+                <MemberAvatar index={index} key={member.id} member={member} />
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>Shared interests</Text>
+            <View style={styles.chips}>
+              {interests.map((interest) => (
+                <InterestChip interest={interest} key={interest} />
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>Conversation starters</Text>
+            <View style={styles.promptList}>
+              {prompts.map((prompt, index) => (
+                <View
+                  key={prompt}
+                  style={[styles.promptRow, index > 0 && styles.promptDivider]}
+                >
+                  <View style={styles.promptNumber}>
+                    <Text style={styles.promptNumberText}>{index + 1}</Text>
+                  </View>
+                  <Text style={styles.promptText}>{prompt}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.privacyNote}>
+              <View style={styles.privacyIcon}>
+                <ShieldCheck color={colors.success} size={22} />
+              </View>
+              <Text style={styles.privacyText}>
+                Only interests members choose to share are shown here.
+              </Text>
+            </View>
+            {onOpenChat ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onOpenChat}
+                style={styles.primaryButton}
+              >
+                <MessageCircle color={colors.surface} size={21} />
+                <Text style={styles.primaryText}>Open group chat</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={onViewPlan ?? onBack}
+              style={styles.viewButton}
+            >
+              <Text style={styles.viewText}>View plan</Text>
+            </Pressable>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-function IcebreakerCard({ member }: { member: IcebreakerMember }) {
+function MemberAvatar({
+  index,
+  member,
+}: {
+  index: number;
+  member: IcebreakerMember;
+}) {
   const name = member.displayName ?? 'Niva member';
-
   return (
-    <View style={styles.memberCard}>
-      <View style={styles.memberHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {name.slice(0, 1).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.memberCopy}>
-          <Text style={styles.memberName}>{name}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionLabel}>All shared interests</Text>
-      {member.sharedInterests.length ? (
-        <View style={styles.chips}>
-          {member.sharedInterests.map((interest) => (
-            <View key={interest} style={styles.chip}>
-              <Text style={styles.chipText}>{interest}</Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={styles.noOverlap}>
-          No shared interests listed yet. Start with the activity itself.
-        </Text>
-      )}
-
-      <View style={styles.promptHeading}>
-        <MessageCircleQuestion
-          color={colors.info}
-          size={18}
-          strokeWidth={2.3}
+    <View
+      accessibilityLabel={name}
+      style={[styles.avatar, index > 0 && styles.avatarOverlap]}
+    >
+      {member.profilePhotoUrl ? (
+        <Image
+          source={{ uri: member.profilePhotoUrl }}
+          style={styles.avatarImage}
         />
-        <Text style={styles.sectionLabel}>Conversation starters</Text>
-      </View>
-      <View style={styles.prompts}>
-        {member.prompts.map((prompt) => (
-          <Text key={prompt} style={styles.prompt}>
-            {prompt}
-          </Text>
-        ))}
-      </View>
+      ) : (
+        <Text style={styles.avatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+      )}
     </View>
   );
 }
 
-function UsersPlaceholder() {
+function InterestChip({ interest }: { interest: string }) {
+  const lower = interest.toLowerCase();
+  const Icon = lower.includes('book')
+    ? BookOpen
+    : lower.includes('coffee')
+      ? Coffee
+      : lower.includes('photo')
+        ? Camera
+        : UsersRound;
   return (
-    <View style={styles.emptyIcon}>
-      <HeartHandshake color={colors.muted} size={24} strokeWidth={2.3} />
+    <View style={styles.chip}>
+      <Icon color={colors.success} size={19} />
+      <Text style={styles.chipText}>{interest}</Text>
     </View>
   );
 }
@@ -196,51 +227,56 @@ function UsersPlaceholder() {
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
+    backgroundColor: colors.successSoft,
+    borderColor: colors.surface,
     borderRadius: radius.pill,
-    height: 42,
+    borderWidth: 3,
+    height: 72,
     justifyContent: 'center',
-    width: 42,
+    overflow: 'hidden',
+    width: 72,
+  },
+  avatarImage: { height: '100%', width: '100%' },
+  avatarOverlap: { marginLeft: -15 },
+  avatarRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
   },
   avatarText: {
-    color: colors.secondary,
-    fontSize: typography.body,
-    fontWeight: '800',
+    color: colors.success,
+    fontSize: typography.heading,
+    fontWeight: '900',
   },
   chip: {
-    backgroundColor: colors.secondarySoft,
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   chipText: {
-    color: colors.secondary,
-    fontSize: typography.small,
-    fontWeight: '800',
+    color: colors.success,
+    fontSize: typography.body,
+    fontWeight: '700',
   },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  empty: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.xl,
-    padding: spacing.xl,
-  },
+  empty: { alignItems: 'center', padding: spacing.xxl },
   emptyIcon: {
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceStrong,
     borderRadius: radius.pill,
-    height: 48,
+    height: 60,
     justifyContent: 'center',
-    width: 48,
+    width: 60,
   },
   emptyText: {
     color: colors.muted,
@@ -250,108 +286,104 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyTitle: {
-    color: colors.ink,
+    color: colors.primaryDark,
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
     marginTop: spacing.md,
   },
   error: {
-    color: colors.primaryDark,
+    color: colors.warning,
     fontSize: typography.small,
     fontWeight: '700',
-    marginTop: spacing.lg,
   },
-  iconButton: {
-    alignItems: 'center',
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  intro: { alignItems: 'flex-start' },
-  introIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.pill,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
+  intro: {
+    color: colors.muted,
+    fontSize: typography.subheading,
+    lineHeight: 28,
+    textAlign: 'center',
   },
   loading: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
   loadingText: { color: colors.muted, fontSize: typography.small },
-  memberCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
     borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    minHeight: 56,
   },
-  memberCopy: { flex: 1 },
-  memberHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  memberName: {
-    color: colors.ink,
+  primaryText: {
+    color: colors.surface,
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
   },
-  noOverlap: {
+  privacyIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  privacyNote: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+  },
+  privacyText: {
     color: colors.muted,
+    flex: 1,
     fontSize: typography.small,
     lineHeight: 20,
-    marginTop: spacing.sm,
   },
-  prompt: { color: colors.ink, fontSize: typography.small, lineHeight: 21 },
-  promptHeading: {
+  promptDivider: { borderTopColor: colors.border, borderTopWidth: 1 },
+  promptList: { marginTop: spacing.md },
+  promptNumber: {
+    alignItems: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  promptNumberText: {
+    color: colors.success,
+    fontSize: typography.body,
+    fontWeight: '900',
+  },
+  promptRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
-    marginTop: spacing.lg,
+    gap: spacing.md,
+    minHeight: 78,
+    paddingVertical: spacing.sm,
   },
-  prompts: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
+  promptText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: typography.body,
+    lineHeight: 24,
   },
   screen: { backgroundColor: colors.background, flex: 1 },
-  sectionLabel: {
-    color: colors.muted,
-    fontSize: typography.small,
-    fontWeight: '800',
-    marginTop: spacing.lg,
-    textTransform: 'uppercase',
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 23,
-    marginTop: spacing.sm,
-  },
-  title: {
-    color: colors.ink,
+  sectionTitle: {
+    color: colors.primaryDark,
     fontSize: typography.heading,
-    fontWeight: '800',
-    lineHeight: 34,
-    marginTop: spacing.md,
+    fontWeight: '900',
+    marginTop: spacing.xl,
   },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 60,
-    paddingHorizontal: spacing.sm,
-  },
-  topBarTitle: {
-    color: colors.ink,
+  viewButton: { alignItems: 'center', justifyContent: 'center', minHeight: 50 },
+  viewText: {
+    color: colors.primaryDark,
     fontSize: typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
   },
 });

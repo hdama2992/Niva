@@ -1,0 +1,47 @@
+appId: com.niva.niva
+name: Niva deck onboarding through final photo guidance
+---
+- assertVisible: "Find plans you’ll look forward to."
+- tapOn: "Phone number"
+- eraseText
+- inputText: "9876500319"
+- hideKeyboard
+- tapOn: "Continue"
+- assertVisible: "Enter the 6-digit code"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/otp-android
+- tapOn: "Verification code"
+- inputText: "123456"
+- hideKeyboard
+- tapOn: "Verify and continue"
+- assertVisible: "Tell us about you"
+- tapOn: "yourname"
+- inputText: "niva_deck_0319"
+- tapOn: "Himaja"
+- eraseText
+- inputText: "Niva Deck Tester"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Enter age"
+    direction: DOWN
+- tapOn: "Enter age"
+- inputText: "28"
+- hideKeyboard
+- tapOn: "Select your city"
+- tapOn: "Bangalore"
+- tapOn: "English"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+- tapOn: "Continue"
+- assertVisible: "What are you into?"
+- tapOn: "Books"
+- tapOn: "Photography"
+- tapOn: "Wellness"
+- tapOn: "Continue"
+- assertVisible: "Finish with a profile photo"
+- assertVisible: "Public profile photo"
+- assertVisible: "Take a photo"
+- assertVisible: "Choose a photo"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/profile-photo-android

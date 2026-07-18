@@ -1,0 +1,7 @@
+appId: com.niva.niva
+name: Niva approved-deck login visual
+---
+- assertVisible: "Find plans you’ll look forward to."
+- assertVisible: "Log in or sign up"
+- assertVisible: "Privacy Policy"
+- takeScreenshot: artifacts/deck-runtime-qa-2026-07-19/login-android
