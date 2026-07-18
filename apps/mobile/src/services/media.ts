@@ -12,7 +12,9 @@ export async function pickProfilePhoto(): Promise<SelectedImage | undefined> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
   if (!permission.granted) {
-    throw new Error('Photo library permission is needed to add a profile photo.');
+    throw new Error(
+      'Photo library permission is needed to add a profile photo.',
+    );
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -30,11 +32,36 @@ export async function pickProfilePhoto(): Promise<SelectedImage | undefined> {
   return { mimeType: asset.mimeType, uri: asset.uri };
 }
 
+export async function takeProfilePhoto(): Promise<SelectedImage | undefined> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    throw new Error('Camera permission is needed to take a profile photo.');
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    aspect: [1, 1],
+    cameraType: ImagePicker.CameraType.front,
+    mediaTypes: ['images'],
+    quality: 0.82,
+  });
+
+  if (result.canceled) {
+    return undefined;
+  }
+
+  const asset = result.assets[0];
+  return { mimeType: asset.mimeType, uri: asset.uri };
+}
+
 export async function takeSelfie(): Promise<SelectedImage | undefined> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
 
   if (!permission.granted) {
-    throw new Error('Camera permission is needed to submit a verification selfie.');
+    throw new Error(
+      'Camera permission is needed to submit a verification selfie.',
+    );
   }
 
   const result = await ImagePicker.launchCameraAsync({
@@ -75,7 +102,9 @@ export async function chooseSelfie(): Promise<SelectedImage | undefined> {
   return { mimeType: asset.mimeType, uri: asset.uri };
 }
 
-export async function uploadProfilePhoto(image: SelectedImage): Promise<string> {
+export async function uploadProfilePhoto(
+  image: SelectedImage,
+): Promise<string> {
   return uploadImage(image, 'profile-photos');
 }
 

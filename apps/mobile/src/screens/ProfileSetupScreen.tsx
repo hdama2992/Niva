@@ -1,29 +1,31 @@
 import {
   ArrowLeft,
   ArrowRight,
+  CheckCircle2,
   Camera,
-  Minus,
-  Plus,
+  ImagePlus,
   Save,
-  Sparkles,
+  X,
+  XCircle,
 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../constants/theme';
-import { pickProfilePhoto } from '../services/media';
+import { pickProfilePhoto, takeProfilePhoto } from '../services/media';
 import { ProfileDraft, SelectedProfilePhoto } from '../types/niva';
 
 type ProfileSetupScreenProps = {
@@ -31,9 +33,17 @@ type ProfileSetupScreenProps = {
   initialProfilePhotoUrl?: string;
   mode?: 'create' | 'edit';
   onBack?: () => void;
+  onCheckUsernameAvailability?: (
+    username: string,
+  ) => Promise<{ available: boolean; username: string }>;
   username: string;
-  onComplete: (profile: ProfileDraft) => Promise<void> | void;
+  onComplete: (profile: ProfileDraft, username: string) => Promise<void> | void;
 };
+
+type UsernameAvailability =
+  'available' | 'checking' | 'idle' | 'taken' | 'unavailable';
+
+const usernamePattern = /^[a-z0-9_]{3,20}$/;
 
 const interestOptions = [
   'Badminton',
@@ -44,7 +54,7 @@ const interestOptions = [
   'Coding',
   'Painting',
   'Trekking',
-  'Career',
+  'Music',
   'Wellness',
 ];
 const languageOptions = [
@@ -68,9 +78,13 @@ export function ProfileSetupScreen({
   initialProfilePhotoUrl,
   mode = 'create',
   onBack,
+  onCheckUsernameAvailability,
   username,
   onComplete,
 }: ProfileSetupScreenProps) {
+  const [profileUsername, setProfileUsername] = useState(username);
+  const [usernameAvailability, setUsernameAvailability] =
+    useState<UsernameAvailability>(username ? 'available' : 'idle');
   const [displayName, setDisplayName] = useState(
     initialProfile?.displayName ?? username,
   );
@@ -86,9 +100,48 @@ export function ProfileSetupScreen({
     initialProfile?.interests ?? [],
   );
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
+  const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'create' || !onCheckUsernameAvailability) {
+      return;
+    }
+
+    const normalizedUsername = profileUsername.trim();
+    if (!usernamePattern.test(normalizedUsername)) {
+      setUsernameAvailability('idle');
+      return;
+    }
+
+    if (normalizedUsername === username && username) {
+      setUsernameAvailability('available');
+      return;
+    }
+
+    setUsernameAvailability('checking');
+    let active = true;
+    const timer = setTimeout(() => {
+      void onCheckUsernameAvailability(normalizedUsername)
+        .then(({ available }) => {
+          if (active) {
+            setUsernameAvailability(available ? 'available' : 'taken');
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setUsernameAvailability('unavailable');
+          }
+        });
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [mode, onCheckUsernameAvailability, profileUsername, username]);
 
   const selectedEnoughInterests = interests.length >= 3;
   const hasProfilePhoto = Boolean(profilePhoto || initialProfilePhotoUrl);
@@ -114,8 +167,20 @@ export function ProfileSetupScreen({
       age <= 100 &&
       languages.length > 0 &&
       hasProfilePhoto &&
+      selectedEnoughInterests &&
+      (mode === 'edit' ||
+        (usernamePattern.test(profileUsername.trim()) &&
+          usernameAvailability === 'available')),
+    [
+      age,
+      displayName,
+      hasProfilePhoto,
+      languages,
+      mode,
+      profileUsername,
       selectedEnoughInterests,
-    [age, displayName, hasProfilePhoto, languages, selectedEnoughInterests],
+      usernameAvailability,
+    ],
   );
 
   const toggleInterest = (interest: string) => {
@@ -145,24 +210,31 @@ export function ProfileSetupScreen({
 
     setSubmitting(true);
     try {
-      await onComplete({
-        displayName: displayName.trim(),
-        city: betaCity,
-        bio: bio.trim() || undefined,
-        age,
-        languages,
-        occupation: occupation.trim() || undefined,
-        profilePhoto,
-        interests,
-      });
+      await onComplete(
+        {
+          displayName: displayName.trim(),
+          city: betaCity,
+          bio: bio.trim() || undefined,
+          age,
+          languages,
+          occupation: occupation.trim() || undefined,
+          profilePhoto,
+          interests,
+        },
+        profileUsername.trim(),
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const chooseProfilePhoto = async () => {
+  const chooseProfilePhoto = async (source: 'camera' | 'library') => {
+    setPhotoSourceOpen(false);
     try {
-      const photo = await pickProfilePhoto();
+      const photo =
+        source === 'camera'
+          ? await takeProfilePhoto()
+          : await pickProfilePhoto();
       if (photo) {
         setProfilePhoto(photo);
       }
@@ -201,26 +273,23 @@ export function ProfileSetupScreen({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          {mode === 'create' ? (
-            <View style={styles.iconPlate}>
-              <Sparkles color={colors.secondary} size={34} strokeWidth={2.2} />
-            </View>
+          {mode === 'edit' ? (
+            <Text style={styles.eyebrow}>@{username}</Text>
           ) : null}
-          <Text style={styles.eyebrow}>@{username}</Text>
           <Text style={styles.title}>
             {mode === 'edit' ? 'Edit your profile' : 'Complete your profile'}
           </Text>
           <Text style={styles.subtitle}>
             {mode === 'edit'
-              ? 'Keep your details current for the groups you join.'
-              : 'Niva uses interests and city to recommend small recurring groups.'}
+              ? 'Keep your details up to date.'
+              : 'Tell us a little about yourself.'}
           </Text>
           <Text style={styles.requiredNote}>* Required</Text>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => void chooseProfilePhoto()}
+          onPress={() => setPhotoSourceOpen(true)}
           style={[
             styles.profilePhotoPicker,
             attempted && !hasProfilePhoto && styles.invalidField,
@@ -241,9 +310,7 @@ export function ProfileSetupScreen({
               {mode === 'edit' ? 'Change profile photo' : 'Profile photo *'}
             </Text>
             <Text style={styles.profilePhotoMeta}>
-              {mode === 'edit'
-                ? 'Your current photo remains unless you choose a new one.'
-                : 'Add a clear photo so members and hosts can recognise you at activities.'}
+              Choose a photo or take one now.
             </Text>
           </View>
         </Pressable>
@@ -252,6 +319,36 @@ export function ProfileSetupScreen({
         ) : null}
 
         <View style={styles.form}>
+          {mode === 'create' ? (
+            <View style={styles.usernameGroup}>
+              <TextField
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={
+                  attempted && !usernamePattern.test(profileUsername.trim())
+                    ? 'Use 3-20 lowercase letters, numbers, or underscores.'
+                    : attempted && usernameAvailability === 'taken'
+                      ? 'That username is already taken.'
+                      : undefined
+                }
+                helperText="Your unique name in Niva."
+                label="Username *"
+                onChangeText={(value) => {
+                  setProfileUsername(
+                    value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                  );
+                  setUsernameAvailability('idle');
+                  setError(undefined);
+                }}
+                placeholder="yourname"
+                value={profileUsername}
+              />
+              <UsernameAvailabilityMessage
+                availability={usernameAvailability}
+              />
+            </View>
+          ) : null}
+
           <TextField
             error={
               attempted && displayName.trim().length < 2
@@ -267,17 +364,23 @@ export function ProfileSetupScreen({
             value={displayName}
           />
 
-          <AgeField
-            age={age}
+          <TextField
             error={
               attempted && (age === undefined || age < 18 || age > 100)
                 ? 'Enter an age between 18 and 100.'
                 : undefined
             }
-            onChange={(value) => {
-              setAge(value);
+            helperText="You must be 18 or older."
+            keyboardType="number-pad"
+            label="Age *"
+            maxLength={3}
+            onChangeText={(value) => {
+              const digits = value.replace(/\D/g, '').slice(0, 3);
+              setAge(digits ? Number(digits) : undefined);
               setError(undefined);
             }}
+            placeholder="Enter age"
+            value={age?.toString() ?? ''}
           />
 
           <View style={styles.fieldGroup}>
@@ -325,11 +428,11 @@ export function ProfileSetupScreen({
           />
 
           <TextField
-            helperText="Share what you enjoy and the kinds of activities or friendships you are looking for."
+            helperText="A short introduction for other members."
             label="About you"
             multiline
             onChangeText={setBio}
-            placeholder="I enjoy weekend badminton, books, and trying new workshops."
+            placeholder="I enjoy badminton, books, and weekend workshops."
             style={styles.bioInput}
             value={bio}
           />
@@ -396,102 +499,138 @@ export function ProfileSetupScreen({
           onPress={() => void continueToDeclaration()}
         />
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setPhotoSourceOpen(false)}
+        transparent
+        visible={photoSourceOpen}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPhotoSourceOpen(false)}
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.photoSheet}>
+            <View style={styles.photoSheetHeader}>
+              <View>
+                <Text style={styles.photoSheetTitle}>Add profile photo</Text>
+                <Text style={styles.photoSheetSubtitle}>
+                  Choose how you want to add it.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close photo options"
+                accessibilityRole="button"
+                hitSlop={10}
+                onPress={() => setPhotoSourceOpen(false)}
+                style={styles.closeButton}
+              >
+                <X color={colors.ink} size={20} strokeWidth={2.4} />
+              </Pressable>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void chooseProfilePhoto('camera')}
+              style={styles.photoOption}
+            >
+              <View style={styles.photoOptionIcon}>
+                <Camera color={colors.secondary} size={22} strokeWidth={2.3} />
+              </View>
+              <View>
+                <Text style={styles.photoOptionTitle}>Take a photo</Text>
+                <Text style={styles.photoOptionMeta}>Use your camera now.</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void chooseProfilePhoto('library')}
+              style={styles.photoOption}
+            >
+              <View style={styles.photoOptionIcon}>
+                <ImagePlus
+                  color={colors.secondary}
+                  size={22}
+                  strokeWidth={2.3}
+                />
+              </View>
+              <View>
+                <Text style={styles.photoOptionTitle}>Choose a photo</Text>
+                <Text style={styles.photoOptionMeta}>
+                  Select one from your device.
+                </Text>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
-function AgeField({
-  age,
-  error,
-  onChange,
+function UsernameAvailabilityMessage({
+  availability,
 }: {
-  age?: number;
-  error?: string;
-  onChange: (age?: number) => void;
+  availability: UsernameAvailability;
 }) {
-  const updateFromText = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 3);
-    onChange(digits ? Number(digits) : undefined);
-  };
+  if (availability === 'idle') {
+    return null;
+  }
 
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.fieldLabel}>Age *</Text>
-      <View style={styles.ageControl}>
-        <Pressable
-          accessibilityLabel="Decrease age"
-          accessibilityRole="button"
-          disabled={age === undefined || age <= 18}
-          onPress={() => onChange(Math.max(18, (age ?? 19) - 1))}
-          style={[
-            styles.ageButton,
-            (age === undefined || age <= 18) && styles.ageButtonDisabled,
-          ]}
-        >
-          <Minus color={colors.ink} size={20} strokeWidth={2.5} />
-        </Pressable>
-        <TextInput
-          accessibilityLabel="Age"
-          keyboardType="number-pad"
-          maxLength={3}
-          onChangeText={updateFromText}
-          placeholder="Enter age"
-          placeholderTextColor={colors.muted}
-          selectionColor={colors.primary}
-          style={styles.ageInput}
-          value={age?.toString() ?? ''}
-        />
-        <Pressable
-          accessibilityLabel="Increase age"
-          accessibilityRole="button"
-          disabled={age !== undefined && age >= 100}
-          onPress={() =>
-            onChange(age === undefined ? 18 : Math.min(100, age + 1))
-          }
-          style={[
-            styles.ageButton,
-            age !== undefined && age >= 100 && styles.ageButtonDisabled,
-          ]}
-        >
-          <Plus color={colors.ink} size={20} strokeWidth={2.5} />
-        </Pressable>
+  if (availability === 'checking') {
+    return (
+      <View style={styles.availabilityRow}>
+        <ActivityIndicator color={colors.muted} size="small" />
+        <Text style={styles.availabilityHint}>Checking availability...</Text>
       </View>
-      <Text style={styles.fieldMeta}>You must be 18 or older.</Text>
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+    );
+  }
+
+  const available = availability === 'available';
+  return (
+    <View style={styles.availabilityRow}>
+      {available ? (
+        <CheckCircle2 color={colors.success} size={17} strokeWidth={2.5} />
+      ) : (
+        <XCircle color={colors.primaryDark} size={17} strokeWidth={2.5} />
+      )}
+      <Text
+        style={
+          available ? styles.availabilitySuccess : styles.availabilityError
+        }
+      >
+        {available
+          ? 'Username is available.'
+          : availability === 'taken'
+            ? 'Username is already taken.'
+            : 'Could not check availability. Try again.'}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  ageButton: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.sm,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  ageButtonDisabled: {
-    opacity: 0.35,
-  },
-  ageControl: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minHeight: 56,
-    padding: spacing.xs,
-  },
-  ageInput: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: typography.body,
+  availabilityError: {
+    color: colors.primaryDark,
+    fontSize: typography.small,
     fontWeight: '700',
-    minWidth: 0,
-    textAlign: 'center',
+  },
+  availabilityHint: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+  },
+  availabilityRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  availabilitySuccess: {
+    color: colors.success,
+    fontSize: typography.small,
+    fontWeight: '700',
   },
   bioInput: {
     minHeight: 92,
@@ -560,15 +699,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: spacing.xl,
   },
-  iconPlate: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.lg,
-    height: 68,
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    width: 68,
-  },
   interestChip: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -594,6 +724,72 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  closeButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  modalBackdrop: {
+    backgroundColor: 'rgba(33, 26, 29, 0.36)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  photoOption: {
+    alignItems: 'center',
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  photoOptionIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.pill,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  photoOptionMeta: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  photoOptionTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
+  },
+  photoSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    gap: spacing.sm,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  photoSheetHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  photoSheetSubtitle: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  photoSheetTitle: {
+    color: colors.ink,
+    fontSize: typography.subheading,
+    fontWeight: '800',
   },
   profilePhoto: {
     borderRadius: radius.pill,
@@ -685,5 +881,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
+  },
+  usernameGroup: {
+    gap: spacing.xs,
   },
 });

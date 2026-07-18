@@ -10,7 +10,6 @@ import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { SelfDeclarationScreen } from './src/screens/SelfDeclarationScreen';
 import { SelfieUploadScreen } from './src/screens/SelfieUploadScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
-import { UsernameScreen } from './src/screens/UsernameScreen';
 import { VerificationPendingScreen } from './src/screens/VerificationPendingScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import {
@@ -48,7 +47,6 @@ type Route =
   | { name: 'splash' }
   | { name: 'login' }
   | { name: 'otp'; phone: string }
-  | { idToken: string; name: 'username'; phone: string }
   | { idToken: string; name: 'profile'; phone: string; username: string }
   | {
       idToken: string;
@@ -176,18 +174,21 @@ export default function App() {
       setRoute(routeForApiUser(session.idToken, session.user));
     });
 
-  const handleUsername = async (idToken: string, username: string) => {
-    const { user } = await setUsername(idToken, username);
-    setRoute(routeForApiUser(idToken, user));
-  };
-
   const handleProfile = (
     idToken: string,
     phone: string,
-    username: string,
+    currentUsername: string,
+    submittedUsername: string,
     profile: ProfileDraft,
   ) =>
     withApiErrors(async () => {
+      let username = currentUsername;
+      if (!username) {
+        const { user } = await setUsername(idToken, submittedUsername);
+        username = user.username ?? submittedUsername;
+        setRoute({ idToken, name: 'profile', phone, username });
+      }
+
       const { age, profilePhoto, ...profileData } = profile;
       if (!profilePhoto || !age) {
         throw new Error(
@@ -294,22 +295,21 @@ export default function App() {
             onVerified={(code) => handleOtpVerified(route.phone, code)}
           />
         );
-      case 'username':
-        return (
-          <UsernameScreen
-            phone={route.phone}
-            onCheckAvailability={(username) =>
-              checkUsernameAvailability(route.idToken, username)
-            }
-            onComplete={(username) => handleUsername(route.idToken, username)}
-          />
-        );
       case 'profile':
         return (
           <ProfileSetupScreen
+            onCheckUsernameAvailability={(username) =>
+              checkUsernameAvailability(route.idToken, username)
+            }
             username={route.username}
-            onComplete={(profile) =>
-              handleProfile(route.idToken, route.phone, route.username, profile)
+            onComplete={(profile, username) =>
+              handleProfile(
+                route.idToken,
+                route.phone,
+                route.username,
+                username,
+                profile,
+              )
             }
           />
         );
@@ -441,20 +441,12 @@ function routeForApiUser(idToken: string, user: ApiUser): Route {
   const mappedUser = mapApiUser(user);
   const profile = profileDraftFromApiUser(user);
 
-  if (!user.username) {
-    return {
-      idToken,
-      name: 'username',
-      phone: mappedUser.phone,
-    };
-  }
-
-  if (!profile) {
+  if (!user.username || !profile) {
     return {
       idToken,
       name: 'profile',
       phone: mappedUser.phone,
-      username: user.username,
+      username: user.username ?? '',
     };
   }
 
