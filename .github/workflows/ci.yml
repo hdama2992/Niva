@@ -30,7 +30,7 @@ jobs:
           DATABASE_URL: postgresql://niva:niva@localhost:5432/niva?schema=public
       - run: pnpm --filter @niva/backend prisma:generate
       - run: pnpm --filter @niva/backend lint
-      - run: pnpm --filter @niva/backend test -- --runInBand
+      - run: pnpm --filter @niva/backend exec jest --runInBand
       - run: pnpm --filter @niva/backend build
       - run: pnpm --filter @niva/mobile typecheck
       - run: pnpm --filter @niva/admin build
