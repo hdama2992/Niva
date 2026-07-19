@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   Smartphone,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -93,6 +93,7 @@ export function LoginScreen({
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   const cleanPhone = (value: string) => value.replace(/\D/g, '');
 
@@ -118,12 +119,15 @@ export function LoginScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.select({ ios: 'padding', android: undefined })}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <ScrollView
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         contentContainerStyle={styles.scrollContent}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
+        ref={scrollRef}
       >
         <ImageBackground
           imageStyle={styles.heroImage}
@@ -205,6 +209,15 @@ export function LoginScreen({
                   if (error) {
                     setError(undefined);
                   }
+                }}
+                onFocus={() => {
+                  requestAnimationFrame(() =>
+                    scrollRef.current?.scrollToEnd({ animated: true }),
+                  );
+                  setTimeout(
+                    () => scrollRef.current?.scrollToEnd({ animated: true }),
+                    220,
+                  );
                 }}
                 placeholder={selectedCountry.placeholder}
                 placeholderTextColor={colors.muted}
