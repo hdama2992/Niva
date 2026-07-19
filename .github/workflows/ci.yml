@@ -28,6 +28,7 @@ jobs:
       - run: pnpm --filter @niva/backend exec prisma validate
         env:
           DATABASE_URL: postgresql://niva:niva@localhost:5432/niva?schema=public
+      - run: pnpm --filter @niva/backend prisma:generate
       - run: pnpm --filter @niva/backend lint
       - run: pnpm --filter @niva/backend test -- --runInBand
       - run: pnpm --filter @niva/backend build
