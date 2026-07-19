@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @niva/backend exec prisma validate
+      - run: pnpm --filter @niva/backend lint
+      - run: pnpm --filter @niva/backend test -- --runInBand
+      - run: pnpm --filter @niva/backend build
+      - run: pnpm --filter @niva/mobile typecheck
+      - run: pnpm --filter @niva/admin build
+      - run: pnpm --filter @niva/website build
