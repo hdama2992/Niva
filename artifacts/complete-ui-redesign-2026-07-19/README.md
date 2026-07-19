@@ -2,7 +2,9 @@
 
 Date: 19 July 2026
 
-Status: visual direction only; these screens have not been implemented in the app.
+Status: implemented and physically verified on Android. The images in this
+folder are the approved visual sources; paired runtime evidence is in
+`../deck-runtime-qa-2026-07-19/`.
 
 ## Approved direction
 
@@ -52,7 +54,9 @@ The pack extends the approved preview-first plan design across Niva using:
 - Face centred, evenly lit, and unobstructed.
 - No filters, edits, sunglasses, masks, or hats.
 
-The current app still offers an existing-photo option for the verification selfie. Implementing this approved design means changing production verification to live camera capture only. A future liveness vendor can strengthen this further without changing the user-facing distinction.
+The implemented verification flow uses a current camera capture rather than a
+gallery upload. A future liveness vendor can strengthen this further without
+changing the user-facing distinction.
 
 ## Navigation rules
 
@@ -68,6 +72,17 @@ The current app still offers an existing-photo option for the verification selfi
 - Completing the profile opens the real Home screen immediately.
 - No welcome banner, confirmation page, or additional interruption is shown.
 
-## Implementation boundary
+## Implementation result
 
-No production UI code was changed while preparing this pack. Implementation should begin only after the pack is approved or annotated.
+All 15 approved source screens above are represented in the connected product:
+
+- the mobile flows use the real Niva API for profile, verification, reporting,
+  feedback, hosting, membership approval, attendee context, and cohort chat;
+- the admin queue uses the real identity, host-access, and report operations;
+- the public policy template powers Privacy, Terms, Community Promise,
+  Support, and account deletion;
+- the deliberately removed standalone Welcome screen remains absent.
+
+The final Android comparisons, role-flow evidence, and verification results are
+documented in `../deck-runtime-qa-2026-07-19/README.md` and the repository-level
+`design-qa.md`.
