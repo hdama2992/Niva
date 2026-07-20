@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasAcceptedMembership(type, activityId) {
+      let memberPath = type == 'EVENT'
+        ? /databases/$(database)/documents/eventMembers/$(activityId + '_' + request.auth.uid)
+        : /databases/$(database)/documents/circleMembers/$(activityId + '_' + request.auth.uid);
+      let membership = get(memberPath);
+      return membership.data.status in ['APPROVED', 'ATTENDED'];
+    }
+
+    function hostsActivity(type, activityId) {
+      let activityPath = type == 'EVENT'
+        ? /databases/$(database)/documents/events/$(activityId)
+        : /databases/$(database)/documents/circles/$(activityId);
+      return get(activityPath).data.hostId == request.auth.uid;
+    }
+
+    function canReadCohort(type, activityId) {
+      return signedIn() &&
+        (hostsActivity(type, activityId) || hasAcceptedMembership(type, activityId));
+    }
+
+    match /users/{userId} {
+      allow read: if ownsUser(userId);
+      allow write: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /eventMembers/{membershipId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /circleMembers/{membershipId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /chatThreads/{threadId} {
+      allow read: if canReadCohort(resource.data.type, resource.data.activityId);
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if canReadCohort(
+          get(/databases/$(database)/documents/chatThreads/$(threadId)).data.type,
+          get(/databases/$(database)/documents/chatThreads/$(threadId)).data.activityId
+        );
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

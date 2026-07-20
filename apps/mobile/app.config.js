@@ -26,9 +26,7 @@ module.exports = () => {
   const requiredProductionVariables = [
     'EXPO_PUBLIC_API_URL',
     'EXPO_PUBLIC_AUTH_MODE',
-    'EXPO_PUBLIC_FIREBASE_PNV_ENABLED',
     'EXPO_PUBLIC_PRIVACY_POLICY_URL',
-    'EXPO_PUBLIC_REALTIME_URL',
     'EXPO_PUBLIC_SUPPORT_URL',
     'EXPO_PUBLIC_TERMS_URL',
     'GOOGLE_SERVICES_JSON',
@@ -50,7 +48,7 @@ module.exports = () => {
       );
     }
 
-    for (const name of ['EXPO_PUBLIC_API_URL', 'EXPO_PUBLIC_REALTIME_URL']) {
+    for (const name of ['EXPO_PUBLIC_API_URL']) {
       if (!process.env[name]?.startsWith('https://')) {
         throw new Error(`${name} must use HTTPS in production builds.`);
       }
@@ -72,7 +70,7 @@ module.exports = () => {
     plugins: [
       ...config.plugins,
       '@react-native-firebase/app',
-      ...(googleServiceInfoFile ? ['@react-native-firebase/auth'] : []),
+      '@react-native-firebase/auth',
     ],
     extra: {
       ...config.extra,

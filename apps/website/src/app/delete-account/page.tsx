@@ -3,7 +3,9 @@
 import { FormEvent, useState } from 'react';
 import { PolicyChrome, policyLinks } from '../components/PolicyChrome';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const apiUrl =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001');
 
 export default function DeleteAccountPage() {
   const [identifier, setIdentifier] = useState('');

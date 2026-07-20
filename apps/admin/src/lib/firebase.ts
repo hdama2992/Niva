@@ -1,7 +1,7 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getApp, getApps, initializeApp, type FirebaseOptions } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
 
-const firebaseConfig = {
+const environmentConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -9,16 +9,34 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 };
 
-export const firebaseAdminUiConfigured =
-  Object.values(firebaseConfig).every(Boolean);
+let authPromise: Promise<Auth> | undefined;
+
+export function initializeAdminFirebaseAuth() {
+  authPromise ??= initializeAuth();
+  return authPromise;
+}
 
 export function getAdminFirebaseAuth() {
-  if (!firebaseAdminUiConfigured) {
-    throw new Error(
-      'Add the public Firebase web configuration to apps/admin/.env.local.',
-    );
+  if (getApps().length === 0) {
+    throw new Error('Firebase is still loading. Please try again.');
+  }
+  return getAuth(getApp());
+}
+
+async function initializeAuth() {
+  if (getApps().length) return getAuth(getApp());
+
+  const configured = Object.values(environmentConfig).every(Boolean);
+  let config = environmentConfig;
+  if (!configured) {
+    const response = await fetch('/__/firebase/init.json');
+    if (!response.ok) {
+      throw new Error(
+        'Firebase Admin is not configured. On localhost, add the public Firebase web configuration to apps/admin/.env.local.',
+      );
+    }
+    config = (await response.json()) as FirebaseOptions;
   }
 
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return getAuth(app);
+  return getAuth(initializeApp(config));
 }

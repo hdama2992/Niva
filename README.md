@@ -1,91 +1,75 @@
 # Niva
 
-Helping women build meaningful friendships through recurring activities.
+Helping women build meaningful friendships through trusted, recurring plans.
 
-## Repository
+## Architecture
 
-This repository is a pnpm/Turborepo monorepo containing the Niva mobile app,
-backend API, admin dashboard, and shared packages.
+Niva is a pnpm/Turborepo monorepo with one Firebase backend:
 
-## Tech Stack
+- React Native + Expo mobile app
+- Firebase Authentication for phone and named-admin sign-in
+- Cloud Firestore for application data and realtime cohort updates
+- Cloud Functions for guarded business rules, REST endpoints, and schedules
+- Cloud Storage for profile, activity-cover, and verification images
+- Firebase Cloud Messaging for push notifications
+- Firebase Hosting for the Next.js admin dashboard and public website
+- Expo/EAS for Android development and Play Store builds
 
-- React Native Expo
-- NestJS
-- Next.js
-- PostgreSQL
-- Prisma
-- Firebase
+There is no separate SQL database, ORM, WebSocket server, or third-party backend
+host in the active architecture.
 
-## Getting Started
+## Local setup
 
 ```bash
 pnpm install
-pnpm dev
+pnpm firebase:emulators
 ```
 
-Start the local PostgreSQL service with:
-
-```bash
-pnpm db:up
-```
-
-Copy the backend environment template before starting the API:
-
-```bash
-cp apps/backend/.env.example apps/backend/.env
-```
-
-Create or apply local database migrations with:
-
-```bash
-pnpm db:migrate
-```
-
-`pnpm dev` starts the API, admin dashboard, docs site, and Expo dev server.
-For focused mobile work, run:
+Run the Expo app separately:
 
 ```bash
 pnpm mobile:start
 ```
 
-For focused documentation work, run:
+The Emulator UI runs at `http://127.0.0.1:4000`; Hosting runs at
+`http://127.0.0.1:5000`; the Functions endpoint runs at
+`http://127.0.0.1:5001/niva-staging/asia-south1/api`.
+
+## Validation
 
 ```bash
-pnpm docs:dev
+pnpm --filter @niva/backend test
+pnpm --filter @niva/backend test:emulator
+pnpm --filter @niva/mobile typecheck
+pnpm firebase:hosting:build
 ```
 
-The admin dashboard runs on port 3000, the API on port 3001, and the docs site
-on port 3002.
+The emulator integration test covers Firebase identity/session creation,
+profile setup, host and participant flows, capacity, approval, Firestore chat,
+attendance, feedback, reports, named-admin actions, and Firestore access rules.
 
-## Workspace Layout
+## Deployment
+
+The staging Firebase project is `niva-staging`.
+
+```bash
+firebase login
+firebase use staging
+firebase functions:secrets:set NIVA_ADMIN_KEY
+pnpm firebase:deploy
+```
+
+Read [the Firebase-only production guide](docs/firebase-only-backend.md) before
+deploying or granting the first administrator.
+
+## Workspace
 
 ```text
-apps/mobile      React Native Expo mobile application
-apps/backend     NestJS API
-apps/admin       Next.js administration dashboard
-apps/docs        Niva Academy documentation website
-packages/ui      Shared web UI components
-packages/shared  Shared utilities
-packages/config  Shared tooling configuration
-packages/types   Shared TypeScript types
-docker            Local infrastructure
-docs              Project documentation
+apps/mobile      Expo/React Native application
+apps/backend     Firebase Cloud Functions REST and scheduled backend
+apps/admin       Firebase-hosted Next.js admin dashboard
+apps/website     Firebase-hosted public and policy website
+apps/docs        Niva Academy documentation
+firebase         Firestore and Storage rules/indexes
+packages         Shared monorepo packages
 ```
-
-## Status
-
-MVP in development.
-
-Completed sprint foundations:
-
-- Sprint 1: phone-auth session shape with Firebase and PostgreSQL.
-- Sprint 2: username, profile, self-declaration, selfie review, admin review,
-  and private trust events.
-- Sprint 3: mobile home and discovery prototype with events, circles,
-  workshops, recommendations, permission blocking, and profile tabs.
-- Sprint 4: closed-beta community scaffolding for host tools, scoped chats,
-  feedback, reports, blocks, notifications, settings, and circle continuity.
-
-Feature tracking:
-
-- [MVP feature status](docs/mvp-feature-status.md)

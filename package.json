@@ -5,19 +5,19 @@
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "build": "turbo run build",
-    "db:down": "docker compose -f docker/postgres/compose.yml down",
-    "db:migrate": "pnpm --filter @niva/backend prisma:migrate",
-    "db:migrate:deploy": "pnpm --filter @niva/backend prisma:migrate:deploy",
-    "db:studio": "pnpm --filter @niva/backend prisma:studio",
-    "db:up": "docker compose -f docker/postgres/compose.yml up -d",
     "docs:dev": "pnpm --filter @niva/docs dev",
     "dev": "turbo run dev --parallel",
+    "firebase:deploy": "firebase deploy",
+    "firebase:deploy:backend": "firebase deploy --only functions,firestore,storage",
+    "firebase:emulators": "pnpm --filter @niva/backend build && firebase emulators:start",
+    "firebase:hosting:build": "NEXT_PUBLIC_API_URL=/api pnpm --filter @niva/website build && NEXT_PUBLIC_API_URL=/api pnpm --filter @niva/admin build && node scripts/prepare-firebase-hosting.mjs",
     "format": "prettier --write .",
     "lint": "turbo run lint",
     "mobile:start": "pnpm --filter @niva/mobile start",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "firebase-tools": "^14.0.0",
     "prettier": "^3.6.2",
     "turbo": "^2.5.5"
   }

@@ -9,8 +9,8 @@ import {
 } from 'firebase/auth';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
-  firebaseAdminUiConfigured,
   getAdminFirebaseAuth,
+  initializeAdminFirebaseAuth,
 } from '../lib/firebase';
 
 type ReviewStatus = 'APPROVED' | 'NEEDS_REVIEW' | 'PENDING' | 'REJECTED';
@@ -132,7 +132,9 @@ type AuthSession = {
   };
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const apiUrl =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001');
 
 async function createAdminSession(idToken: string) {
   const response = await fetch(`${apiUrl}/auth/session`, {
@@ -154,13 +156,10 @@ async function createAdminSession(idToken: string) {
 export default function Home() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [bootstrapKey, setBootstrapKey] = useState('');
   const [idToken, setIdToken] = useState('');
   const [signedInUserId, setSignedInUserId] = useState('');
-  const [error, setError] = useState<string | undefined>(() =>
-    firebaseAdminUiConfigured
-      ? undefined
-      : 'Add the public Firebase web configuration to apps/admin/.env.local.',
-  );
+  const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState<VerificationReview[]>([]);
   const [approvals, setApprovals] = useState<HostApproval[]>([]);
@@ -200,46 +199,89 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!firebaseAdminUiConfigured) {
-      return;
-    }
+    let unsubscribe: () => void = () => {};
+    let active = true;
 
-    const unsubscribe = onAuthStateChanged(
-      getAdminFirebaseAuth(),
-      async (user) => {
-        const token = user ? await user.getIdToken() : '';
-        setIdToken(token);
-        if (token) {
-          try {
-            const session = await createAdminSession(token);
-            setSignedInUserId(session.user.id);
-          } catch (sessionError) {
-            setError(
-              sessionError instanceof Error
-                ? sessionError.message
-                : 'Unable to restore the Niva administrator session.',
-            );
+    void initializeAdminFirebaseAuth()
+      .then((firebaseAuth) => {
+        if (!active) return;
+        unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+          const token = user ? await user.getIdToken() : '';
+          setIdToken(token);
+          if (token) {
+            try {
+              const session = await createAdminSession(token);
+              setSignedInUserId(session.user.id);
+            } catch (sessionError) {
+              setError(
+                sessionError instanceof Error
+                  ? sessionError.message
+                  : 'Unable to restore the Niva administrator session.',
+              );
+            }
           }
+          if (!user) {
+            setSignedInUserId('');
+            setLoaded(false);
+            setReviews([]);
+            setApprovals([]);
+            setReports([]);
+            setActivities([]);
+            setMembers([]);
+            setDeletionRequests([]);
+            setBetaRequests([]);
+          }
+        });
+      })
+      .catch((firebaseError) => {
+        if (active) {
+          setError(
+            firebaseError instanceof Error
+              ? firebaseError.message
+              : 'Unable to initialize Firebase Admin.',
+          );
         }
-        if (!user) {
-          setSignedInUserId('');
-          setLoaded(false);
-          setReviews([]);
-          setApprovals([]);
-          setReports([]);
-          setActivities([]);
-          setMembers([]);
-          setDeletionRequests([]);
-          setBetaRequests([]);
-        }
-      },
-    );
-    return unsubscribe;
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const authorizationHeaders = (token = idToken) => ({
     Authorization: `Bearer ${token}`,
   });
+
+  const bootstrapAdministrator = async () => {
+    if (!idToken || !signedInUserId || !bootstrapKey.trim()) return;
+    setLoading(true);
+    setError(undefined);
+    try {
+      const response = await fetch(`${apiUrl}/admin/access`, {
+        body: JSON.stringify({
+          role: 'SUPER_ADMIN',
+          userId: signedInUserId,
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Niva-Admin-Key': bootstrapKey.trim(),
+          ...authorizationHeaders(),
+        },
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setBootstrapKey('');
+      await loadReviews(undefined, idToken);
+    } catch (bootstrapError) {
+      setError(
+        bootstrapError instanceof Error
+          ? bootstrapError.message
+          : 'Unable to grant the first administrator.',
+      );
+      setLoading(false);
+    }
+  };
 
   const signInAdmin = async (event: FormEvent) => {
     event.preventDefault();
@@ -247,7 +289,7 @@ export default function Home() {
     setError(undefined);
     try {
       const credential = await signInWithEmailAndPassword(
-        getAdminFirebaseAuth(),
+        await initializeAdminFirebaseAuth(),
         adminEmail.trim(),
         adminPassword,
       );
@@ -861,12 +903,34 @@ export default function Home() {
           ) : null}
 
           {signedInUserId && !loaded ? (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              Firebase sign-in succeeded. This account&apos;s Niva user ID is{' '}
-              <code className="font-mono font-semibold">{signedInUserId}</code>.
-              A Niva owner must grant this ID an administrator role before the
-              dashboard can load.
-            </p>
+            <div className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+              <p>
+                Firebase sign-in succeeded. This account&apos;s Niva user ID is{' '}
+                <code className="font-mono font-semibold">
+                  {signedInUserId}
+                </code>
+                . Existing administrators can grant this ID access. For the
+                first administrator only, enter the one-time bootstrap secret.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  autoComplete="off"
+                  className="min-h-11 flex-1 rounded-md border border-amber-300 bg-white px-3 outline-none focus:ring-2 focus:ring-amber-400"
+                  onChange={(event) => setBootstrapKey(event.target.value)}
+                  placeholder="One-time admin bootstrap secret"
+                  type="password"
+                  value={bootstrapKey}
+                />
+                <button
+                  className="min-h-11 rounded-md bg-[#17345b] px-5 font-bold text-white disabled:opacity-50"
+                  disabled={!bootstrapKey.trim() || loading}
+                  onClick={() => void bootstrapAdministrator()}
+                  type="button"
+                >
+                  Grant my admin access
+                </button>
+              </div>
+            </div>
           ) : null}
 
           {loaded ? (

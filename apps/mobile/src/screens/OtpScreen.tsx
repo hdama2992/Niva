@@ -1,8 +1,4 @@
-import {
-  ArrowRight,
-  MessageSquareText,
-  ShieldCheck,
-} from 'lucide-react-native';
+import { ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,12 +14,9 @@ import {
 import { DeckTopBar } from '../components/DeckTopBar';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
-import { MobileAuthMode } from '../services/mobile-auth';
-
 const resendDelaySeconds = 60;
 
 type OtpScreenProps = {
-  authMode: MobileAuthMode;
   phone: string;
   onBack: () => void;
   onResend: () => Promise<void>;
@@ -31,7 +24,6 @@ type OtpScreenProps = {
 };
 
 export function OtpScreen({
-  authMode,
   phone,
   onBack,
   onResend,
@@ -63,6 +55,7 @@ export function OtpScreen({
     try {
       await onVerified(code);
     } catch (verifyError) {
+      logSafeAuthError('OTP verification failed', verifyError);
       setError(friendlyOtpError(verifyError, 'Unable to verify this code.'));
     } finally {
       setSubmitting(false);
@@ -77,6 +70,7 @@ export function OtpScreen({
       setResendSeconds(resendDelaySeconds);
       inputRef.current?.focus();
     } catch (resendError) {
+      logSafeAuthError('OTP resend failed', resendError);
       setError(friendlyOtpError(resendError, 'Unable to resend the code.'));
     } finally {
       setResending(false);
@@ -97,18 +91,6 @@ export function OtpScreen({
             <Text style={styles.change}>Change</Text>
           </Pressable>
         </View>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => inputRef.current?.focus()}
-          style={styles.autofillCard}
-        >
-          <View style={styles.messageIcon}>
-            <MessageSquareText color={colors.surface} size={17} />
-          </View>
-          <Text style={styles.autofillText}>Code detected from Messages</Text>
-          <Text style={styles.autofillAction}>Autofill</Text>
-        </Pressable>
 
         <Pressable
           accessibilityLabel="Verification code"
@@ -132,6 +114,7 @@ export function OtpScreen({
             autoComplete="sms-otp"
             autoFocus
             caretHidden
+            importantForAutofill="yes"
             keyboardType="number-pad"
             maxLength={6}
             onChangeText={(value) => {
@@ -160,30 +143,23 @@ export function OtpScreen({
         ) : null}
 
         <View style={styles.resendRow}>
-          {authMode === 'firebase' ? (
-            resendSeconds > 0 ? (
-              <Text style={styles.resendHint}>
-                Resend available in{' '}
-                <Text style={styles.resendStrong}>
-                  {formatTimer(resendSeconds)}
-                </Text>
-              </Text>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                disabled={resending}
-                onPress={() => void resendCode()}
-              >
-                <Text style={styles.resendAction}>
-                  {resending ? 'Sending another code…' : 'Resend code'}
-                </Text>
-              </Pressable>
-            )
-          ) : (
+          {resendSeconds > 0 ? (
             <Text style={styles.resendHint}>
-              Use <Text style={styles.resendStrong}>123456</Text> for beta
-              testing.
+              Resend available in{' '}
+              <Text style={styles.resendStrong}>
+                {formatTimer(resendSeconds)}
+              </Text>
             </Text>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={resending}
+              onPress={() => void resendCode()}
+            >
+              <Text style={styles.resendAction}>
+                {resending ? 'Sending another code…' : 'Resend code'}
+              </Text>
+            </Pressable>
           )}
         </View>
       </View>
@@ -223,6 +199,8 @@ function friendlyOtpError(error: unknown, fallback: string) {
       ? String(error.code)
       : '';
   switch (code) {
+    case 'niva/session-unavailable':
+      return 'Your phone was verified, but Niva could not finish signing you in. Check the connection and try again.';
     case 'auth/code-expired':
     case 'auth/session-expired':
       return 'This code has expired. Request a new one.';
@@ -238,25 +216,19 @@ function friendlyOtpError(error: unknown, fallback: string) {
   }
 }
 
+function logSafeAuthError(context: string, error: unknown) {
+  if (!__DEV__) return;
+
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String(error.code)
+      : 'unknown';
+  const name = error instanceof Error ? error.name : typeof error;
+
+  console.warn(`[Niva auth] ${context}.`, { code, name });
+}
+
 const styles = StyleSheet.create({
-  autofillAction: {
-    color: '#1769B0',
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  autofillCard: {
-    alignItems: 'center',
-    backgroundColor: colors.infoSoft,
-    borderColor: '#C8D7E7',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    minHeight: 54,
-    paddingHorizontal: spacing.md,
-  },
-  autofillText: { color: colors.primary, flex: 1, fontSize: typography.small },
   change: {
     color: colors.success,
     fontSize: typography.body,
@@ -292,20 +264,13 @@ const styles = StyleSheet.create({
   helpButton: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   helpText: { color: '#1769B0', fontSize: typography.body, fontWeight: '800' },
   hiddenInput: {
-    height: 1,
+    height: '100%',
     left: 0,
     opacity: 0.01,
     position: 'absolute',
     top: 0,
-    width: 1,
-  },
-  messageIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
+    width: '100%',
+    zIndex: 1,
   },
   phoneRow: {
     alignItems: 'center',

@@ -18,17 +18,17 @@ const steps = [
   },
   {
     id: 'backend',
-    title: 'NestJS Backend',
+    title: 'Cloud Functions API',
     role: 'The business rules layer.',
     detail:
-      'Checks Firebase tokens, decides what users can do, and protects the database.',
+      'Checks Firebase tokens, enforces product rules, and performs privileged Firestore writes.',
   },
   {
     id: 'database',
-    title: 'PostgreSQL',
+    title: 'Cloud Firestore',
     role: 'The product memory.',
     detail:
-      'Stores users, profiles, reviews, trust events, communities, attendance, and future matching data.',
+      'Stores users, profiles, reviews, plans, attendance, notifications, and audit records.',
   },
   {
     id: 'trust',

@@ -1,7 +1,7 @@
-import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { getMessaging, getToken } from '@react-native-firebase/messaging';
 
 import { registerPushToken } from './community';
 
@@ -70,20 +70,14 @@ export async function registerForPushNotifications(idToken: string) {
     };
   }
 
-  const projectId =
-    Constants.easConfig?.projectId ??
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-
-  if (!projectId) {
+  const pushToken = await getToken(getMessaging());
+  if (!pushToken) {
     return {
       registered: false,
-      reason: 'The EAS project ID is not configured for this build.',
+      reason: 'This device did not provide a Firebase push token.',
     };
   }
+  await registerPushToken(idToken, pushToken, Platform.OS);
 
-  const pushToken = await Notifications.getExpoPushTokenAsync({ projectId });
-  await registerPushToken(idToken, pushToken.data, Platform.OS);
-
-  return { registered: true, token: pushToken.data };
+  return { registered: true, token: pushToken };
 }

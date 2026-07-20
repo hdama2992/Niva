@@ -1,20 +1,17 @@
-import { io, Socket } from 'socket.io-client';
+import {
+  collection,
+  doc,
+  getFirestore,
+  limitToLast,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from '@react-native-firebase/firestore';
+import { getAuth } from '@react-native-firebase/auth';
 import type { ChatMessage } from './community';
 
 type CohortType = 'CIRCLE' | 'EVENT';
-
-type CohortMessageEvent = {
-  activityId: string;
-  message: ChatMessage;
-  type: CohortType;
-};
-
-type CohortActivityEvent = {
-  activityId: string;
-  type: CohortType;
-};
-
-type SubscriptionResponse = { error?: string; ok: boolean };
 
 type CohortHandlers = {
   onActivityChange: () => void;
@@ -22,108 +19,101 @@ type CohortHandlers = {
   onMessage: (message: ChatMessage) => void;
 };
 
-const realtimeUrl =
-  process.env.EXPO_PUBLIC_REALTIME_URL ??
-  process.env.EXPO_PUBLIC_API_URL ??
-  'http://localhost:3001';
-
-let activeToken: string | undefined;
-let socket: Socket | undefined;
-
 export function subscribeToCohortRealtime(
-  idToken: string,
+  _idToken: string,
   type: CohortType,
   activityId: string,
   handlers: CohortHandlers,
 ) {
-  const client = connectRealtime(idToken);
-  const subscription = { activityId, type };
+  const firestore = getFirestore();
+  const threadId = `${type}_${activityId}`;
+  let initialMessagesLoaded = false;
 
-  const subscribe = () => {
-    client
-      .timeout(5000)
-      .emit(
-        'cohort:subscribe',
-        subscription,
-        (timeoutError: Error | null, response?: SubscriptionResponse) => {
-          handlers.onConnectionChange(!timeoutError && response?.ok === true);
-        },
-      );
-  };
-  const onConnect = () => subscribe();
-  const onDisconnect = () => handlers.onConnectionChange(false);
-  const onMessage = (event: CohortMessageEvent) => {
-    if (event.type === type && event.activityId === activityId) {
-      handlers.onMessage(event.message);
-    }
-  };
-  const onActivityChange = (event: CohortActivityEvent) => {
-    if (event.type === type && event.activityId === activityId) {
-      handlers.onActivityChange();
-    }
-  };
+  const unsubscribeMessages = onSnapshot(
+    query(
+      collection(firestore, 'chatThreads', threadId, 'messages'),
+      orderBy('createdAt', 'asc'),
+      limitToLast(200),
+    ),
+    (snapshot) => {
+      if (initialMessagesLoaded) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type !== 'added') return;
+          handlers.onMessage(toChatMessage(change.doc.id, change.doc.data()));
+        });
+      }
+      initialMessagesLoaded = true;
+      handlers.onConnectionChange(true);
+    },
+    () => handlers.onConnectionChange(false),
+  );
 
-  client.on('connect', onConnect);
-  client.on('disconnect', onDisconnect);
-  client.on('cohort:message', onMessage);
-  client.on('cohort:activity-updated', onActivityChange);
-  client.on('cohort:activity-cancelled', onActivityChange);
-
-  if (client.connected) {
-    subscribe();
-  }
+  const unsubscribeActivity = onSnapshot(
+    doc(firestore, 'chatThreads', threadId),
+    () => {
+      if (initialMessagesLoaded) handlers.onActivityChange();
+    },
+    () => handlers.onConnectionChange(false),
+  );
 
   return () => {
-    client.emit('cohort:unsubscribe', subscription);
-    client.off('connect', onConnect);
-    client.off('disconnect', onDisconnect);
-    client.off('cohort:message', onMessage);
-    client.off('cohort:activity-updated', onActivityChange);
-    client.off('cohort:activity-cancelled', onActivityChange);
+    unsubscribeMessages();
+    unsubscribeActivity();
     handlers.onConnectionChange(false);
   };
 }
 
 export function subscribeToMemberRealtime(
-  idToken: string,
+  _idToken: string,
   onUpdate: () => void,
 ) {
-  const client = connectRealtime(idToken);
-  const notify = () => onUpdate();
-
-  client.on('notification:new', notify);
-  client.on('activity:membership-updated', notify);
-
-  return () => {
-    client.off('notification:new', notify);
-    client.off('activity:membership-updated', notify);
+  const firestore = getFirestore();
+  const currentUserId = getAuth().currentUser?.uid;
+  if (!currentUserId) return () => undefined;
+  let readySubscriptions = 0;
+  const notifyAfterInitialLoad = () => {
+    readySubscriptions += 1;
+    if (readySubscriptions > 3) onUpdate();
   };
+  const unsubscribes = [
+    onSnapshot(
+      query(
+        collection(firestore, 'notifications'),
+        where('userId', '==', currentUserId),
+        orderBy('createdAt', 'desc'),
+      ),
+      notifyAfterInitialLoad,
+    ),
+    onSnapshot(
+      query(
+        collection(firestore, 'eventMembers'),
+        where('userId', '==', currentUserId),
+      ),
+      notifyAfterInitialLoad,
+    ),
+    onSnapshot(
+      query(
+        collection(firestore, 'circleMembers'),
+        where('userId', '==', currentUserId),
+      ),
+      notifyAfterInitialLoad,
+    ),
+  ];
+
+  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
 }
 
 export function disconnectRealtime() {
-  socket?.disconnect();
-  socket = undefined;
-  activeToken = undefined;
+  // Firestore listeners are owned and disconnected by each returned unsubscribe.
 }
 
-function connectRealtime(idToken: string) {
-  if (socket && activeToken === idToken) {
-    if (!socket.active) {
-      socket.connect();
-    }
-    return socket;
-  }
-
-  socket?.disconnect();
-  activeToken = idToken;
-  socket = io(realtimeUrl, {
-    auth: { idToken },
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 750,
-    reconnectionDelayMax: 5000,
-    transports: ['websocket', 'polling'],
-  });
-
-  return socket;
+function toChatMessage(id: string, data: Record<string, unknown>): ChatMessage {
+  const timestamp = data.createdAt as { toDate?: () => Date } | undefined;
+  return {
+    body: String(data.body ?? ''),
+    createdAt: timestamp?.toDate?.().toISOString() ?? new Date().toISOString(),
+    id,
+    sender: data.sender as ChatMessage['sender'],
+    senderId: String(data.senderId ?? ''),
+  };
 }

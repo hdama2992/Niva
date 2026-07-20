@@ -1,10 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  MessageSquareText,
-  ShieldCheck,
-  Smartphone,
-} from 'lucide-react-native';
+import { Check, ChevronDown, MessageSquareText } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,13 +18,8 @@ import {
 
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../constants/theme';
-import { MobileAuthMode } from '../services/mobile-auth';
-
 type LoginScreenProps = {
-  authMode: MobileAuthMode;
   onContinue: (phone: string) => Promise<void>;
-  onVerifyPhoneNumber: () => void;
-  pnvAvailable: boolean;
 };
 
 type Country = {
@@ -81,12 +70,7 @@ const countries: Country[] = [
 const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
 const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL;
 
-export function LoginScreen({
-  authMode,
-  onContinue,
-  onVerifyPhoneNumber,
-  pnvAvailable,
-}: LoginScreenProps) {
+export function LoginScreen({ onContinue }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
@@ -110,6 +94,7 @@ export function LoginScreen({
     try {
       await onContinue(`${selectedCountry.dialCode}${localPhone}`);
     } catch (authError) {
+      logSafeAuthError('Phone verification request failed', authError);
       setError(friendlyPhoneError(authError));
     } finally {
       setSubmitting(false);
@@ -145,43 +130,6 @@ export function LoginScreen({
               Meet people through thoughtful plans near you.
             </Text>
           </View>
-
-          {pnvAvailable ? (
-            <View style={styles.pnvSection}>
-              <View style={styles.pnvCopy}>
-                <View style={styles.pnvIcon}>
-                  <Smartphone
-                    color={colors.secondary}
-                    size={20}
-                    strokeWidth={2.4}
-                  />
-                </View>
-                <View style={styles.pnvTextGroup}>
-                  <Text style={styles.pnvTitle}>Verify from your SIM</Text>
-                  <Text style={styles.pnvText}>
-                    Your mobile carrier confirms the number after you consent.
-                    No SMS code is needed.
-                  </Text>
-                </View>
-              </View>
-              <PrimaryButton
-                icon={
-                  <ShieldCheck
-                    color={colors.surface}
-                    size={20}
-                    strokeWidth={2.4}
-                  />
-                }
-                label="Verify my phone number"
-                onPress={onVerifyPhoneNumber}
-              />
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerLabel}>or use SMS</Text>
-                <View style={styles.dividerLine} />
-              </View>
-            </View>
-          ) : null}
 
           <View style={styles.phoneGroup}>
             <Text style={styles.label}>Log in or sign up</Text>
@@ -227,7 +175,6 @@ export function LoginScreen({
               />
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Text style={styles.phonePrivacy}>Your number stays private.</Text>
           </View>
 
           <PrimaryButton
@@ -243,13 +190,7 @@ export function LoginScreen({
                 />
               )
             }
-            label={
-              submitting
-                ? 'Starting verification...'
-                : pnvAvailable
-                  ? 'Text me a code'
-                  : 'Continue'
-            }
+            label={submitting ? 'Starting verification...' : 'Continue'}
             onPress={() => void continueToOtp()}
           />
           <Text style={styles.consentText}>
@@ -353,6 +294,18 @@ function friendlyPhoneError(error: unknown) {
   }
 }
 
+function logSafeAuthError(context: string, error: unknown) {
+  if (!__DEV__) return;
+
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String(error.code)
+      : 'unknown';
+  const name = error instanceof Error ? error.name : typeof error;
+
+  console.warn(`[Niva auth] ${context}.`, { code, name });
+}
+
 const styles = StyleSheet.create({
   brand: {
     color: colors.surface,
@@ -450,22 +403,6 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
-  divider: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  dividerLabel: {
-    color: colors.muted,
-    fontSize: typography.small,
-    fontWeight: '700',
-  },
-  dividerLine: {
-    backgroundColor: colors.border,
-    flex: 1,
-    height: 1,
-  },
   error: {
     color: colors.primaryDark,
     fontSize: typography.small,
@@ -494,11 +431,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: spacing.md,
   },
-  phonePrivacy: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 18,
-  },
   phoneRow: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -510,42 +442,6 @@ const styles = StyleSheet.create({
   },
   phoneRowError: {
     borderColor: colors.primaryDark,
-  },
-  pnvCopy: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  pnvIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.secondarySoft,
-    borderRadius: radius.pill,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  pnvSection: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-  },
-  pnvText: {
-    color: colors.muted,
-    fontSize: typography.small,
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  pnvTextGroup: {
-    flex: 1,
-  },
-  pnvTitle: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
   },
   scrollContent: {
     flexGrow: 1,

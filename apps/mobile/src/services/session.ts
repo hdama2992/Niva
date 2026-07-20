@@ -52,6 +52,15 @@ export type Session = {
   user: ApiUser;
 };
 
+export class NivaSessionUnavailableError extends Error {
+  readonly code = 'niva/session-unavailable';
+
+  constructor() {
+    super('Niva could not finish creating the signed-in session.');
+    this.name = 'NivaSessionUnavailableError';
+  }
+}
+
 async function request<T>(
   path: string,
   idToken: string,
@@ -76,47 +85,26 @@ async function request<T>(
 }
 
 export async function createSession(idToken: string): Promise<ApiUser> {
-  const response = await fetch(`${apiUrl}/auth/session`, {
-    body: JSON.stringify({ idToken }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}/auth/session`, {
+      body: JSON.stringify({ idToken }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+  } catch {
+    throw new NivaSessionUnavailableError();
+  }
 
   if (!response.ok) {
-    throw new Error('Unable to create a Niva session.');
+    throw new NivaSessionUnavailableError();
   }
 
   const payload = (await response.json()) as { user: ApiUser };
   return payload.user;
-}
-
-export async function exchangePnvToken(pnvToken: string): Promise<string> {
-  const response = await fetch(`${apiUrl}/auth/pnv/exchange`, {
-    body: JSON.stringify({ pnvToken }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(
-      message || 'Unable to verify the phone number from this device.',
-    );
-  }
-
-  const payload = (await response.json()) as { customToken: string };
-  return payload.customToken;
-}
-
-export async function createBetaSession(phone: string): Promise<Session> {
-  const idToken = `niva-beta:${phone}`;
-  const user = await createSession(idToken);
-
-  return { idToken, user };
 }
 
 export function getMe(idToken: string) {

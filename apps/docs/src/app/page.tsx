@@ -20,13 +20,13 @@ const docs = [
     id: 'sprint-0',
     title: 'Sprint 0: Product Stack',
     section: 'Learning',
-    body: 'React Native Expo for mobile, NestJS for APIs, Next.js for admin and docs, PostgreSQL for durable product data.',
+    body: 'React Native Expo for mobile, Firebase Functions and Firestore for the backend, and Next.js for hosted admin and public web experiences.',
   },
   {
     id: 'sprint-1',
     title: 'Sprint 1: Authentication',
     section: 'Learning',
-    body: 'Firebase verifies the phone number. NestJS verifies the Firebase ID token. Prisma stores or updates the Niva user.',
+    body: 'Firebase verifies the phone number. A guarded Cloud Function verifies the ID token and creates or updates the Firestore user.',
   },
   {
     id: 'sprint-2',
@@ -107,10 +107,10 @@ const docs = [
     body: 'Google, Apple, and other providers can be added later through Firebase Auth providers. They are not wired into the current Expo client yet.',
   },
   {
-    id: 'postgres',
-    title: 'PostgreSQL',
+    id: 'firestore',
+    title: 'Cloud Firestore',
     section: 'Database',
-    body: 'PostgreSQL stores users, attendance, events, communities, host status, and trust signals as the product grows.',
+    body: 'Firestore stores users, attendance, plans, host status, moderation records, and private trust evidence.',
   },
   {
     id: 'interviews',
@@ -122,13 +122,13 @@ const docs = [
 
 const architectureChart = `flowchart TD
   user[User] --> app[React Native Expo App]
-  app --> api[HTTPS Request]
-  api --> backend[NestJS Backend]
-  backend --> firebase[Firebase Auth]
-  backend --> postgres[(PostgreSQL)]
-  backend --> trust[Trust Events]
-  backend --> review[Admin Review]
-  firebase --> sms[SMS Provider]
+  app --> auth[Firebase Auth]
+  app --> api[Firebase HTTPS Function]
+  api --> firestore[(Cloud Firestore)]
+  api --> storage[Cloud Storage]
+  api --> fcm[Firebase Cloud Messaging]
+  firestore --> realtime[Approved realtime listeners]
+  hosting[Firebase Hosting] --> api
 `;
 
 export default function DocsHome() {
@@ -201,15 +201,15 @@ export default function DocsHome() {
           <h1>Learn the product by building the product.</h1>
           <p className="hero-copy">
             Every sprint explains what we built, why it exists, and how it fits
-            into Niva. The stack is TypeScript-first: React Native Expo, NestJS,
-            Next.js, PostgreSQL, and Firebase.
+            into Niva. The stack is TypeScript-first: React Native Expo,
+            Next.js, and Firebase.
           </p>
           <div className="stack-strip" aria-label="Niva stack">
             <span>React Native Expo</span>
-            <span>NestJS</span>
+            <span>Cloud Functions</span>
             <span>Next.js</span>
-            <span>PostgreSQL</span>
-            <span>Firebase</span>
+            <span>Cloud Firestore</span>
+            <span>Firebase Hosting</span>
             <span>Trust Events</span>
           </div>
         </section>
@@ -241,7 +241,7 @@ export default function DocsHome() {
         <section className="section-band" id="architecture">
           <div className="section-heading">
             <p className="eyebrow">Architecture</p>
-            <h2>React Native, Firebase, NestJS, and PostgreSQL</h2>
+            <h2>React Native and one Firebase backend</h2>
           </div>
           <MermaidDiagram chart={architectureChart} />
           <ArchitectureFlow />
@@ -261,37 +261,37 @@ export default function DocsHome() {
         <section className="split-section" id="backend">
           <div>
             <p className="eyebrow">Backend</p>
-            <h2>NestJS owns product decisions</h2>
+            <h2>Cloud Functions own product decisions</h2>
           </div>
           <p>
-            Firebase can prove who the user is. NestJS decides what that user
-            can do inside Niva and protects PostgreSQL from direct client
-            access.
+            Firebase Auth proves who the user is. Guarded HTTPS Functions decide
+            what that user can do, while Firestore rules restrict the direct
+            realtime surface.
           </p>
         </section>
 
         <section className="split-section" id="database">
           <div>
             <p className="eyebrow">Database</p>
-            <h2>PostgreSQL is the durable source of truth</h2>
+            <h2>Firestore is the durable source of truth</h2>
           </div>
           <p>
-            User profiles, activities, attendance, host promotion, trust
-            signals, and matching data belong in a relational database behind
-            the API.
+            User profiles, plans, attendance, host access, safety evidence,
+            notifications, and audit records live in Firebase and are mutated
+            through transactions and guarded Functions.
           </p>
         </section>
 
         <section className="section-band" id="deployment">
           <div className="section-heading">
             <p className="eyebrow">Deployment</p>
-            <h2>Local today, production-ready shape tomorrow</h2>
+            <h2>Emulated locally, deployed together</h2>
           </div>
           <div className="timeline">
             <span>Local Expo app</span>
-            <span>Local NestJS API</span>
-            <span>Managed PostgreSQL</span>
-            <span>Firebase Auth project</span>
+            <span>Firebase Emulator Suite</span>
+            <span>Cloud Functions + Firestore</span>
+            <span>Firebase Hosting + FCM</span>
             <span>EAS builds</span>
           </div>
         </section>

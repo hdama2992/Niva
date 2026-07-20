@@ -22,23 +22,18 @@ import {
   acceptSelfDeclaration,
   checkUsernameAvailability,
   ApiUser,
-  createBetaSession,
   createSession,
   deleteAccount,
-  exchangePnvToken,
   setUsername,
   submitSelfie,
   updateProfile,
 } from './src/services/session';
 import { initializeFirebase } from './src/services/firebase';
 import {
-  getMobileAuthMode,
-  getPhoneNumberVerificationAvailability,
+  assertFirebaseAuthConfigured,
   logoutMobileUser,
-  requestPhoneNumberVerification,
   restoreFirebaseIdToken,
   sendPhoneCode,
-  signInWithPnvCustomToken,
   verifyPhoneCode,
 } from './src/services/mobile-auth';
 import {
@@ -83,22 +78,13 @@ type Route =
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: 'splash' });
-  const [pnvAvailable, setPnvAvailable] = useState(false);
-  const authMode = getMobileAuthMode();
-
-  if (authMode === 'firebase') {
-    initializeFirebase();
-  }
+  assertFirebaseAuthConfigured();
+  initializeFirebase();
 
   useEffect(() => {
     let isActive = true;
 
     const restoreSession = async () => {
-      if (authMode === 'beta') {
-        setRoute({ name: 'login' });
-        return;
-      }
-
       try {
         const idToken = await restoreFirebaseIdToken();
 
@@ -125,43 +111,14 @@ export default function App() {
     return () => {
       isActive = false;
     };
-  }, [authMode]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void getPhoneNumberVerificationAvailability()
-      .then((availability) => {
-        if (isActive) {
-          setPnvAvailable(availability.available);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setPnvAvailable(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [authMode]);
+  }, []);
 
   const handleOtpRequested = async (phone: string) => {
     await sendPhoneCode(phone);
     setRoute({ name: 'otp', phone });
   };
 
-  const handlePnvRequested = () =>
-    withApiErrors(async () => {
-      const pnvToken = await requestPhoneNumberVerification();
-      const customToken = await exchangePnvToken(pnvToken);
-      const firebaseIdToken = await signInWithPnvCustomToken(customToken);
-      const user = await createSession(firebaseIdToken);
-      setRoute(routeForApiUser(firebaseIdToken, user));
-    });
-
-  const handleOtpVerified = async (phone: string, code: string) => {
+  const handleOtpVerified = async (_phone: string, code: string) => {
     const firebaseIdToken = await verifyPhoneCode(code);
 
     if (firebaseIdToken) {
@@ -169,9 +126,7 @@ export default function App() {
       setRoute(routeForApiUser(firebaseIdToken, user));
       return;
     }
-
-    const session = await createBetaSession(phone);
-    setRoute(routeForApiUser(session.idToken, session.user));
+    throw new Error('Firebase did not create a signed-in session.');
   };
 
   const handleProfile = (
@@ -183,18 +138,16 @@ export default function App() {
   ) =>
     withApiErrors(async () => {
       let activeIdToken = idToken;
-      if (authMode === 'firebase') {
-        const refreshedIdToken = await restoreFirebaseIdToken();
-        if (!refreshedIdToken) {
-          setRoute({ name: 'login' });
-          Alert.alert(
-            'Sign in again',
-            'Your session expired before the photo upload. Sign in again to finish your profile.',
-          );
-          return;
-        }
-        activeIdToken = refreshedIdToken;
+      const refreshedIdToken = await restoreFirebaseIdToken();
+      if (!refreshedIdToken) {
+        setRoute({ name: 'login' });
+        Alert.alert(
+          'Sign in again',
+          'Your session expired before the photo upload. Sign in again to finish your profile.',
+        );
+        return;
       }
+      activeIdToken = refreshedIdToken;
 
       let username = currentUsername;
       if (!username) {
@@ -295,20 +248,12 @@ export default function App() {
       case 'splash':
         return <SplashScreen />;
       case 'login':
-        return (
-          <LoginScreen
-            authMode={authMode}
-            onContinue={handleOtpRequested}
-            onVerifyPhoneNumber={handlePnvRequested}
-            pnvAvailable={pnvAvailable}
-          />
-        );
+        return <LoginScreen onContinue={handleOtpRequested} />;
       case 'otp':
         return (
           <OtpScreen
             phone={route.phone}
             onBack={() => setRoute({ name: 'login' })}
-            authMode={authMode}
             onResend={() => sendPhoneCode(route.phone)}
             onVerified={(code) => handleOtpVerified(route.phone, code)}
           />
