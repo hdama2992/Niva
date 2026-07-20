@@ -182,11 +182,30 @@ export default function App() {
     profile: ProfileDraft,
   ) =>
     withApiErrors(async () => {
+      let activeIdToken = idToken;
+      if (authMode === 'firebase') {
+        const refreshedIdToken = await restoreFirebaseIdToken();
+        if (!refreshedIdToken) {
+          setRoute({ name: 'login' });
+          Alert.alert(
+            'Sign in again',
+            'Your session expired before the photo upload. Sign in again to finish your profile.',
+          );
+          return;
+        }
+        activeIdToken = refreshedIdToken;
+      }
+
       let username = currentUsername;
       if (!username) {
-        const { user } = await setUsername(idToken, submittedUsername);
+        const { user } = await setUsername(activeIdToken, submittedUsername);
         username = user.username ?? submittedUsername;
-        setRoute({ idToken, name: 'profile', phone, username });
+        setRoute({
+          idToken: activeIdToken,
+          name: 'profile',
+          phone,
+          username,
+        });
       }
 
       const { age, profilePhoto, ...profileData } = profile;
@@ -198,9 +217,13 @@ export default function App() {
 
       const profilePhotoUrl = await uploadProfilePhoto(profilePhoto);
 
-      await updateProfile(idToken, { age, ...profileData, profilePhotoUrl });
+      await updateProfile(activeIdToken, {
+        age,
+        ...profileData,
+        profilePhotoUrl,
+      });
       setRoute({
-        idToken,
+        idToken: activeIdToken,
         name: 'declaration',
         phone,
         profile,

@@ -1,7 +1,6 @@
 import {
   Check,
   ChevronDown,
-  LockKeyhole,
   MessageSquareText,
   ShieldCheck,
   Smartphone,
@@ -228,6 +227,7 @@ export function LoginScreen({
               />
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Text style={styles.phonePrivacy}>Your number stays private.</Text>
           </View>
 
           <PrimaryButton
@@ -252,15 +252,6 @@ export function LoginScreen({
             }
             onPress={() => void continueToOtp()}
           />
-          <View style={styles.securityNote}>
-            <View style={styles.securityIcon}>
-              <LockKeyhole color={colors.success} size={19} strokeWidth={2.3} />
-            </View>
-            <Text style={styles.securityText}>
-              Your number is used to sign in and protect your account. It isn’t
-              shown on your profile.
-            </Text>
-          </View>
           <Text style={styles.consentText}>
             By continuing, you agree to our{' '}
             <Text
@@ -365,9 +356,9 @@ function friendlyPhoneError(error: unknown) {
 const styles = StyleSheet.create({
   brand: {
     color: colors.surface,
-    fontSize: 30,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.4,
   },
   brandGlass: {
     alignItems: 'center',
@@ -376,8 +367,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.42)',
     borderRadius: radius.pill,
     borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
   },
   container: {
     flex: 1,
@@ -503,6 +494,11 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: spacing.md,
   },
+  phonePrivacy: {
+    color: colors.muted,
+    fontSize: typography.small,
+    lineHeight: 18,
+  },
   phoneRow: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -553,27 +549,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  securityIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.successSoft,
-    borderRadius: radius.pill,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  securityNote: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.sm,
-  },
-  securityText: {
-    color: colors.muted,
-    flex: 1,
-    fontSize: typography.small,
-    lineHeight: 19,
   },
   sheetTitle: {
     color: colors.ink,

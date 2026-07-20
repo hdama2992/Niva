@@ -173,7 +173,9 @@ async function uploadImage(
   const user = getFirebaseAuth().currentUser;
 
   if (!user) {
-    throw new Error('Sign in before uploading a photo.');
+    throw new Error(
+      'Your sign-in session expired. Sign in again before uploading this photo.',
+    );
   }
 
   const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';

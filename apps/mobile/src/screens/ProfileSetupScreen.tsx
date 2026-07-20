@@ -6,6 +6,7 @@ import {
   Camera,
   ChevronDown,
   ImagePlus,
+  Info,
   Save,
   X,
   XCircle,
@@ -109,6 +110,7 @@ export function ProfileSetupScreen({
   const [profilePhoto, setProfilePhoto] = useState<SelectedProfilePhoto>();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
+  const [photoTipsOpen, setPhotoTipsOpen] = useState(false);
   const [error, setError] = useState<string>();
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -344,9 +346,9 @@ export function ProfileSetupScreen({
         <View style={styles.header}>
           {mode === 'edit' ? (
             <Text style={styles.eyebrow}>@{username}</Text>
-          ) : (
+          ) : step === 1 ? (
             <Text style={styles.eyebrow}>Profile · {step} of 3</Text>
-          )}
+          ) : null}
           <Text style={styles.title}>
             {mode === 'edit'
               ? 'Edit your profile'
@@ -356,64 +358,47 @@ export function ProfileSetupScreen({
                   ? 'What are you into?'
                   : 'Finish with a profile photo'}
           </Text>
-          <Text style={styles.subtitle}>
-            {mode === 'edit'
-              ? 'Keep your details up to date.'
-              : step === 1
-                ? 'The essentials other members need to know.'
-                : step === 2
-                  ? 'Pick at least three so we can surface relevant plans.'
-                  : 'This helps people recognise you when you meet.'}
-          </Text>
-          {step !== 3 || mode === 'edit' ? (
-            <Text style={styles.requiredNote}>* Required</Text>
+          {mode === 'edit' || step === 3 ? (
+            <Text style={styles.subtitle}>
+              {mode === 'edit'
+                ? 'Keep your details up to date.'
+                : 'Add a clear photo so members can recognise you.'}
+            </Text>
           ) : null}
         </View>
 
         {mode === 'edit' || step === 3 ? (
           <>
-            {mode === 'create' ? (
-              <View style={styles.savedProfileCard}>
-                <View style={styles.savedProfileCopy}>
-                  <Text style={styles.savedProfileName}>
-                    {displayName} · {city}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.savedProfileMeta}>
-                    {interests.slice(0, 3).join(' · ')}
-                  </Text>
-                </View>
-                <View style={styles.savedBadge}>
-                  <CheckCircle2 color={colors.success} size={18} />
-                  <Text style={styles.savedBadgeText}>Details ready</Text>
-                </View>
-              </View>
-            ) : null}
             <Pressable
-          accessibilityRole="button"
-          onPress={() => setPhotoSourceOpen(true)}
-          style={[
-            styles.profilePhotoPicker,
-            attempted && !hasProfilePhoto && styles.invalidField,
-          ]}
+              accessibilityRole="button"
+              onPress={() => setPhotoSourceOpen(true)}
+              style={[
+                styles.profilePhotoPicker,
+                attempted && !hasProfilePhoto && styles.invalidField,
+              ]}
             >
-          {profilePhoto || initialProfilePhotoUrl ? (
-            <Image
-              source={{ uri: profilePhoto?.uri ?? initialProfilePhotoUrl }}
-              style={styles.profilePhoto}
-            />
-          ) : (
-            <View style={styles.profilePhotoPlaceholder}>
-              <Camera color={colors.secondary} size={24} strokeWidth={2.3} />
-            </View>
-          )}
-          <View style={styles.profilePhotoCopy}>
-            <Text style={styles.profilePhotoTitle}>
-              {mode === 'edit' ? 'Change profile photo' : 'Profile photo *'}
-            </Text>
-            <Text style={styles.profilePhotoMeta}>
-              Choose a photo or take one now.
-            </Text>
-          </View>
+              {profilePhoto || initialProfilePhotoUrl ? (
+                <Image
+                  source={{ uri: profilePhoto?.uri ?? initialProfilePhotoUrl }}
+                  style={styles.profilePhoto}
+                />
+              ) : (
+                <View style={styles.profilePhotoPlaceholder}>
+                  <Camera
+                    color={colors.secondary}
+                    size={24}
+                    strokeWidth={2.3}
+                  />
+                </View>
+              )}
+              <View style={styles.profilePhotoCopy}>
+                <Text style={styles.profilePhotoTitle}>
+                  {mode === 'edit' ? 'Change profile photo' : 'Profile photo *'}
+                </Text>
+                <Text style={styles.profilePhotoMeta}>
+                  Choose a photo or take one now.
+                </Text>
+              </View>
             </Pressable>
             {mode === 'create' ? (
               <View style={styles.photoActionRow}>
@@ -430,29 +415,28 @@ export function ProfileSetupScreen({
                   onPress={() => void chooseProfilePhoto('library')}
                   style={styles.photoActionButton}
                 >
-                  <ImagePlus color={colors.primary} size={21} strokeWidth={2.3} />
+                  <ImagePlus
+                    color={colors.primary}
+                    size={21}
+                    strokeWidth={2.3}
+                  />
                   <Text style={styles.photoActionText}>Choose a photo</Text>
                 </Pressable>
               </View>
             ) : null}
             <Text style={styles.photoPrivacyTitle}>Public profile photo</Text>
             <Text style={styles.photoPrivacyText}>
-              Approved members may see this in plan details and attendee lists.
+              Members in your plans can see it.
             </Text>
             {mode === 'create' ? (
-              <View style={styles.photoGuidance}>
-                {[
-                  'Recent solo photo',
-                  'Face clearly visible',
-                  'Good natural light',
-                  'No heavy filters',
-                ].map((item) => (
-                  <View key={item} style={styles.photoGuidanceRow}>
-                    <CheckCircle2 color={colors.success} size={20} />
-                    <Text style={styles.photoGuidanceText}>{item}</Text>
-                  </View>
-                ))}
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPhotoTipsOpen(true)}
+                style={styles.photoTipsButton}
+              >
+                <Info color={colors.primary} size={19} strokeWidth={2.3} />
+                <Text style={styles.photoTipsButtonText}>View photo tips</Text>
+              </Pressable>
             ) : null}
             {attempted && !hasProfilePhoto ? (
               <Text style={styles.fieldError}>Add a profile photo.</Text>
@@ -461,110 +445,176 @@ export function ProfileSetupScreen({
         ) : null}
 
         {mode === 'edit' || step === 1 ? (
-        <View style={styles.form}>
-          {mode === 'create' ? (
-            <View style={styles.usernameGroup}>
-              <TextField
-                autoCapitalize="none"
-                autoCorrect={false}
-                error={
-                  attempted && !usernamePattern.test(profileUsername.trim())
-                    ? 'Use 3-20 lowercase letters, numbers, or underscores.'
-                    : attempted && usernameAvailability === 'taken'
-                      ? 'That username is already taken.'
-                      : undefined
-                }
-                helperText="Your unique name in Niva."
-                label="Username *"
-                onChangeText={(value) => {
-                  setProfileUsername(
-                    value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-                  );
-                  setUsernameAvailability('idle');
-                  setError(undefined);
-                }}
-                placeholder="yourname"
-                value={profileUsername}
-              />
-              <UsernameAvailabilityMessage
-                availability={usernameAvailability}
-              />
-            </View>
-          ) : null}
-
-          <TextField
-            error={
-              attempted && displayName.trim().length < 2
-                ? 'Enter at least two characters.'
-                : undefined
-            }
-            label="Display name *"
-            onChangeText={(value) => {
-              setDisplayName(value);
-              setError(undefined);
-            }}
-            placeholder="Himaja"
-            value={displayName}
-          />
-
-          <TextField
-            error={
-              attempted && (age === undefined || age < 18 || age > 100)
-                ? 'Enter an age between 18 and 100.'
-                : undefined
-            }
-            helperText="You must be 18 or older."
-            keyboardType="number-pad"
-            label="Age *"
-            maxLength={3}
-            onChangeText={(value) => {
-              const digits = value.replace(/\D/g, '').slice(0, 3);
-              setAge(digits ? Number(digits) : undefined);
-              setError(undefined);
-            }}
-            placeholder="Enter age"
-            value={age?.toString() ?? ''}
-          />
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>City *</Text>
-            <Text style={styles.fieldMeta}>
-              Choose a city where Niva currently has activities.
-            </Text>
-            <Pressable
-              accessibilityLabel="Select city"
-              accessibilityRole="button"
-              onPress={() => setCityPickerOpen(true)}
-              style={[
-                styles.selectField,
-                attempted && !city && styles.selectFieldError,
-              ]}
-            >
-              <Text
-                style={city ? styles.selectValue : styles.selectPlaceholder}
-              >
-                {city || 'Select your city'}
-              </Text>
-              <ChevronDown color={colors.muted} size={20} strokeWidth={2.4} />
-            </Pressable>
-            {attempted && !city ? (
-              <Text style={styles.fieldError}>Select your city.</Text>
+          <View style={styles.form}>
+            {mode === 'create' ? (
+              <View style={styles.usernameGroup}>
+                <TextField
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  error={
+                    attempted && !usernamePattern.test(profileUsername.trim())
+                      ? 'Use 3-20 lowercase letters, numbers, or underscores.'
+                      : attempted && usernameAvailability === 'taken'
+                        ? 'That username is already taken.'
+                        : undefined
+                  }
+                  helperText="Your unique @handle in profiles and chat."
+                  label="Username *"
+                  onChangeText={(value) => {
+                    setProfileUsername(
+                      value.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                    );
+                    setUsernameAvailability('idle');
+                    setError(undefined);
+                  }}
+                  placeholder="yourname"
+                  value={profileUsername}
+                />
+                <UsernameAvailabilityMessage
+                  availability={usernameAvailability}
+                />
+              </View>
             ) : null}
-          </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Languages *</Text>
-            <Text style={styles.fieldMeta}>Select every language you use.</Text>
-            <View style={styles.choiceList}>
-              {availableLanguages.map((language) => {
-                const selected = languages.includes(language);
+            <TextField
+              error={
+                attempted && displayName.trim().length < 2
+                  ? 'Enter at least two characters.'
+                  : undefined
+              }
+              label="Display name *"
+              helperText="The name other members will see."
+              onChangeText={(value) => {
+                setDisplayName(value);
+                setError(undefined);
+              }}
+              placeholder="Himaja"
+              value={displayName}
+            />
+
+            <TextField
+              error={
+                attempted && (age === undefined || age < 18 || age > 100)
+                  ? 'Enter an age between 18 and 100.'
+                  : undefined
+              }
+              helperText="You must be 18 or older."
+              keyboardType="number-pad"
+              label="Age *"
+              maxLength={3}
+              onChangeText={(value) => {
+                const digits = value.replace(/\D/g, '').slice(0, 3);
+                setAge(digits ? Number(digits) : undefined);
+                setError(undefined);
+              }}
+              placeholder="Enter age"
+              value={age?.toString() ?? ''}
+            />
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>City *</Text>
+              <Text style={styles.fieldMeta}>
+                Choose a city where Niva currently has activities.
+              </Text>
+              <Pressable
+                accessibilityLabel="Select city"
+                accessibilityRole="button"
+                onPress={() => setCityPickerOpen(true)}
+                style={[
+                  styles.selectField,
+                  attempted && !city && styles.selectFieldError,
+                ]}
+              >
+                <Text
+                  style={city ? styles.selectValue : styles.selectPlaceholder}
+                >
+                  {city || 'Select your city'}
+                </Text>
+                <ChevronDown color={colors.muted} size={20} strokeWidth={2.4} />
+              </Pressable>
+              {attempted && !city ? (
+                <Text style={styles.fieldError}>Select your city.</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Languages *</Text>
+              <Text style={styles.fieldMeta}>
+                Select every language you use.
+              </Text>
+              <View style={styles.choiceList}>
+                {availableLanguages.map((language) => {
+                  const selected = languages.includes(language);
+
+                  return (
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      key={language}
+                      onPress={() => toggleLanguage(language)}
+                      style={[
+                        styles.interestChip,
+                        selected && styles.interestChipSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.interestText,
+                          selected && styles.interestTextSelected,
+                        ]}
+                      >
+                        {language}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {attempted && languages.length === 0 ? (
+                <Text style={styles.fieldError}>
+                  Select at least one language.
+                </Text>
+              ) : null}
+            </View>
+
+            <TextField
+              label="Occupation (optional)"
+              onChangeText={setOccupation}
+              placeholder="Designer, student, founder"
+              value={occupation}
+            />
+
+            <TextField
+              helperText="A short introduction for other members."
+              label="About you"
+              multiline
+              onChangeText={setBio}
+              placeholder="I enjoy badminton, books, and weekend workshops."
+              style={styles.bioInput}
+              value={bio}
+            />
+          </View>
+        ) : null}
+
+        {mode === 'edit' || step === 2 ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Interests *</Text>
+                <Text style={styles.sectionMeta}>
+                  {interests.length} selected · minimum 3
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.interests}>
+              {[...interestOptions, ...customInterests].map((interest) => {
+                const selected = interests.includes(interest);
 
                 return (
                   <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                    key={language}
-                    onPress={() => toggleLanguage(language)}
+                    accessibilityRole="button"
+                    key={interest}
+                    onPress={() => toggleInterest(interest)}
                     style={[
                       styles.interestChip,
                       selected && styles.interestChipSelected,
@@ -576,125 +626,64 @@ export function ProfileSetupScreen({
                         selected && styles.interestTextSelected,
                       ]}
                     >
-                      {language}
+                      {interest}
                     </Text>
                   </Pressable>
                 );
               })}
-            </View>
-            {attempted && languages.length === 0 ? (
-              <Text style={styles.fieldError}>
-                Select at least one language.
-              </Text>
-            ) : null}
-          </View>
-
-          <TextField
-            label="Occupation (optional)"
-            onChangeText={setOccupation}
-            placeholder="Designer, student, founder"
-            value={occupation}
-          />
-
-          <TextField
-            helperText="A short introduction for other members."
-            label="About you"
-            multiline
-            onChangeText={setBio}
-            placeholder="I enjoy badminton, books, and weekend workshops."
-            style={styles.bioInput}
-            value={bio}
-          />
-        </View>
-        ) : null}
-
-        {mode === 'edit' || step === 2 ? (
-        <>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Interests *</Text>
-            <Text style={styles.sectionMeta}>{interests.length}/3 minimum</Text>
-          </View>
-        </View>
-
-        <View style={styles.interests}>
-          {[...interestOptions, ...customInterests].map((interest) => {
-            const selected = interests.includes(interest);
-
-            return (
               <Pressable
                 accessibilityRole="button"
-                key={interest}
-                onPress={() => toggleInterest(interest)}
+                onPress={() => {
+                  setCustomInterestOpen((current) => !current);
+                  setError(undefined);
+                }}
                 style={[
                   styles.interestChip,
-                  selected && styles.interestChipSelected,
+                  customInterestOpen && styles.interestChipSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.interestText,
-                    selected && styles.interestTextSelected,
+                    customInterestOpen && styles.interestTextSelected,
                   ]}
                 >
-                  {interest}
+                  Other
                 </Text>
               </Pressable>
-            );
-          })}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setCustomInterestOpen((current) => !current);
-              setError(undefined);
-            }}
-            style={[
-              styles.interestChip,
-              customInterestOpen && styles.interestChipSelected,
-            ]}
-          >
-            <Text
-              style={[
-                styles.interestText,
-                customInterestOpen && styles.interestTextSelected,
-              ]}
-            >
-              Other
-            </Text>
-          </Pressable>
-        </View>
+            </View>
 
-        {customInterestOpen ? (
-          <View style={styles.customInterestPanel}>
-            <TextField
-              autoCapitalize="words"
-              autoComplete="off"
-              autoCorrect={false}
-              label="Add another interest"
-              maxLength={30}
-              onChangeText={setCustomInterest}
-              onSubmitEditing={addCustomInterest}
-              placeholder="For example, photography"
-              returnKeyType="done"
-              spellCheck={false}
-              value={customInterest}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={addCustomInterest}
-              style={styles.addInterestButton}
-            >
-              <Text style={styles.addInterestText}>Add interest</Text>
-            </Pressable>
-          </View>
-        ) : null}
+            {customInterestOpen ? (
+              <View style={styles.customInterestPanel}>
+                <TextField
+                  autoCapitalize="words"
+                  autoComplete="off"
+                  autoCorrect={false}
+                  label="Add another interest"
+                  maxLength={30}
+                  onChangeText={setCustomInterest}
+                  onSubmitEditing={addCustomInterest}
+                  placeholder="For example, photography"
+                  returnKeyType="done"
+                  spellCheck={false}
+                  value={customInterest}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={addCustomInterest}
+                  style={styles.addInterestButton}
+                >
+                  <Text style={styles.addInterestText}>Add interest</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
-        {attempted && !selectedEnoughInterests ? (
-          <Text style={styles.fieldError}>
-            Select at least three interests.
-          </Text>
-        ) : null}
-        </>
+            {attempted && !selectedEnoughInterests ? (
+              <Text style={styles.fieldError}>
+                Select at least three interests.
+              </Text>
+            ) : null}
+          </>
         ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -728,7 +717,9 @@ export function ProfileSetupScreen({
             }}
             style={styles.backToDetails}
           >
-            <Text style={styles.backToDetailsText}>Back to profile details</Text>
+            <Text style={styles.backToDetailsText}>
+              Back to profile details
+            </Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -796,6 +787,52 @@ export function ProfileSetupScreen({
                 </Text>
               </View>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setPhotoTipsOpen(false)}
+        transparent
+        visible={photoTipsOpen}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPhotoTipsOpen(false)}
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.photoSheet}>
+            <View style={styles.photoSheetHeader}>
+              <View>
+                <Text style={styles.photoSheetTitle}>Profile photo tips</Text>
+                <Text style={styles.photoSheetSubtitle}>
+                  Help members recognise you in person.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close photo tips"
+                accessibilityRole="button"
+                hitSlop={10}
+                onPress={() => setPhotoTipsOpen(false)}
+                style={styles.closeButton}
+              >
+                <X color={colors.ink} size={20} strokeWidth={2.4} />
+              </Pressable>
+            </View>
+            <View style={styles.photoGuidance}>
+              {[
+                'Use a recent solo photo',
+                'Keep your face clearly visible',
+                'Choose good natural light',
+                'Avoid heavy filters',
+              ].map((item) => (
+                <View key={item} style={styles.photoGuidanceRow}>
+                  <CheckCircle2 color={colors.success} size={20} />
+                  <Text style={styles.photoGuidanceText}>{item}</Text>
+                </View>
+              ))}
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1147,7 +1184,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
-    marginBottom: spacing.lg,
     paddingHorizontal: spacing.md,
   },
   photoActionButton: {
@@ -1198,6 +1234,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: spacing.xs,
     textAlign: 'center',
+  },
+  photoTipsButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.lg,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  photoTipsButtonText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '800',
   },
   photoSheet: {
     backgroundColor: colors.background,
@@ -1258,47 +1308,6 @@ const styles = StyleSheet.create({
     width: 56,
   },
   profilePhotoTitle: {
-    color: colors.ink,
-    fontSize: typography.body,
-    fontWeight: '800',
-  },
-  requiredNote: {
-    color: colors.muted,
-    fontSize: typography.small,
-    fontWeight: '700',
-    marginTop: spacing.sm,
-  },
-  savedBadge: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  savedBadgeText: {
-    color: colors.success,
-    fontSize: typography.small,
-    fontWeight: '800',
-  },
-  savedProfileCard: {
-    alignItems: 'center',
-    backgroundColor: colors.glass,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-  },
-  savedProfileCopy: {
-    flex: 1,
-  },
-  savedProfileMeta: {
-    color: colors.muted,
-    fontSize: typography.small,
-    marginTop: 3,
-  },
-  savedProfileName: {
     color: colors.ink,
     fontSize: typography.body,
     fontWeight: '800',
