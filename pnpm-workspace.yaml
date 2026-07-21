@@ -4,6 +4,7 @@ packages:
 allowBuilds:
   '@firebase/util': false
   protobufjs: false
+  re2: true
   sharp: false
   unrs-resolver: false
 minimumReleaseAgeExclude:

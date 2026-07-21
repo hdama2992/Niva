@@ -12,25 +12,20 @@ out/
 .firebase/
 coverage/
 
-# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-
-# Environment files
+# Local configuration and credentials
 .env
 .env.*
 !.env.example
 .secret.local
 *-debug.log
 
-# IDE files
+# Local-only QA and runtime artifacts
+artifacts/
+tmp/
+docker/postgres/data/
+
+# Editor and operating-system files
+.git/
 .idea/
 .vscode/settings.json
-
-# OS files
 .DS_Store
-
-# Local runtime data
-docker/postgres/data/
