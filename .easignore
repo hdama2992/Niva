@@ -11,6 +11,8 @@ lib/
 out/
 .firebase/
 coverage/
+apps/mobile/android/
+apps/mobile/ios/
 
 # Local configuration and credentials
 .env
