@@ -1,10 +1,7 @@
 const { existsSync } = require('node:fs');
 const path = require('node:path');
 
-const app = require('./app.json');
-
-module.exports = () => {
-  const config = app.expo;
+module.exports = ({ config }) => {
   const localGoogleServicesPath = path.join(__dirname, 'google-services.json');
   const localGoogleServiceInfoPath = path.join(
     __dirname,
@@ -68,6 +65,7 @@ module.exports = () => {
         : {}),
     },
     plugins: [
+      './plugins/withFirebaseMessagingManifest',
       ...config.plugins,
       '@react-native-firebase/app',
       '@react-native-firebase/auth',
