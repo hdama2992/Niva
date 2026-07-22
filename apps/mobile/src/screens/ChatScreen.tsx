@@ -145,21 +145,11 @@ export function ChatScreen({
         }
         ref={scrollRef}
       >
-        <View style={styles.boundary}>
-          <Text style={styles.boundaryText}>
-            This is a joined cohort space. No random direct messages.
-          </Text>
-        </View>
         {activityNotice ? (
           <Text style={styles.activityNotice}>{activityNotice}</Text>
         ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {loading ? <ChatShimmer /> : null}
-        {!loading && !messages.length && !error ? (
-          <Text style={styles.emptyText}>
-            Start with a quick hello or a practical question about the activity.
-          </Text>
-        ) : null}
         {!loading
           ? messages.map((message) => {
               const own = message.senderId === userId;
@@ -268,17 +258,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
-  boundary: {
-    backgroundColor: colors.infoSoft,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  boundaryText: {
-    color: colors.info,
-    fontSize: typography.small,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
   chatShimmer: { gap: spacing.sm, paddingVertical: spacing.sm },
   chatShimmerOwn: {
     alignSelf: 'flex-end',
@@ -309,13 +288,6 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'android' ? spacing.lg : spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 24,
-    paddingHorizontal: spacing.md,
-    textAlign: 'center',
   },
   error: {
     color: colors.primaryDark,
