@@ -49,7 +49,10 @@ export default function DeleteAccountPage() {
         <p>
           Open Profile, choose Settings, select Delete account, and confirm.
           Niva deletes the Firebase sign-in identity, profile, memberships,
-          cohort messages, trust records, private selfie, and profile images.
+          authored cohort messages, private selfie, notification tokens, and
+          uploaded profile images. Restricted safety or moderation records may
+          be retained where needed to address abuse, fraud, legal claims, or
+          legal obligations.
         </p>
         <h2>Cannot access the app?</h2>
         {status === 'saved' ? (

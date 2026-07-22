@@ -11,7 +11,11 @@ import {
   requiredString,
 } from './core';
 import { publicRouter } from './public';
-import { createSession, userRouter } from './users';
+import {
+  createSession,
+  requireCurrentLegalAcceptance,
+  userRouter,
+} from './users';
 
 export const app = express();
 
@@ -47,7 +51,12 @@ app.post(
 
 app.use(publicRouter);
 app.use('/users', authenticate, userRouter);
-app.use('/community', authenticate, communityRouter);
+app.use(
+  '/community',
+  authenticate,
+  requireCurrentLegalAcceptance,
+  communityRouter,
+);
 app.use('/admin', authenticate, adminRouter);
 
 app.use((_request, _response, next) => {

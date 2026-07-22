@@ -21,7 +21,7 @@ export async function pickProfilePhoto(): Promise<SelectedImage | undefined> {
     allowsEditing: true,
     aspect: [1, 1],
     mediaTypes: ['images'],
-    quality: 0.82,
+    quality: 0.62,
   });
 
   if (result.canceled) {
@@ -44,7 +44,7 @@ export async function takeProfilePhoto(): Promise<SelectedImage | undefined> {
     aspect: [1, 1],
     cameraType: ImagePicker.CameraType.front,
     mediaTypes: ['images'],
-    quality: 0.82,
+    quality: 0.62,
   });
 
   if (result.canceled) {
@@ -69,7 +69,7 @@ export async function takeSelfie(): Promise<SelectedImage | undefined> {
     aspect: [1, 1],
     cameraType: ImagePicker.CameraType.front,
     mediaTypes: ['images'],
-    quality: 0.84,
+    quality: 0.68,
   });
 
   if (result.canceled) {
@@ -91,7 +91,7 @@ export async function chooseSelfie(): Promise<SelectedImage | undefined> {
     allowsEditing: true,
     aspect: [1, 1],
     mediaTypes: ['images'],
-    quality: 0.84,
+    quality: 0.68,
   });
 
   if (result.canceled) {

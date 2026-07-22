@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   asAuthed,
@@ -21,6 +22,7 @@ import {
 } from './core';
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
+export const CURRENT_LEGAL_VERSION = '2026-07-22';
 
 export const userRouter = Router();
 
@@ -52,6 +54,7 @@ userRouter.post(
     const body = assertObject(request.body);
     const username = normalizeUsername(requiredString(body, 'username', 20));
     const userId = asAuthed(request).userId;
+    await assertCurrentLegalAcceptance(userId);
     const userReference = db.collection('users').doc(userId);
     const usernameReference = db.collection('usernames').doc(username);
 
@@ -89,6 +92,7 @@ userRouter.put(
   '/me/profile',
   asyncRoute(async (request, response) => {
     const body = assertObject(request.body);
+    await assertCurrentLegalAcceptance(asAuthed(request).userId);
     const city = requiredString(body, 'city', 80);
     if (!SUPPORTED_CITIES.includes(city)) {
       throw new HttpError(
@@ -105,7 +109,7 @@ userRouter.put(
     }
     const profile = {
       age: requiredNumber(body, 'age', 18, 100),
-      bio: optionalString(body, 'bio', 280),
+      bio: requiredString(body, 'bio', 280),
       city,
       displayName,
       interests: requiredStringArray(body, 'interests', 3, 10),
@@ -125,50 +129,26 @@ userRouter.put(
 );
 
 userRouter.post(
-  '/me/self-declaration',
+  '/me/legal-acceptance',
   asyncRoute(async (request, response) => {
     const body = assertObject(request.body);
     if (!requiredBoolean(body, 'accepted')) {
-      throw new HttpError(400, 'The declaration must be accepted.');
+      throw new HttpError(
+        400,
+        'The Terms and Privacy Policy must be accepted.',
+      );
     }
-    const version = body.version === undefined ? 'v1' : body.version;
-    if (version !== 'v1') throw new HttpError(400, 'Unsupported declaration.');
-    const reference = db.collection('users').doc(asAuthed(request).userId);
-    await reference.update({
-      selfDeclarationAccepted: true,
-      selfDeclarationAcceptedAt: Timestamp.now(),
-      selfDeclarationVersion: version,
-      updatedAt: Timestamp.now(),
-    });
-    response.json({ user: documentToJson(await reference.get()) });
-  }),
-);
-
-userRouter.post(
-  '/me/community-guidelines',
-  asyncRoute(async (request, response) => {
-    const body = assertObject(request.body);
-    if (!requiredBoolean(body, 'accepted') || body.version !== 'v1') {
-      throw new HttpError(400, 'Accept the current community guidelines.');
+    const version = body.version ?? CURRENT_LEGAL_VERSION;
+    if (version !== CURRENT_LEGAL_VERSION) {
+      throw new HttpError(400, 'Please accept the current policies.');
     }
+    const now = Timestamp.now();
     const reference = db.collection('users').doc(asAuthed(request).userId);
     await reference.update({
-      communityGuidelinesAccepted: true,
-      communityGuidelinesAcceptedAt: Timestamp.now(),
-      communityGuidelinesVersion: 'v1',
-      updatedAt: Timestamp.now(),
-    });
-    response.json({ user: documentToJson(await reference.get()) });
-  }),
-);
-
-userRouter.post(
-  '/me/welcome-completed',
-  asyncRoute(async (request, response) => {
-    const reference = db.collection('users').doc(asAuthed(request).userId);
-    await reference.update({
-      updatedAt: Timestamp.now(),
-      welcomeCompletedAt: Timestamp.now(),
+      legalAcceptedAt: now,
+      privacyPolicyVersion: CURRENT_LEGAL_VERSION,
+      termsVersion: CURRENT_LEGAL_VERSION,
+      updatedAt: now,
     });
     response.json({ user: documentToJson(await reference.get()) });
   }),
@@ -179,6 +159,7 @@ userRouter.post(
   asyncRoute(async (request, response) => {
     const body = assertObject(request.body);
     const userId = asAuthed(request).userId;
+    await assertCurrentLegalAcceptance(userId);
     const storagePath = requiredString(body, 'selfieStoragePath', 500);
     const expected = new RegExp(
       `^verification-selfies/${escapeRegExp(userId)}/[A-Za-z0-9._-]+$`,
@@ -193,8 +174,14 @@ userRouter.post(
 
     const now = Timestamp.now();
     const reference = db.collection('users').doc(userId);
+    const existing = await reference.get();
+    const previousStoragePath = existing.get(
+      'selfieVerification.selfieStoragePath',
+    ) as string | null;
     await reference.update({
       selfieVerification: {
+        deletedAt: null,
+        deletionDueAt: null,
         selfieStoragePath: storagePath,
         status: 'PENDING',
         submittedAt: now,
@@ -211,6 +198,9 @@ userRouter.post(
       updatedAt: now,
       userId,
     });
+    if (previousStoragePath && previousStoragePath !== storagePath) {
+      await bucket.file(previousStoragePath).delete({ ignoreNotFound: true });
+    }
     response.json({ user: documentToJson(await reference.get()) });
   }),
 );
@@ -245,6 +235,34 @@ export async function createSession(idToken: string) {
     );
   }
   return upsertUserFromToken(decoded);
+}
+
+export async function requireCurrentLegalAcceptance(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+) {
+  try {
+    await assertCurrentLegalAcceptance(asAuthed(request).userId);
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function assertCurrentLegalAcceptance(userId: string) {
+  const user = await getRequiredDocument('users', userId);
+  if (
+    !user.get('legalAcceptedAt') ||
+    user.get('termsVersion') !== CURRENT_LEGAL_VERSION ||
+    user.get('privacyPolicyVersion') !== CURRENT_LEGAL_VERSION
+  ) {
+    throw new HttpError(
+      403,
+      'Accept the current Terms and Privacy Policy to continue.',
+      'LEGAL_ACCEPTANCE_REQUIRED',
+    );
+  }
 }
 
 async function deleteUserData(userId: string) {
@@ -286,15 +304,40 @@ async function deleteUserData(userId: string) {
   for (let offset = 0; offset < authoredMessages.docs.length; offset += 400) {
     const batch = db.batch();
     authoredMessages.docs.slice(offset, offset + 400).forEach((document) => {
-      batch.update(document.ref, {
-        sender: { displayName: 'Former member', id: userId, username: null },
-      });
+      batch.delete(document.ref);
     });
     await batch.commit();
   }
 
   if (username) await db.collection('usernames').doc(username).delete();
   await userReference.delete();
+}
+
+export async function cleanupExpiredVerificationSelfies(limit = 200) {
+  const now = Timestamp.now();
+  const users = await db
+    .collection('users')
+    .where('selfieVerification.deletionDueAt', '<=', now)
+    .limit(limit)
+    .get();
+  let deleted = 0;
+
+  for (const user of users.docs) {
+    const storagePath = user.get('selfieVerification.selfieStoragePath') as
+      string | null;
+    if (storagePath) {
+      await bucket.file(storagePath).delete({ ignoreNotFound: true });
+    }
+    await user.ref.update({
+      'selfieVerification.deletedAt': now,
+      'selfieVerification.deletionDueAt': null,
+      'selfieVerification.selfieStoragePath': null,
+      updatedAt: now,
+    });
+    deleted += 1;
+  }
+
+  return { deleted, scanned: users.size };
 }
 
 function normalizeUsername(input: string) {

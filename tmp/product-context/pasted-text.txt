@@ -1,0 +1,376 @@
+Yes bro — correct. **Selfie check should be in Sprint 2.** Not gender detection, but **real-person + profile consistency + abuse prevention**.
+
+# Sprint 2: Auth + Username + Selfie Trust v1
+
+## Goal
+
+By end of Sprint 2:
+
+```txt
+User can sign up → choose username → complete profile → upload selfie → become “basic verified” → join events/circles.
+```
+
+---
+
+## 1. Auth
+
+Implement:
+
+```txt
+Phone OTP login — required
+Google login — optional/convenience
+Auth profile creation in Firestore
+Logout
+Session persistence
+```
+
+User doc:
+
+```ts
+users/{uid} {
+  uid: string;
+  username: string;
+  displayName: string;
+  phoneNumber?: string;
+  email?: string;
+  authProviders: string[];
+
+  phoneVerified: boolean;
+  googleVerified: boolean;
+
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+---
+
+## 2. Username
+
+Rules:
+
+```txt
+3–20 chars
+lowercase only
+letters, numbers, underscore
+unique
+cannot change more than once every 30 days later
+```
+
+Firestore:
+
+```ts
+usernames/{username} {
+  uid: string;
+  createdAt: Timestamp;
+}
+```
+
+---
+
+## 3. Profile Setup
+
+Fields:
+
+```ts
+users/{uid}/profile {
+  displayName: string;
+  username: string;
+  bio?: string;
+  city: string;
+  interests: string[];
+  profilePhotoUrl?: string;
+  profileCompleteness: number;
+}
+```
+
+MVP required fields:
+
+```txt
+Display name
+Username
+City
+At least 3 interests
+Profile photo/selfie
+Self-declaration
+```
+
+---
+
+## 4. Selfie Check
+
+This is the missing part.
+
+### What selfie check does
+
+```txt
+Checks:
+- Is there a real face?
+- Is image quality okay?
+- Is it not obviously fake/AI/screenshot?
+- Is the same selfie/profile photo used consistently?
+```
+
+### What it does NOT do
+
+```txt
+It does not decide “woman or not woman.”
+It does not auto-reject based on masculine/feminine appearance.
+```
+
+Selfie status:
+
+```ts
+verification: {
+  status: "not_started" | "pending" | "approved" | "needs_review" | "rejected";
+  selfieUrl?: string;
+  selfieSubmittedAt?: Timestamp;
+  selfieCheckProvider?: "manual" | "vendor" | "none";
+  selfieCheckResult?: {
+    faceDetected: boolean;
+    imageQuality: "low" | "medium" | "high";
+    suspectedFake: boolean;
+    suspectedScreenshot: boolean;
+    confidence: number;
+  };
+}
+```
+
+For MVP:
+
+```txt
+Option A: Manual-lite
+Store selfie → mark pending → admin approves.
+
+Option B: Vendor later
+Use Persona / Stripe Identity / HyperVerge / IDfy for stronger checks.
+```
+
+Sprint 2 should implement **Option A now**, but keep fields ready for vendor later.
+
+---
+
+## 5. Self-declaration
+
+Add checkbox:
+
+```txt
+I confirm that I am eligible to join Niva’s women-centered community and will follow the community safety guidelines.
+```
+
+Store:
+
+```ts
+selfDeclaration: {
+  accepted: boolean;
+  acceptedAt: Timestamp;
+  version: "v1";
+}
+```
+
+---
+
+## 6. Trust Engine v1
+
+Trust score is private.
+
+```ts
+trust: {
+  score: number;
+  tier: "new" | "basic_verified" | "trusted" | "host_eligible" | "host";
+  verificationStatus: "unverified" | "pending" | "verified" | "restricted";
+}
+```
+
+Initial scoring:
+
+```txt
+Phone verified: +15
+Google linked: +5
+Username set: +5
+Profile complete: +10
+Self-declaration accepted: +10
+Selfie approved: +25
+First event attended: +20
+Each attended event: +5
+Positive host feedback: +10
+Confirmed report: -50
+No-show: -10
+Fake verification: -100
+```
+
+---
+
+## 7. Trust Events Collection
+
+```ts
+trustEvents/{eventId} {
+  userId: string;
+  type:
+    | "PHONE_VERIFIED"
+    | "GOOGLE_LINKED"
+    | "USERNAME_SET"
+    | "PROFILE_COMPLETED"
+    | "SELF_DECLARATION_ACCEPTED"
+    | "SELFIE_SUBMITTED"
+    | "SELFIE_APPROVED"
+    | "SELFIE_REJECTED"
+    | "EVENT_ATTENDED"
+    | "NO_SHOW"
+    | "REPORT_CONFIRMED";
+
+  points: number;
+  metadata?: Record<string, any>;
+  createdAt: Timestamp;
+}
+```
+
+Cloud Function:
+
+```ts
+recalculateTrustScore(userId)
+```
+
+---
+
+## 8. Permissions
+
+```txt
+Browse events/circles:
+any logged-in user
+
+Join event:
+phone verified + selfDeclaration + selfie approved
+
+Join circle:
+phone verified + selfDeclaration + selfie approved
+
+Chat:
+basic_verified and above
+
+Create event:
+trusted and above
+
+Host official circle:
+host only
+```
+
+---
+
+## 9. Admin Review MVP
+
+For Sprint 2, build simple admin-only Firestore workflow, even without full admin UI.
+
+```ts
+verificationReviews/{uid} {
+  userId: string;
+  selfieUrl: string;
+  status: "pending" | "approved" | "rejected" | "needs_review";
+  reviewerId?: string;
+  reason?: string;
+  createdAt: Timestamp;
+  reviewedAt?: Timestamp;
+}
+```
+
+You can approve using Firebase console for now.
+
+---
+
+# Sprint 2 Screens
+
+```txt
+1. Login screen
+2. Phone OTP screen
+3. Google login button
+4. Username screen
+5. Profile setup screen
+6. Self-declaration screen
+7. Selfie upload screen
+8. Verification pending screen
+9. Basic profile screen
+10. Permission blocked modal
+```
+
+Blocked modal copy:
+
+```txt
+Complete verification to join events and circles.
+This helps us keep Niva safer for everyone.
+```
+
+---
+
+# Sprint 2 Done Criteria
+
+```txt
+User can sign up
+User can choose unique username
+User can complete profile
+User can accept self-declaration
+User can upload selfie
+Selfie creates verification review
+Admin can approve/reject
+Approved user becomes basic_verified
+Only basic_verified users can join events/circles
+Trust score updates through trustEvents
+```
+
+---
+
+# Sprint 3: Home Page + Discovery
+
+Sprint 3 should be about the actual app feeling.
+
+## Goal
+
+```txt
+User opens Niva and immediately sees:
+- what’s happening near her
+- which circles she can join
+- what actions she should take next
+```
+
+## Home layout MVP
+
+```txt
+Top:
+Good morning, Himaja
+Bangalore
+
+Trust card:
+Complete verification / You’re verified / Become trusted member
+
+Main sections:
+1. This week near you
+2. Circles starting soon
+3. Workshops
+4. Recommended for your interests
+5. Safety/community tips
+```
+
+## Bottom tabs
+
+```txt
+Home
+Explore
+Circles
+Messages
+Profile
+```
+
+## Sprint 3 Features
+
+```txt
+Event cards
+Circle cards
+Home feed
+Explore filters
+Join request flow
+Empty states
+Basic search
+Interest-based recommendations
+```
+
+Sprint 2 = **trust foundation**.
+Sprint 3 = **Niva becomes usable and beautiful**.

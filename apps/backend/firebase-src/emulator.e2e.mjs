@@ -53,6 +53,10 @@ async function api(path, token, options = {}) {
 }
 
 async function completeProfile(account, displayName) {
+  await api('/users/me/legal-acceptance', account.idToken, {
+    body: JSON.stringify({ accepted: true, version: '2026-07-22' }),
+    method: 'POST',
+  });
   await api('/users/me/username', account.idToken, {
     body: JSON.stringify({ username: displayName.toLowerCase() }),
     method: 'POST',
@@ -69,14 +73,6 @@ async function completeProfile(account, displayName) {
       profilePhotoUrl: `https://example.com/${displayName}.jpg`,
     }),
     method: 'PUT',
-  });
-  await api('/users/me/self-declaration', account.idToken, {
-    body: JSON.stringify({ accepted: true, version: 'v1' }),
-    method: 'POST',
-  });
-  await api('/users/me/community-guidelines', account.idToken, {
-    body: JSON.stringify({ accepted: true, version: 'v1' }),
-    method: 'POST',
   });
   await db.collection('users').doc(account.uid).update({
     'selfieVerification.status': 'APPROVED',
@@ -113,6 +109,132 @@ const created = await api('/community/events', host.idToken, {
 });
 assert.equal(created.event.title, 'Firebase Emulator Meetup');
 const eventId = created.event.id;
+
+const edited = await api(`/community/events/${eventId}`, host.idToken, {
+  body: JSON.stringify({
+    interests: ['Books', 'Coffee', 'Photography'],
+    title: 'Edited Firebase Emulator Meetup',
+  }),
+  method: 'PATCH',
+});
+assert.equal(edited.event.title, 'Edited Firebase Emulator Meetup');
+assert.deepEqual(edited.event.interests, ['Books', 'Coffee', 'Photography']);
+
+const fitnessEvent = await api('/community/events', host.idToken, {
+  body: JSON.stringify({
+    capacity: 8,
+    city: 'Bangalore',
+    description: 'A second event used to validate dynamic Explore categories.',
+    difficulty: 'BEGINNER',
+    interests: ['Fitness', 'Wellness'],
+    locationName: 'Niva Test Park',
+    startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+    title: 'Firebase Fitness Walk',
+  }),
+  method: 'POST',
+});
+const listedByCategory = await api(
+  '/community/events?city=Bangalore',
+  member.idToken,
+);
+const listedInterests = new Set(
+  listedByCategory.events.flatMap((event) => event.interests),
+);
+assert.equal(listedInterests.has('Books'), true);
+assert.equal(listedInterests.has('Fitness'), true);
+
+const cancelledFitnessEvent = await api(
+  `/community/events/${fitnessEvent.event.id}/cancel`,
+  host.idToken,
+  {
+    body: JSON.stringify({ reason: 'Emulator cancellation coverage.' }),
+    method: 'POST',
+  },
+);
+assert.equal(cancelledFitnessEvent.event.status, 'CANCELLED');
+const listedAfterCancellation = await api(
+  '/community/events?city=Bangalore',
+  member.idToken,
+);
+assert.equal(
+  listedAfterCancellation.events.some(
+    (event) => event.id === fitnessEvent.event.id,
+  ),
+  false,
+);
+await assert.rejects(() =>
+  api(`/community/events/${fitnessEvent.event.id}`, host.idToken, {
+    body: JSON.stringify({ title: 'Cancelled events cannot be edited' }),
+    method: 'PATCH',
+  }),
+);
+
+const circle = await api('/community/circles', host.idToken, {
+  body: JSON.stringify({
+    capacity: 6,
+    city: 'Bangalore',
+    description: 'A recurring circle lifecycle integration test.',
+    difficulty: 'SOCIAL',
+    durationWeeks: 4,
+    interests: ['Art', 'Photography'],
+    locationName: 'Niva Test Studio',
+    recurrenceIntervalWeeks: 1,
+    schedule: 'Saturday mornings',
+    startsAt: new Date(Date.now() + 96 * 60 * 60 * 1000).toISOString(),
+    timezone: 'Asia/Kolkata',
+    title: 'Firebase Photo Circle',
+  }),
+  method: 'POST',
+});
+assert.equal(circle.circle.occurrences.length, 4);
+const editedCircle = await api(
+  `/community/circles/${circle.circle.id}`,
+  host.idToken,
+  {
+    body: JSON.stringify({
+      durationWeeks: 6,
+      schedule: 'Saturday mornings, twice a month',
+      recurrenceIntervalWeeks: 2,
+    }),
+    method: 'PATCH',
+  },
+);
+assert.equal(editedCircle.circle.occurrences.length, 3);
+
+const joinedCircle = await api(
+  `/community/circles/${circle.circle.id}/join`,
+  member.idToken,
+  { method: 'POST' },
+);
+assert.equal(joinedCircle.membership.status, 'REQUESTED');
+const circleMembers = await api(
+  `/community/circles/${circle.circle.id}/members`,
+  host.idToken,
+);
+assert.equal(circleMembers.members.length, 1);
+const approvedCircle = await api(
+  `/community/circles/${circle.circle.id}/members/${circleMembers.members[0].id}`,
+  host.idToken,
+  { body: JSON.stringify({ status: 'APPROVED' }), method: 'PATCH' },
+);
+assert.equal(approvedCircle.membership.status, 'APPROVED');
+const cancelledCircle = await api(
+  `/community/circles/${circle.circle.id}/cancel`,
+  host.idToken,
+  {
+    body: JSON.stringify({ reason: 'Recurring circle cancellation coverage.' }),
+    method: 'POST',
+  },
+);
+assert.equal(cancelledCircle.circle.status, 'CANCELLED');
+const circlesAfterCancellation = await api(
+  '/community/circles?city=Bangalore',
+  member.idToken,
+);
+assert.equal(
+  circlesAfterCancellation.circles.some((item) => item.id === circle.circle.id),
+  false,
+);
 
 const joined = await api(`/community/events/${eventId}/join`, member.idToken, {
   method: 'POST',
@@ -225,8 +347,44 @@ await api(`/admin/reports/${reports.reports[0].id}`, host.idToken, {
 
 const analytics = await api('/admin/analytics/summary', host.idToken);
 assert.equal(analytics.analytics.feedbackSubmitted, 1);
-assert.equal(analytics.analytics.membershipApprovals, 1);
+assert.equal(analytics.analytics.membershipApprovals, 2);
+
+const cancelledMainEvent = await api(
+  `/community/events/${eventId}/cancel`,
+  host.idToken,
+  {
+    body: JSON.stringify({ reason: 'Host cancelled this emulator plan.' }),
+    method: 'POST',
+  },
+);
+assert.equal(cancelledMainEvent.event.status, 'CANCELLED');
+const memberNotifications = await api(
+  '/community/notifications',
+  member.idToken,
+);
+assert.equal(
+  memberNotifications.notifications.some(
+    (notification) => notification.type === 'ACTIVITY_CANCELLED',
+  ),
+  true,
+);
+
+await api('/users/me', member.idToken, {
+  body: JSON.stringify({ confirmation: 'DELETE' }),
+  method: 'DELETE',
+});
+const [deletedMember, deletedMessage] = await Promise.all([
+  db.collection('users').doc(member.uid).get(),
+  db
+    .collection('chatThreads')
+    .doc(`EVENT_${eventId}`)
+    .collection('messages')
+    .doc(sent.message.id)
+    .get(),
+]);
+assert.equal(deletedMember.exists, false);
+assert.equal(deletedMessage.exists, false);
 
 console.info(
-  'Firebase emulator E2E passed: auth, profiles, host, participant, chat, safety, and admin.',
+  'Firebase emulator E2E passed: auth, terms/privacy acceptance, profiles, event and recurring-circle lifecycle, host, participant, chat deletion, safety, and admin.',
 );

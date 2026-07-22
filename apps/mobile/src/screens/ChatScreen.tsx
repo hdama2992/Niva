@@ -110,7 +110,7 @@ export function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
       style={styles.screen}
     >
@@ -160,30 +160,32 @@ export function ChatScreen({
             Start with a quick hello or a practical question about the activity.
           </Text>
         ) : null}
-        {!loading ? messages.map((message) => {
-          const own = message.senderId === userId;
-          return (
-            <View
-              key={message.id}
-              style={[styles.messageRow, own && styles.messageRowOwn]}
-            >
-              <View style={[styles.message, own && styles.messageOwn]}>
-                <Text style={[styles.sender, own && styles.senderOwn]}>
-                  {own
-                    ? 'You'
-                    : (message.sender.displayName ??
-                      message.sender.username ??
-                      'Niva member')}
-                </Text>
-                <Text
-                  style={[styles.messageText, own && styles.messageTextOwn]}
+        {!loading
+          ? messages.map((message) => {
+              const own = message.senderId === userId;
+              return (
+                <View
+                  key={message.id}
+                  style={[styles.messageRow, own && styles.messageRowOwn]}
                 >
-                  {message.body}
-                </Text>
-              </View>
-            </View>
-          );
-        }) : null}
+                  <View style={[styles.message, own && styles.messageOwn]}>
+                    <Text style={[styles.sender, own && styles.senderOwn]}>
+                      {own
+                        ? 'You'
+                        : (message.sender.displayName ??
+                          message.sender.username ??
+                          'Niva member')}
+                    </Text>
+                    <Text
+                      style={[styles.messageText, own && styles.messageTextOwn]}
+                    >
+                      {message.body}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          : null}
       </ScrollView>
 
       <View style={styles.composer}>
@@ -230,8 +232,16 @@ function ChatShimmer() {
       }
       animation = Animated.loop(
         Animated.sequence([
-          Animated.timing(opacity, { duration: 720, toValue: 0.78, useNativeDriver: true }),
-          Animated.timing(opacity, { duration: 720, toValue: 0.38, useNativeDriver: true }),
+          Animated.timing(opacity, {
+            duration: 720,
+            toValue: 0.78,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            duration: 720,
+            toValue: 0.38,
+            useNativeDriver: true,
+          }),
         ]),
       );
       animation.start();
@@ -240,7 +250,10 @@ function ChatShimmer() {
   }, [opacity]);
 
   return (
-    <View accessibilityLabel="Loading cohort messages" style={styles.chatShimmer}>
+    <View
+      accessibilityLabel="Loading cohort messages"
+      style={styles.chatShimmer}
+    >
       <Animated.View style={[styles.chatShimmerWide, { opacity }]} />
       <Animated.View style={[styles.chatShimmerShort, { opacity }]} />
       <Animated.View style={[styles.chatShimmerOwn, { opacity }]} />
@@ -267,9 +280,25 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   chatShimmer: { gap: spacing.sm, paddingVertical: spacing.sm },
-  chatShimmerOwn: { alignSelf: 'flex-end', backgroundColor: colors.infoSoft, borderRadius: radius.md, height: 62, width: '68%' },
-  chatShimmerShort: { backgroundColor: colors.surfaceStrong, borderRadius: radius.md, height: 52, width: '62%' },
-  chatShimmerWide: { backgroundColor: colors.surfaceStrong, borderRadius: radius.md, height: 72, width: '82%' },
+  chatShimmerOwn: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.md,
+    height: 62,
+    width: '68%',
+  },
+  chatShimmerShort: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.md,
+    height: 52,
+    width: '62%',
+  },
+  chatShimmerWide: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.md,
+    height: 72,
+    width: '82%',
+  },
   composer: {
     alignItems: 'flex-end',
     backgroundColor: colors.surface,

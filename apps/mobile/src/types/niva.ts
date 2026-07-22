@@ -17,8 +17,6 @@ export type NivaUser = {
   profilePhotoUrl?: string;
   interests: string[];
   selfieUrl?: string;
-  selfDeclarationAccepted: boolean;
-  communityGuidelinesAccepted: boolean;
   verificationStatus: VerificationStatus;
   trustScore: number;
   trustTier: TrustTier;
@@ -28,7 +26,7 @@ export type ProfileDraft = {
   displayName: string;
   city: string;
   age?: number;
-  bio?: string;
+  bio: string;
   languages: string[];
   occupation?: string;
   profilePhoto?: SelectedProfilePhoto;

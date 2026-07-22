@@ -186,20 +186,16 @@ export async function upsertUserFromToken(decoded: DecodedIdToken) {
   if (!existing.exists) {
     await reference.create({
       authProviders: [...providers],
-      communityGuidelinesAccepted: false,
-      communityGuidelinesAcceptedAt: null,
-      communityGuidelinesVersion: null,
       createdAt: now,
       displayName: decoded.name ?? null,
       email: decoded.email ?? null,
       googleVerified: providers.has('google.com'),
       id: decoded.uid,
+      legalAcceptedAt: null,
+      privacyPolicyVersion: null,
       phone: decoded.phone_number ?? null,
       phoneVerified: Boolean(decoded.phone_number),
       profile: null,
-      selfDeclarationAccepted: false,
-      selfDeclarationAcceptedAt: null,
-      selfDeclarationVersion: null,
       selfieVerification: {
         selfieStoragePath: null,
         status: 'NOT_STARTED',
@@ -212,7 +208,7 @@ export async function upsertUserFromToken(decoded: DecodedIdToken) {
       },
       updatedAt: now,
       username: null,
-      welcomeCompletedAt: null,
+      termsVersion: null,
     });
   } else {
     await reference.update({

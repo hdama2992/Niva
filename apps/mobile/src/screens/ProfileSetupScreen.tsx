@@ -170,6 +170,7 @@ export function ProfileSetupScreen({
     () =>
       displayName.trim().length >= 2 &&
       city.trim().length >= 2 &&
+      bio.trim().length >= 10 &&
       age !== undefined &&
       age >= 18 &&
       age <= 100 &&
@@ -181,6 +182,7 @@ export function ProfileSetupScreen({
           usernameAvailability === 'available')),
     [
       age,
+      bio,
       city,
       displayName,
       hasProfilePhoto,
@@ -195,6 +197,7 @@ export function ProfileSetupScreen({
   const detailsComplete =
     displayName.trim().length >= 2 &&
     city.trim().length >= 2 &&
+    bio.trim().length >= 10 &&
     age !== undefined &&
     age >= 18 &&
     age <= 100 &&
@@ -276,7 +279,7 @@ export function ProfileSetupScreen({
         {
           displayName: displayName.trim(),
           city: city.trim(),
-          bio: bio.trim() || undefined,
+          bio: bio.trim(),
           age,
           languages,
           occupation: occupation.trim() || undefined,
@@ -584,8 +587,13 @@ export function ProfileSetupScreen({
             />
 
             <TextField
-              helperText="A short introduction for other members."
-              label="About you"
+              error={
+                attempted && bio.trim().length < 10
+                  ? 'Write at least 10 characters about yourself.'
+                  : undefined
+              }
+              helperText="A short introduction other members can read."
+              label="About you *"
               multiline
               onChangeText={setBio}
               placeholder="I enjoy badminton, books, and weekend workshops."
@@ -699,7 +707,9 @@ export function ProfileSetupScreen({
           }
           label={
             submitting
-              ? 'Saving...'
+              ? mode === 'create' && step === 3
+                ? 'Uploading photo...'
+                : 'Saving...'
               : mode === 'edit'
                 ? 'Save changes'
                 : step === 3
@@ -1027,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + 64,
   },
   error: {
     color: colors.primaryDark,

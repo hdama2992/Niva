@@ -19,7 +19,6 @@ export function PolicyChrome({
           Niva
         </Link>
         <nav className="policy-nav" aria-label="Legal and support">
-          <Link href="/community-promise">Community Promise</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/support">Get help</Link>
@@ -54,8 +53,7 @@ export function PolicyChrome({
 
 export const policyLinks: PolicyLink[] = [
   { href: '/privacy', label: 'Privacy & safety' },
-  { href: '/community-promise', label: 'Community Promise' },
-  { href: '/terms', label: 'Terms of participation' },
+  { href: '/terms', label: 'Terms of Service' },
   { href: '/delete-account', label: 'Delete your account' },
   { href: '/support', label: 'Help & support' },
 ];

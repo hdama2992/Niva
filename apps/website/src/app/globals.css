@@ -230,10 +230,22 @@ body {
   margin-bottom: 8px;
   margin-top: 30px;
 }
+.policy-prose h3 {
+  color: var(--policy-blue);
+  font-size: 19px;
+  margin: 24px 0 7px;
+}
 .policy-prose p {
   color: var(--policy-muted);
   font-size: 16px;
   line-height: 1.75;
+}
+.policy-prose ul {
+  color: var(--policy-muted);
+  display: grid;
+  gap: 8px;
+  line-height: 1.65;
+  padding-left: 22px;
 }
 .policy-prose a {
   color: #315c49;

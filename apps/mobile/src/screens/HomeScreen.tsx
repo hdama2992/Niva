@@ -5,19 +5,17 @@ import {
   CalendarCheck,
   CheckCircle2,
   ChevronRight,
-  CircleHelp,
   CircleUserRound,
   Clock3,
   Compass,
   Home,
   LockKeyhole,
-  LogOut,
   MapPin,
+  MessageCircle,
   Pencil,
   Search,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
   Star,
   UsersRound,
@@ -62,7 +60,6 @@ import {
 } from '../constants/activity-artwork';
 import { ActivityDetailScreen } from './ActivityDetailScreen';
 import { ChatScreen } from './ChatScreen';
-import { CommunityGuidelinesScreen } from './CommunityGuidelinesScreen';
 import { CreateCircleInput, CreateCircleScreen } from './CreateCircleScreen';
 import { CreateEventInput, CreateEventScreen } from './CreateEventScreen';
 import { ActivityEditInput, EditActivityScreen } from './EditActivityScreen';
@@ -74,8 +71,7 @@ import { ManageEventScreen } from './ManageEventScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { HostPathwayScreen } from './HostPathwayScreen';
 import { ReportReason, ReportScreen } from './ReportScreen';
-import { SettingsScreen, SettingsSection } from './SettingsScreen';
-import { acceptCommunityGuidelines } from '../services/session';
+import { SettingsScreen } from './SettingsScreen';
 import { uploadActivityCover } from '../services/media';
 import {
   blockUser,
@@ -132,29 +128,21 @@ type HomeScreenProps = {
   onStartVerification: (joiningTitle?: string, returnTab?: Tab) => void;
 };
 
-type Tab = 'home' | 'explore' | 'plans' | 'profile';
+type Tab = 'home' | 'explore' | 'plans' | 'chats' | 'profile';
 type SecondaryScreen =
   | 'create-circle'
   | 'create-event'
-  | 'community-promise'
   | 'host-pathway'
   | 'notifications'
-  | `settings-${SettingsSection}`;
+  | 'settings';
 
 const tabs: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: 'home', label: 'Home', icon: <Home size={21} /> },
   { id: 'explore', label: 'Explore', icon: <Search size={21} /> },
   { id: 'plans', label: 'Plans', icon: <CalendarCheck size={21} /> },
+  { id: 'chats', label: 'Chats', icon: <MessageCircle size={21} /> },
   { id: 'profile', label: 'Profile', icon: <CircleUserRound size={21} /> },
 ];
-
-const filters = ['All', 'Fitness', 'Books', 'Wellness', 'Music', 'Safety'];
-const exploreKinds = [
-  { id: 'all', label: 'All' },
-  { id: 'event', label: 'Events' },
-  { id: 'circle', label: 'Circles' },
-] as const;
-type ExploreKind = (typeof exploreKinds)[number]['id'];
 const defaultSettings: CommunitySettings = {
   allowCircleContinuitySuggestions: true,
   notificationsEnabled: true,
@@ -175,7 +163,6 @@ export function HomeScreen({
   const [blockedModalVisible, setBlockedModalVisible] = useState(false);
   const [joinRequest, setJoinRequest] = useState<string>();
   const [joinCandidate, setJoinCandidate] = useState<DiscoveryItem>();
-  const [guidelinesJoin, setGuidelinesJoin] = useState<DiscoveryItem>();
   const [chatItem, setChatItem] = useState<DiscoveryItem>();
   const [icebreakerActivity, setIcebreakerActivity] = useState<DiscoveryItem>();
   const [managedEvent, setManagedEvent] = useState<DiscoveryItem>();
@@ -199,18 +186,12 @@ export function HomeScreen({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<CommunitySettings>();
   const [hostApproval, setHostApproval] = useState<HostApproval | null>();
-  const [guidelinesAccepted, setGuidelinesAccepted] = useState(
-    user.communityGuidelinesAccepted,
-  );
   const [apiError, setApiError] = useState<string>();
   const [loadError, setLoadError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
   const [secondaryScreen, setSecondaryScreen] = useState<SecondaryScreen>();
   const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState(filters[0]);
-  const [exploreFilterOpen, setExploreFilterOpen] = useState(false);
-  const [activeExploreKind, setActiveExploreKind] =
-    useState<ExploreKind>('all');
+  const [activeFilter, setActiveFilter] = useState('All');
 
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -256,6 +237,15 @@ export function HomeScreen({
     [apiCircles, apiEvents],
   );
   const recommended = apiRecommendations;
+  const availableFilters = useMemo(
+    () => [
+      'All',
+      ...Array.from(
+        new Set(allItems.flatMap((item) => item.interests).filter(Boolean)),
+      ).sort((left, right) => left.localeCompare(right)),
+    ],
+    [allItems],
+  );
   const exploreResults = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -267,12 +257,15 @@ export function HomeScreen({
           .includes(normalizedQuery);
       const matchesFilter =
         activeFilter === 'All' || item.interests.includes(activeFilter);
-      const matchesKind =
-        activeExploreKind === 'all' || item.category === activeExploreKind;
-
-      return matchesQuery && matchesFilter && matchesKind;
+      return matchesQuery && matchesFilter;
     });
-  }, [activeExploreKind, activeFilter, allItems, query]);
+  }, [activeFilter, allItems, query]);
+
+  useEffect(() => {
+    if (!availableFilters.includes(activeFilter)) {
+      setActiveFilter('All');
+    }
+  }, [activeFilter, availableFilters]);
   const nextPlan = useMemo(
     () =>
       myActivities
@@ -558,11 +551,6 @@ export function HomeScreen({
       return;
     }
 
-    if (!guidelinesAccepted) {
-      setGuidelinesJoin(item);
-      return;
-    }
-
     setJoinCandidate(item);
   };
 
@@ -576,26 +564,6 @@ export function HomeScreen({
   const openItem = (item: DiscoveryItem) => {
     softHaptic();
     setSelectedItem(item);
-  };
-
-  const acceptGuidelinesForJoin = async () => {
-    const pendingItem = guidelinesJoin;
-    if (!pendingItem) {
-      return;
-    }
-
-    try {
-      await acceptCommunityGuidelines(idToken);
-      setGuidelinesAccepted(true);
-      setGuidelinesJoin(undefined);
-      setJoinCandidate(pendingItem);
-    } catch (error) {
-      setApiError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save your community agreement.',
-      );
-    }
   };
 
   const confirmJoin = async () => {
@@ -1007,16 +975,6 @@ export function HomeScreen({
     );
   }
 
-  if (guidelinesJoin) {
-    return (
-      <CommunityGuidelinesScreen
-        activityTitle={guidelinesJoin.title}
-        onAccept={() => void acceptGuidelinesForJoin()}
-        onBack={() => setGuidelinesJoin(undefined)}
-      />
-    );
-  }
-
   if (managedEvent) {
     return (
       <ManageEventScreen
@@ -1105,18 +1063,19 @@ export function HomeScreen({
     );
   }
 
-  if (secondaryScreen?.startsWith('settings-')) {
-    const section = secondaryScreen.replace('settings-', '') as SettingsSection;
+  if (secondaryScreen === 'settings') {
     return (
       <SettingsScreen
         blockedUsers={blockedUsers}
         onBack={() => setSecondaryScreen(undefined)}
         onChange={(nextSettings) => void updateMemberSettings(nextSettings)}
         onDeleteAccount={onDeleteAccount}
-        onOpenCommunityPromise={() => setSecondaryScreen('community-promise')}
+        onEditProfile={onEditProfile}
+        onLogout={onLogout}
+        onStartVerification={() => onStartVerification(undefined, 'profile')}
         onUnblock={(blockedUserId) => void unblockMember(blockedUserId)}
-        section={section}
         settings={settings ?? defaultSettings}
+        verificationStatus={user.verificationStatus}
       />
     );
   }
@@ -1128,17 +1087,6 @@ export function HomeScreen({
         onApply={() => void requestHostAccess()}
         onBack={() => setSecondaryScreen(undefined)}
         user={user}
-      />
-    );
-  }
-
-  if (secondaryScreen === 'community-promise') {
-    return (
-      <CommunityGuidelinesScreen
-        activityTitle="Niva"
-        onAccept={() => setSecondaryScreen(undefined)}
-        onBack={() => setSecondaryScreen(undefined)}
-        reviewOnly
       />
     );
   }
@@ -1173,7 +1121,6 @@ export function HomeScreen({
               onOpenNotifications={() => setSecondaryScreen('notifications')}
               user={user}
             />
-            <TrustStatusStrip user={user} verified={verified} />
             {apiError ? (
               <View style={styles.apiBanner}>
                 <Text style={styles.apiBannerText}>{apiError}</Text>
@@ -1257,15 +1204,8 @@ export function HomeScreen({
         return (
           <>
             <ScreenTitle
-              icon={
-                <SlidersHorizontal
-                  color={colors.primary}
-                  size={25}
-                  strokeWidth={2.3}
-                />
-              }
               title="Explore"
-              subtitle="Search small events, recurring circles, and workshops."
+              subtitle="Find plans by activity or area."
             />
             <View style={styles.searchBox}>
               <Search color={colors.muted} size={20} strokeWidth={2.3} />
@@ -1278,31 +1218,12 @@ export function HomeScreen({
                 value={query}
               />
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setExploreFilterOpen(true)}
-              style={styles.filterButton}
-            >
-              <SlidersHorizontal
-                color={colors.primary}
-                size={18}
-                strokeWidth={2.4}
-              />
-              <Text style={styles.filterButtonText}>
-                {activeExploreKind === 'all'
-                  ? 'Filter plans'
-                  : activeExploreKind === 'event'
-                    ? 'Events only'
-                    : 'Circles only'}
-              </Text>
-              <ChevronRight color={colors.muted} size={18} strokeWidth={2.4} />
-            </Pressable>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.filterScroller}
             >
-              {filters.map((filter) => (
+              {availableFilters.map((filter) => (
                 <Pressable
                   key={filter}
                   onPress={() => setActiveFilter(filter)}
@@ -1354,6 +1275,15 @@ export function HomeScreen({
             onOpen={setSelectedItem}
           />
         );
+      case 'chats':
+        return (
+          <ChatsOverview
+            items={myActivities}
+            loading={isLoading}
+            onBrowse={() => changeTab('explore')}
+            onOpen={setChatItem}
+          />
+        );
       case 'profile':
         return (
           <>
@@ -1390,40 +1320,17 @@ export function HomeScreen({
               </Pressable>
             </View>
 
-            <Text style={styles.profileBio}>
-              {user.bio ||
-                'Here to meet good people through thoughtful local plans.'}
-            </Text>
-
-            <View style={styles.profileVerification}>
-              <View
-                style={
-                  verified
-                    ? styles.profileVerificationIcon
-                    : styles.profileVerificationIconPending
-                }
+            {user.bio ? (
+              <Text style={styles.profileBio}>{user.bio}</Text>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onEditProfile}
+                style={styles.addBioButton}
               >
-                <ShieldCheck
-                  color={verified ? colors.surface : colors.warning}
-                  size={18}
-                  strokeWidth={2.5}
-                />
-              </View>
-              <View style={styles.profileHeaderCopy}>
-                <Text style={styles.profileVerificationTitle}>
-                  {verified
-                    ? 'Profile verified'
-                    : user.verificationStatus === 'pending'
-                      ? 'Verification in review'
-                      : 'Verification not completed'}
-                </Text>
-                {!verified ? (
-                  <Text style={styles.profileVerificationText}>
-                    Verification is required before joining plans.
-                  </Text>
-                ) : null}
-              </View>
-            </View>
+                <Text style={styles.addBioText}>Add your About me</Text>
+              </Pressable>
+            )}
 
             <View style={styles.profileInterests}>
               {user.interests.map((interest) => (
@@ -1504,38 +1411,11 @@ export function HomeScreen({
                     strokeWidth={2.3}
                   />
                 }
-                label="Preferences"
-                onPress={() => setSecondaryScreen('settings-preferences')}
-              />
-              <ProfileMenuRow
-                icon={
-                  <ShieldCheck
-                    color={colors.secondary}
-                    size={20}
-                    strokeWidth={2.3}
-                  />
-                }
-                label="Safety & privacy"
-                onPress={() => setSecondaryScreen('settings-safety')}
-              />
-              <ProfileMenuRow
-                icon={
-                  <CircleHelp color={colors.info} size={20} strokeWidth={2.3} />
-                }
-                label="Support & policies"
-                onPress={() => setSecondaryScreen('settings-support')}
+                label="Settings"
+                onPress={() => setSecondaryScreen('settings')}
                 last
               />
             </View>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={onLogout}
-              style={styles.logoutButton}
-            >
-              <LogOut color={colors.primary} size={19} strokeWidth={2.4} />
-              <Text style={styles.logoutText}>Log out</Text>
-            </Pressable>
           </>
         );
     }
@@ -1605,63 +1485,6 @@ export function HomeScreen({
             </Pressable>
           </View>
         </View>
-      </Modal>
-
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setExploreFilterOpen(false)}
-        transparent
-        visible={exploreFilterOpen}
-      >
-        <Pressable
-          style={styles.sheetBackdrop}
-          onPress={() => setExploreFilterOpen(false)}
-        >
-          <Pressable style={styles.filterSheet}>
-            <View style={styles.filterSheetHandle} />
-            <Text style={styles.filterSheetTitle}>Show me</Text>
-            <Text style={styles.filterSheetText}>
-              Choose a plan type. Activity categories stay available above the
-              results.
-            </Text>
-            <View style={styles.filterSheetOptions}>
-              {exploreKinds.map((kind) => {
-                const active = activeExploreKind === kind.id;
-                return (
-                  <Pressable
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: active }}
-                    key={kind.id}
-                    onPress={() => {
-                      setActiveExploreKind(kind.id);
-                      setExploreFilterOpen(false);
-                    }}
-                    style={[
-                      styles.filterSheetOption,
-                      active && styles.filterSheetOptionActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.filterSheetOptionText,
-                        active && styles.filterSheetOptionTextActive,
-                      ]}
-                    >
-                      {kind.label === 'All' ? 'All plans' : kind.label}
-                    </Text>
-                    {active ? (
-                      <CheckCircle2
-                        color={colors.primary}
-                        size={20}
-                        strokeWidth={2.5}
-                      />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </Pressable>
-        </Pressable>
       </Modal>
 
       <JoinConfirmModal
@@ -1809,33 +1632,6 @@ function greetingForCurrentTime() {
   }
 
   return 'Good evening';
-}
-
-function TrustStatusStrip({
-  user,
-  verified,
-}: {
-  user: NivaUser;
-  verified: boolean;
-}) {
-  const statusTitle = verified
-    ? 'Verified member'
-    : user.verificationStatus === 'pending'
-      ? 'Verification pending'
-      : 'Verification starts when you join';
-
-  return (
-    <View style={styles.trustStrip}>
-      <View style={verified ? styles.trustDotVerified : styles.trustDotPending}>
-        {verified ? (
-          <CheckCircle2 color={colors.surface} size={15} strokeWidth={2.8} />
-        ) : (
-          <ShieldCheck color={colors.warning} size={15} strokeWidth={2.6} />
-        )}
-      </View>
-      <Text style={styles.trustStripTitle}>{statusTitle}</Text>
-    </View>
-  );
 }
 
 function HomePlanHero({
@@ -2065,17 +1861,88 @@ function ScreenTitle({
   subtitle,
   title,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   subtitle: string;
   title: string;
 }) {
   return (
     <View style={styles.screenTitle}>
-      <View style={styles.screenTitleIcon}>{icon}</View>
+      {icon ? <View style={styles.screenTitleIcon}>{icon}</View> : null}
       <View style={styles.screenTitleCopy}>
         <Text style={styles.screenTitleText}>{title}</Text>
         <Text style={styles.screenSubtitle}>{subtitle}</Text>
       </View>
+    </View>
+  );
+}
+
+function ChatsOverview({
+  items,
+  loading,
+  onBrowse,
+  onOpen,
+}: {
+  items: DiscoveryItem[];
+  loading: boolean;
+  onBrowse: () => void;
+  onOpen: (item: DiscoveryItem) => void;
+}) {
+  const conversations = items.filter(
+    (item) =>
+      item.membershipStatus === 'APPROVED' ||
+      item.membershipStatus === 'ATTENDED',
+  );
+
+  return (
+    <View>
+      <ScreenTitle
+        subtitle="Chat with people in plans you have joined."
+        title="Chats"
+      />
+      {loading ? (
+        <ListShimmer label="Loading your chats" />
+      ) : conversations.length ? (
+        <View style={styles.chatList}>
+          {conversations.map((item) => (
+            <Pressable
+              accessibilityLabel={`Open ${item.title} chat`}
+              accessibilityRole="button"
+              key={`${item.id}:${item.occurrenceId ?? 'activity'}`}
+              onPress={() => onOpen(item)}
+              style={styles.chatListRow}
+            >
+              <Image
+                resizeMode="cover"
+                source={resolveActivityCardArtwork(item)}
+                style={styles.chatListImage}
+              />
+              <View style={styles.chatListCopy}>
+                <Text numberOfLines={1} style={styles.chatListTitle}>
+                  {item.title}
+                </Text>
+                <Text numberOfLines={1} style={styles.chatListText}>
+                  {item.category === 'circle' ? 'Circle chat' : 'Event chat'} ·{' '}
+                  {item.location}
+                </Text>
+              </View>
+              <View style={styles.chatListAction}>
+                <MessageCircle
+                  color={colors.primary}
+                  size={20}
+                  strokeWidth={2.3}
+                />
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <IllustratedEmptyState
+          actionLabel="Find a plan"
+          onAction={onBrowse}
+          text="Your cohort chats appear after you join a plan."
+          title="No chats yet"
+        />
+      )}
     </View>
   );
 }
@@ -2671,6 +2538,47 @@ const styles = StyleSheet.create({
   chatCopy: {
     flex: 1,
     gap: 3,
+  },
+  chatList: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  chatListAction: {
+    alignItems: 'center',
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.pill,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  chatListCopy: { flex: 1 },
+  chatListImage: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.md,
+    height: 58,
+    width: 58,
+  },
+  chatListRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 82,
+    padding: spacing.sm,
+  },
+  chatListText: {
+    color: colors.muted,
+    fontSize: typography.small,
+    marginTop: 3,
+  },
+  chatListTitle: {
+    color: colors.ink,
+    fontSize: typography.body,
+    fontWeight: '800',
   },
   chatRow: {
     alignItems: 'center',
@@ -3388,6 +3296,20 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: spacing.lg,
   },
+  addBioButton: {
+    alignSelf: 'flex-start',
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  addBioText: {
+    color: colors.primary,
+    fontSize: typography.small,
+    fontWeight: '800',
+  },
   profileEditButton: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -4059,34 +3981,6 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: 'center',
     width: 28,
-  },
-  trustStrip: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  trustStripDivider: {
-    backgroundColor: colors.border,
-    height: 16,
-    width: 1,
-  },
-  trustStripMeta: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  trustStripTitle: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '900',
   },
   verticalCards: {
     gap: spacing.md,

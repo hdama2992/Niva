@@ -168,6 +168,10 @@ adminRouter.patch(
     const review = await getRequiredDocument('verificationReviews', userId);
     const user = await getRequiredDocument('users', userId);
     const now = Timestamp.now();
+    const selfieDeletionDueAt =
+      status === 'APPROVED' || status === 'REJECTED'
+        ? Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000)
+        : null;
     const selfieStatus = status;
     const verificationStatus =
       status === 'APPROVED'
@@ -184,6 +188,7 @@ adminRouter.patch(
         updatedAt: now,
       }),
       user.ref.update({
+        'selfieVerification.deletionDueAt': selfieDeletionDueAt,
         'selfieVerification.reason': reason,
         'selfieVerification.reviewedAt': now,
         'selfieVerification.status': selfieStatus,

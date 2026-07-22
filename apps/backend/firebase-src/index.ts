@@ -3,6 +3,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { app } from './app';
 import { dispatchPendingPushNotifications } from './community';
 import { adminKey } from './params';
+import { cleanupExpiredVerificationSelfies } from './users';
 
 export const api = onRequest(
   {
@@ -29,5 +30,20 @@ export const dispatchPushNotifications = onSchedule(
   async () => {
     const result = await dispatchPendingPushNotifications(200);
     console.info('Push notification dispatch complete', result);
+  },
+);
+
+export const deleteExpiredVerificationSelfies = onSchedule(
+  {
+    maxInstances: 1,
+    memory: '256MiB',
+    region: 'asia-south1',
+    schedule: '15 3 * * *',
+    timeZone: 'Asia/Kolkata',
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const result = await cleanupExpiredVerificationSelfies(500);
+    console.info('Verification selfie cleanup complete', result);
   },
 );

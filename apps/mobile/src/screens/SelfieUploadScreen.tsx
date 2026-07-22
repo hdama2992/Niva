@@ -212,7 +212,8 @@ export function SelfieUploadScreen({
             <Text style={styles.modalText}>
               The selfie helps an authorised reviewer confirm that the person
               joining plans matches the account. Hosts and members never receive
-              it. It is stored privately and removed when the account is
+              it. It is stored privately while the review is pending and removed
+              within 30 days after a final decision, or sooner if the account is
               deleted.
             </Text>
           </View>

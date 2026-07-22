@@ -267,10 +267,6 @@ export async function joinActivity(
   if (user.get('trust.verificationStatus') !== 'VERIFIED') {
     throw new HttpError(403, 'Complete verification before joining a plan.');
   }
-  if (user.get('communityGuidelinesAccepted') !== true) {
-    throw new HttpError(403, 'Accept the community guidelines before joining.');
-  }
-
   const activityReference = db
     .collection(activityCollection(type))
     .doc(activityId);

@@ -1,3 +1,5 @@
+import { CURRENT_LEGAL_VERSION } from '../constants/legal';
+
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export type ApiTrust = {
@@ -33,13 +35,9 @@ export type ApiUser = {
   authProviders: string[];
   phoneVerified: boolean;
   googleVerified: boolean;
-  selfDeclarationAccepted: boolean;
-  selfDeclarationAcceptedAt: string | null;
-  selfDeclarationVersion: string | null;
-  communityGuidelinesAccepted: boolean;
-  communityGuidelinesAcceptedAt: string | null;
-  communityGuidelinesVersion: string | null;
-  welcomeCompletedAt: string | null;
+  legalAcceptedAt: string | null;
+  privacyPolicyVersion: string | null;
+  termsVersion: string | null;
   profile: ApiUserProfile | null;
   selfieVerification: ApiSelfieVerification | null;
   trust: ApiTrust | null;
@@ -136,7 +134,7 @@ export function updateProfile(
   idToken: string,
   profile: {
     age: number;
-    bio?: string;
+    bio: string;
     city: string;
     displayName: string;
     interests: string[];
@@ -171,22 +169,9 @@ async function readErrorMessage(response: Response, fallback: string) {
   }
 }
 
-export function acceptSelfDeclaration(idToken: string) {
-  return request<{ user: ApiUser }>('/users/me/self-declaration', idToken, {
-    body: { accepted: true, version: 'v1' },
-    method: 'POST',
-  });
-}
-
-export function completeWelcome(idToken: string) {
-  return request<{ user: ApiUser }>('/users/me/welcome-completed', idToken, {
-    method: 'POST',
-  });
-}
-
-export function acceptCommunityGuidelines(idToken: string) {
-  return request<{ user: ApiUser }>('/users/me/community-guidelines', idToken, {
-    body: { accepted: true, version: 'v1' },
+export function acceptLegalDocuments(idToken: string) {
+  return request<{ user: ApiUser }>('/users/me/legal-acceptance', idToken, {
+    body: { accepted: true, version: CURRENT_LEGAL_VERSION },
     method: 'POST',
   });
 }

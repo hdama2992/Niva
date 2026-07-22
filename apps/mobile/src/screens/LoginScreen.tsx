@@ -1,9 +1,10 @@
 import { Check, ChevronDown, MessageSquareText } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '../constants/legal';
 import { colors, radius, spacing, typography } from '../constants/theme';
 type LoginScreenProps = {
   onContinue: (phone: string) => Promise<void>;
@@ -67,9 +69,6 @@ const countries: Country[] = [
     placeholder: '8123 4567',
   },
 ];
-const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
-const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL;
-
 export function LoginScreen({ onContinue }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
@@ -77,6 +76,16 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() =>
+        scrollRef.current?.scrollToEnd({ animated: true }),
+      );
+    });
+
+    return () => keyboardSubscription.remove();
+  }, []);
 
   const cleanPhone = (value: string) => value.replace(/\D/g, '');
 
@@ -194,13 +203,11 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
             onPress={() => void continueToOtp()}
           />
           <Text style={styles.consentText}>
-            By continuing, you agree to our{' '}
+            You can review Niva’s{' '}
             <Text
               accessibilityRole="link"
               onPress={
-                privacyPolicyUrl
-                  ? () => void Linking.openURL(privacyPolicyUrl)
-                  : undefined
+                () => void Linking.openURL(PRIVACY_POLICY_URL)
               }
               style={styles.consentLink}
             >
@@ -210,13 +217,13 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
             <Text
               accessibilityRole="link"
               onPress={
-                termsUrl ? () => void Linking.openURL(termsUrl) : undefined
+                () => void Linking.openURL(TERMS_URL)
               }
               style={styles.consentLink}
             >
               Terms
             </Text>
-            .
+            . You’ll be asked to accept them before creating your profile.
           </Text>
         </View>
       </ScrollView>

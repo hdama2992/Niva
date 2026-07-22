@@ -10,16 +10,17 @@ import {
 } from 'react-native';
 
 import { colors } from './src/constants/theme';
+import { CURRENT_LEGAL_VERSION } from './src/constants/legal';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { OtpScreen } from './src/screens/OtpScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
-import { SelfDeclarationScreen } from './src/screens/SelfDeclarationScreen';
+import { LegalAcceptanceScreen } from './src/screens/LegalAcceptanceScreen';
 import { SelfieUploadScreen } from './src/screens/SelfieUploadScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { VerificationPendingScreen } from './src/screens/VerificationPendingScreen';
 import {
-  acceptSelfDeclaration,
+  acceptLegalDocuments,
   checkUsernameAvailability,
   ApiUser,
   createSession,
@@ -47,31 +48,25 @@ type Route =
   | { name: 'splash' }
   | { name: 'login' }
   | { name: 'otp'; phone: string }
+  | { idToken: string; name: 'legal'; user: ApiUser }
   | { idToken: string; name: 'profile'; phone: string; username: string }
-  | {
-      idToken: string;
-      name: 'declaration';
-      phone: string;
-      username: string;
-      profile: ProfileDraft;
-    }
   | {
       idToken: string;
       joiningTitle?: string;
       name: 'selfie';
-      returnTab?: 'explore' | 'home' | 'plans' | 'profile';
+      returnTab?: 'chats' | 'explore' | 'home' | 'plans' | 'profile';
       user: NivaUser;
     }
   | {
       idToken: string;
       name: 'pending';
-      returnTab?: 'explore' | 'home' | 'plans' | 'profile';
+      returnTab?: 'chats' | 'explore' | 'home' | 'plans' | 'profile';
       user: NivaUser;
     }
   | { idToken: string; name: 'edit-profile'; user: NivaUser }
   | {
       idToken: string;
-      initialTab?: 'explore' | 'home' | 'plans' | 'profile';
+      initialTab?: 'chats' | 'explore' | 'home' | 'plans' | 'profile';
       name: 'home';
       user: NivaUser;
     };
@@ -149,18 +144,6 @@ export default function App() {
       }
       activeIdToken = refreshedIdToken;
 
-      let username = currentUsername;
-      if (!username) {
-        const { user } = await setUsername(activeIdToken, submittedUsername);
-        username = user.username ?? submittedUsername;
-        setRoute({
-          idToken: activeIdToken,
-          name: 'profile',
-          phone,
-          username,
-        });
-      }
-
       const { age, profilePhoto, ...profileData } = profile;
       if (!profilePhoto || !age) {
         throw new Error(
@@ -168,25 +151,26 @@ export default function App() {
         );
       }
 
-      const profilePhotoUrl = await uploadProfilePhoto(profilePhoto);
+      const [profilePhotoUrl, usernameResult] = await Promise.all([
+        uploadProfilePhoto(profilePhoto),
+        currentUsername
+          ? Promise.resolve(undefined)
+          : setUsername(activeIdToken, submittedUsername),
+      ]);
+      const username =
+        currentUsername || usernameResult?.user.username || submittedUsername;
 
-      await updateProfile(activeIdToken, {
+      const { user } = await updateProfile(activeIdToken, {
         age,
         ...profileData,
         profilePhotoUrl,
       });
-      setRoute({
-        idToken: activeIdToken,
-        name: 'declaration',
-        phone,
-        profile,
-        username,
-      });
+      setRoute(routeForApiUser(activeIdToken, user));
     });
 
-  const handleDeclaration = (idToken: string) =>
+  const handleLegalAcceptance = (idToken: string) =>
     withApiErrors(async () => {
-      const { user } = await acceptSelfDeclaration(idToken);
+      const { user } = await acceptLegalDocuments(idToken);
       setRoute(routeForApiUser(idToken, user));
     });
 
@@ -227,7 +211,7 @@ export default function App() {
     idToken: string,
     currentUser: NivaUser,
     image: SelectedImage,
-    returnTab?: 'explore' | 'home' | 'plans' | 'profile',
+    returnTab?: 'chats' | 'explore' | 'home' | 'plans' | 'profile',
   ) =>
     withApiErrors(async () => {
       const selfieStoragePath = await uploadVerificationSelfie(image);
@@ -258,6 +242,18 @@ export default function App() {
             onVerified={(code) => handleOtpVerified(route.phone, code)}
           />
         );
+      case 'legal':
+        return (
+          <LegalAcceptanceScreen
+            onBack={() =>
+              withApiErrors(async () => {
+                await logoutMobileUser();
+                setRoute({ name: 'login' });
+              })
+            }
+            onAccept={() => handleLegalAcceptance(route.idToken)}
+          />
+        );
       case 'profile':
         return (
           <ProfileSetupScreen
@@ -274,21 +270,6 @@ export default function App() {
                 profile,
               )
             }
-          />
-        );
-      case 'declaration':
-        return (
-          <SelfDeclarationScreen
-            displayName={route.profile.displayName}
-            onBack={() =>
-              setRoute({
-                idToken: route.idToken,
-                name: 'profile',
-                phone: route.phone,
-                username: route.username,
-              })
-            }
-            onAccept={() => handleDeclaration(route.idToken)}
           />
         );
       case 'selfie':
@@ -413,22 +394,20 @@ function routeForApiUser(idToken: string, user: ApiUser): Route {
   const mappedUser = mapApiUser(user);
   const profile = profileDraftFromApiUser(user);
 
+  if (
+    !user.legalAcceptedAt ||
+    user.termsVersion !== CURRENT_LEGAL_VERSION ||
+    user.privacyPolicyVersion !== CURRENT_LEGAL_VERSION
+  ) {
+    return { idToken, name: 'legal', user };
+  }
+
   if (!user.username || !profile) {
     return {
       idToken,
       name: 'profile',
       phone: mappedUser.phone,
       username: user.username ?? '',
-    };
-  }
-
-  if (!user.selfDeclarationAccepted) {
-    return {
-      idToken,
-      name: 'declaration',
-      phone: mappedUser.phone,
-      profile,
-      username: user.username,
     };
   }
 
@@ -455,8 +434,6 @@ function mapApiUser(user: ApiUser): NivaUser {
       ? profile.interests
       : ['Books', 'Coffee', 'Wellness'],
     selfieUrl: selfie?.selfieUrl ?? undefined,
-    selfDeclarationAccepted: user.selfDeclarationAccepted,
-    communityGuidelinesAccepted: user.communityGuidelinesAccepted,
     verificationStatus: mapVerificationStatus(
       trust?.verificationStatus,
       selfie?.status,
@@ -477,7 +454,7 @@ function profileDraftFromApiUser(user: ApiUser): ProfileDraft | undefined {
     displayName: profile.displayName,
     city: profile.city,
     age: profile.age ?? undefined,
-    bio: profile.bio ?? undefined,
+    bio: profile.bio ?? '',
     languages: profile.languages?.length ? profile.languages : ['English'],
     occupation: profile.occupation ?? undefined,
     interests: profile.interests,
@@ -487,7 +464,7 @@ function profileDraftFromApiUser(user: ApiUser): ProfileDraft | undefined {
 function profileDraftFromNivaUser(user: NivaUser): ProfileDraft {
   return {
     age: user.age,
-    bio: user.bio,
+    bio: user.bio ?? '',
     city: user.city,
     displayName: user.displayName,
     interests: user.interests,
