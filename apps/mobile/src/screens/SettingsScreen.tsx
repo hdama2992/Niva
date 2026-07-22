@@ -26,11 +26,7 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
-import {
-  PRIVACY_POLICY_URL,
-  SUPPORT_URL,
-  TERMS_URL,
-} from '../constants/legal';
+import { PRIVACY_POLICY_URL, SUPPORT_URL, TERMS_URL } from '../constants/legal';
 import { BlockedUser, CommunitySettings } from '../services/community';
 import { NivaUser } from '../types/niva';
 
@@ -418,7 +414,7 @@ const styles = StyleSheet.create({
     fontSize: typography.small,
     fontWeight: '800',
   },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  content: { padding: spacing.lg, paddingBottom: 120 },
   deleteActions: {
     flexDirection: 'row',
     gap: spacing.sm,

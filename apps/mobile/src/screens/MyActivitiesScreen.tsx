@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 
-import { resolveActivityCardArtwork } from '../constants/activity-artwork';
+import { resolveActivityPlanArtwork } from '../constants/activity-artwork';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
 
@@ -308,6 +308,9 @@ function AgendaCard({
     item.membershipStatus === 'APPROVED' ||
     item.membershipStatus === 'ATTENDED';
   const pending = item.membershipStatus === 'REQUESTED';
+  const cancelled =
+    item.membershipStatus === 'CANCELLED' ||
+    item.activityStatus === 'CANCELLED';
   const past = activityTime(item).getTime() < Date.now();
 
   return (
@@ -318,7 +321,7 @@ function AgendaCard({
     >
       <Image
         resizeMode="cover"
-        source={resolveActivityCardArtwork(item)}
+        source={resolveActivityPlanArtwork(item)}
         style={[styles.cardImage, compact && styles.cardImageCompact]}
       />
       <View style={styles.cardBody}>
@@ -339,7 +342,9 @@ function AgendaCard({
         </View>
         <View style={styles.cardFooter}>
           <View style={styles.statusRow}>
-            {pending ? (
+            {cancelled ? (
+              <X color={colors.warning} size={15} strokeWidth={2.3} />
+            ) : pending ? (
               <TimerReset color={colors.warning} size={15} strokeWidth={2.3} />
             ) : (
               <CheckCircle2
@@ -348,15 +353,22 @@ function AgendaCard({
                 strokeWidth={2.3}
               />
             )}
-            <Text style={[styles.statusText, pending && styles.statusPending]}>
-              {pending
-                ? 'Request pending'
-                : past
-                  ? 'Completed'
-                  : 'You’re going'}
+            <Text
+              style={[
+                styles.statusText,
+                (pending || cancelled) && styles.statusPending,
+              ]}
+            >
+              {cancelled
+                ? 'Cancelled'
+                : pending
+                  ? 'Request pending'
+                  : past
+                    ? 'Completed'
+                    : 'You’re going'}
             </Text>
           </View>
-          {approved && !past ? (
+          {approved && !past && !cancelled ? (
             <Pressable
               accessibilityLabel={`Open ${item.title} chat`}
               accessibilityRole="button"
@@ -369,14 +381,14 @@ function AgendaCard({
               <MessageCircle color={colors.info} size={18} strokeWidth={2.3} />
               <Text style={styles.chatButtonText}>Chat</Text>
             </Pressable>
-          ) : past && item.category === 'event' ? (
+          ) : past && !cancelled && item.category === 'event' ? (
             <Pressable
               onPress={() => onFeedback(item)}
               style={styles.smallAction}
             >
               <Text style={styles.smallActionText}>Feedback</Text>
             </Pressable>
-          ) : pending ? (
+          ) : pending && !cancelled ? (
             <Pressable onPress={() => onLeave(item)} style={styles.smallAction}>
               <Text style={styles.smallActionText}>Withdraw</Text>
             </Pressable>

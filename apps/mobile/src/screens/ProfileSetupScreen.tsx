@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -114,6 +115,54 @@ export function ProfileSetupScreen({
   const [error, setError] = useState<string>();
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (photoSourceOpen) {
+          setPhotoSourceOpen(false);
+          return true;
+        }
+        if (photoTipsOpen) {
+          setPhotoTipsOpen(false);
+          return true;
+        }
+        if (cityPickerOpen) {
+          setCityPickerOpen(false);
+          return true;
+        }
+        if (customInterestOpen) {
+          setCustomInterestOpen(false);
+          return true;
+        }
+        if (mode === 'edit') {
+          onBack?.();
+          return true;
+        }
+        if (step > 1) {
+          setAttempted(false);
+          setStep((current) => (current === 3 ? 2 : 1));
+          return true;
+        }
+        return false;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [
+    cityPickerOpen,
+    customInterestOpen,
+    mode,
+    onBack,
+    photoSourceOpen,
+    photoTipsOpen,
+    step,
+  ]);
 
   useEffect(() => {
     if (mode !== 'create' || !onCheckUsernameAvailability) {

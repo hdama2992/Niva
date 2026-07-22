@@ -1671,8 +1671,8 @@ function HomePlanHero({
         <View style={styles.homeHeroImage}>
           <Image
             resizeMode="cover"
-            source={resolveActivityArtwork(item)}
-            style={StyleSheet.absoluteFill}
+            source={resolveActivityCardArtwork(item)}
+            style={styles.artworkFill}
           />
         </View>
         <Pressable
@@ -1763,11 +1763,7 @@ function HomeRecommendationCard({
       ]}
     >
       <View style={styles.homeRecommendationImage}>
-        <Image
-          resizeMode="contain"
-          source={artwork}
-          style={StyleSheet.absoluteFill}
-        />
+        <Image resizeMode="cover" source={artwork} style={styles.artworkFill} />
       </View>
       <View style={styles.homeRecommendationBody}>
         <View style={styles.homeRecommendationTopRow}>
@@ -1887,10 +1883,17 @@ function ChatsOverview({
   onBrowse: () => void;
   onOpen: (item: DiscoveryItem) => void;
 }) {
-  const conversations = items.filter(
-    (item) =>
-      item.membershipStatus === 'APPROVED' ||
-      item.membershipStatus === 'ATTENDED',
+  const conversations = Array.from(
+    new Map(
+      items
+        .filter(
+          (item) =>
+            item.activityStatus !== 'CANCELLED' &&
+            (item.membershipStatus === 'APPROVED' ||
+              item.membershipStatus === 'ATTENDED'),
+        )
+        .map((item) => [item.remoteId ?? item.id, item] as const),
+    ).values(),
   );
 
   return (
@@ -2018,9 +2021,9 @@ function DiscoveryCard({
       {!compact ? (
         <View style={styles.discoveryCardImage}>
           <Image
-            resizeMode="contain"
-            source={resolveActivityArtwork(item)}
-            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            source={resolveActivityCardArtwork(item)}
+            style={styles.artworkFill}
           />
         </View>
       ) : null}
@@ -2401,6 +2404,10 @@ function formatActivityDifficulty(
 }
 
 const styles = StyleSheet.create({
+  artworkFill: {
+    height: '100%',
+    width: '100%',
+  },
   actionDisabled: {
     opacity: 0.55,
   },

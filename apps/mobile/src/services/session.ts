@@ -1,4 +1,5 @@
 import { CURRENT_LEGAL_VERSION } from '../constants/legal';
+import { resolveFirebaseIdToken } from './mobile-auth';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -64,10 +65,11 @@ async function request<T>(
   idToken: string,
   options: { body?: unknown; method?: 'DELETE' | 'GET' | 'POST' | 'PUT' } = {},
 ): Promise<T> {
+  const activeIdToken = await resolveFirebaseIdToken(idToken);
   const response = await fetch(`${apiUrl}${path}`, {
     body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${activeIdToken}`,
       'Content-Type': 'application/json',
     },
     method: options.method ?? 'GET',
@@ -86,8 +88,9 @@ export async function createSession(idToken: string): Promise<ApiUser> {
   let response: Response;
 
   try {
+    const activeIdToken = await resolveFirebaseIdToken(idToken);
     response = await fetch(`${apiUrl}/auth/session`, {
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken: activeIdToken }),
       headers: {
         'Content-Type': 'application/json',
       },

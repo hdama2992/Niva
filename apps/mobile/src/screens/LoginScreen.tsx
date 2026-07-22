@@ -74,17 +74,33 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [error, setError] = useState<string>();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', () => {
-      requestAnimationFrame(() =>
-        scrollRef.current?.scrollToEnd({ animated: true }),
-      );
-    });
+    const keyboardShowSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        requestAnimationFrame(() =>
+          scrollRef.current?.scrollToEnd({ animated: true }),
+        );
+        setTimeout(
+          () => scrollRef.current?.scrollToEnd({ animated: true }),
+          180,
+        );
+      },
+    );
+    const keyboardHideSubscription = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false),
+    );
 
-    return () => keyboardSubscription.remove();
+    return () => {
+      keyboardShowSubscription.remove();
+      keyboardHideSubscription.remove();
+    };
   }, []);
 
   const cleanPhone = (value: string) => value.replace(/\D/g, '');
@@ -126,7 +142,7 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
           imageStyle={styles.heroImage}
           resizeMode="cover"
           source={require('../../assets/login-friends-hero.webp')}
-          style={styles.hero}
+          style={[styles.hero, keyboardVisible && styles.heroKeyboard]}
         >
           <View style={styles.brandGlass}>
             <Text style={styles.brand}>niva</Text>
@@ -206,9 +222,7 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
             You can review Niva’s{' '}
             <Text
               accessibilityRole="link"
-              onPress={
-                () => void Linking.openURL(PRIVACY_POLICY_URL)
-              }
+              onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
               style={styles.consentLink}
             >
               Privacy Policy
@@ -216,9 +230,7 @@ export function LoginScreen({ onContinue }: LoginScreenProps) {
             and{' '}
             <Text
               accessibilityRole="link"
-              onPress={
-                () => void Linking.openURL(TERMS_URL)
-              }
+              onPress={() => void Linking.openURL(TERMS_URL)}
               style={styles.consentLink}
             >
               Terms
@@ -356,6 +368,9 @@ const styles = StyleSheet.create({
     height: 260,
     justifyContent: 'flex-start',
     padding: spacing.lg,
+  },
+  heroKeyboard: {
+    height: 116,
   },
   heroImage: {
     borderBottomLeftRadius: radius.lg,

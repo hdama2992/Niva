@@ -1,3 +1,5 @@
+import { resolveFirebaseIdToken } from './mobile-auth';
+
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 type HttpMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
@@ -7,10 +9,11 @@ async function request<T>(
   idToken: string,
   options: { body?: unknown; method?: HttpMethod } = {},
 ): Promise<T> {
+  const activeIdToken = await resolveFirebaseIdToken(idToken);
   const response = await fetch(`${apiUrl}${path}`, {
     body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
-      Authorization: `Bearer ${idToken}`,
+      Authorization: `Bearer ${activeIdToken}`,
       'Content-Type': 'application/json',
     },
     method: options.method ?? 'GET',

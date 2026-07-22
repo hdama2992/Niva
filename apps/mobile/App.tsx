@@ -35,6 +35,7 @@ import {
   logoutMobileUser,
   restoreFirebaseIdToken,
   sendPhoneCode,
+  subscribeToFirebaseIdToken,
   verifyPhoneCode,
 } from './src/services/mobile-auth';
 import {
@@ -107,6 +108,23 @@ export default function App() {
       isActive = false;
     };
   }, []);
+
+  useEffect(
+    () =>
+      subscribeToFirebaseIdToken((idToken) => {
+        if (!idToken) {
+          setRoute((current) =>
+            'idToken' in current ? { name: 'login' } : current,
+          );
+          return;
+        }
+
+        setRoute((current) =>
+          'idToken' in current ? { ...current, idToken } : current,
+        );
+      }),
+    [],
+  );
 
   const handleOtpRequested = async (phone: string) => {
     await sendPhoneCode(phone);

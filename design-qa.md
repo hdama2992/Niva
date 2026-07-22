@@ -1,61 +1,71 @@
 # Niva mobile redesign QA
 
 Date: 22 July 2026
-Branch: `codex/pvt-firebase-only-backend`
+Branch: `codex/firebase-only-backend`
 
 ## Scope
 
+- Login, OTP, profile completion, and returning-session recovery.
 - Home, Explore, Plans, Chats, Profile, and Settings navigation.
 - Firebase-only host and participant activity lifecycle.
 - Terms and Privacy acceptance without a Community Promise step or policy.
 - Android keyboard, calendar, category-filter, account-deletion, and host-management behavior.
-- Visual comparison against the approved sapphire/porcelain mobile deck.
+- Same-state visual comparison against the approved sapphire/porcelain mobile deck.
 
-## Automated checks completed
+## Release checks
 
 - Workspace typecheck: passed.
 - Workspace lint: passed.
 - Full workspace production build: passed.
-- Android production JavaScript export: passed (2,726 modules).
-- Backend unit tests: passed (3/3).
-- Firebase emulator end-to-end suite: passed.
+- Android production JavaScript export: passed (2,727 modules and all eight required assets).
 - Git whitespace validation: passed.
+- Backend unit tests: previously passed (3/3); this run could not rebind its local test server inside the Codex sandbox.
+- Firebase emulator end-to-end suite: previously passed from a clean emulator. The repeated run against the long-lived QA emulator completed the functional journey but its final analytics count assertion encountered pre-existing seeded records.
 
-The emulator suite covers Terms and Privacy acceptance, profile completion,
-two event categories, event creation and editing, production-safe event
-cancellation, recurring-circle creation and occurrences, participant join
-requests, host approvals, protected chat, attendance, feedback, host access,
-safety reports, notifications, analytics, and account deletion.
+## Physical Android journeys
 
-## Physical Android checks completed before disconnect
+1. **Authentication and onboarding — passed**
+   - Phone and OTP actions remain reachable above the Android keyboard.
+   - Firebase-emulator OTP, session creation, Terms, Privacy, and profile completion work.
+   - An expired Firebase ID token refreshes through the authenticated Firebase user instead of leaving the user at “session invalid or expired”.
+   - Android Back closes onboarding modals, goes to the previous step, and returns Edit profile to Profile.
 
-- Login phone field remains reachable above the keyboard.
-- OTP action remains reachable above the keyboard.
-- Legal acceptance contains Terms and Privacy only.
-- Profile setup reaches the final photo step with corrected bottom clearance.
-- A seeded approved plan appears under **Your next plan** on Home.
-- Opening the Home plan hero opens that exact activity detail.
-- The populated activity detail displays the host note and approved attendees.
+2. **Participant discovery and joining — passed**
+   - Home opens the exact next plan when one exists and falls back to discovery when none exists.
+   - Explore builds category filters from the live activities and filters Books, Fitness, and Photography correctly.
+   - Join confirmation, request submission, pending state, withdrawal, host approval, approved detail, and protected chat all work.
 
-## Remaining physical and visual acceptance
+3. **Plans and chat — passed**
+   - Dates are selectable in the week rail.
+   - Dates with plans have markers in the week rail and month calendar.
+   - Recurring-circle occurrences appear on their applicable dates.
+   - Chats is present in bottom navigation, contains approved non-cancelled activities once, and persists a sent message.
+   - The Android keyboard resizes the chat composer above the keyboard.
 
-The Android device is no longer visible to ADB. The last known address,
-`192.168.0.7:42497`, is unreachable. The following checks require the device
-to be reconnected:
+4. **Host lifecycle — passed**
+   - Host event creation, editing, request review, approval, and cancellation work through the UI.
+   - Cancelled activities move to History, display Cancelled, and do not expose Chat or participant actions.
 
-1. Create two activities through the host UI and confirm their live Explore
-   categories and category filtering.
-2. Edit and cancel an activity through the host UI and verify the participant
-   sees the updated/cancelled state.
-3. Select populated dates in Plans and verify plan dots in the week rail and
-   full calendar, including recurring-circle occurrences.
-4. Open Chats from the bottom navigation, enter a cohort chat, and verify the
-   composer moves above the Android keyboard.
-5. Recheck Profile and Settings, including Edit profile, verification,
-   recommendation visibility, blocked members, Help & legal, Log out, and the
-   irreversible account-deletion warning.
-6. Capture populated implementation screenshots at the same viewport and
-   state as the approved source screens, compare them in one image, and fix
-   any visible P0-P2 mismatch.
+5. **Profile, settings, and deletion — passed**
+   - Edit profile, verification, recommendation visibility, blocked members, legal/help, and Log out are reachable.
+   - Preferences and Community Promise are absent.
+   - Delete account is last and requires a destructive confirmation before deletion.
 
-final result: blocked
+## Visual acceptance
+
+Reference/current comparison sheets are in `artifacts/final-device-audit-2026-07-22/comparisons/` for Home, activity detail, Plans, and Profile.
+
+- P0 functional mismatch: none found.
+- P1 hierarchy/layout mismatch: none found.
+- P2 polish mismatch: none blocking acceptance. Content density and Android system chrome differ from the static deck by design.
+- Home, detail, Plans, and Profile use the approved trust-led navy, porcelain, warm illustration, rounded-card, and restrained glass treatment.
+- Plan cards now use a purpose-built portrait book-swap asset; uploaded custom event photography continues to take precedence.
+- The floating grey gear visible in device screenshots belongs to Expo Dev Client and is absent from release builds.
+
+## Accessibility and real-environment limits
+
+- Labels, roles, keyboard reachability, destructive confirmation, and Android hardware Back were checked.
+- TalkBack traversal, font scaling, switch access, and contrast under device accessibility overrides still require a manual accessibility pass.
+- Real SMS/Play Integrity, push notifications, production Storage uploads, and a Play Internal Testing build cannot be proven by the emulator-only Firebase environment.
+
+final result: passed for implementation and connected-device QA; remaining items are production-service acceptance checks

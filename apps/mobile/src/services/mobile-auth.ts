@@ -1,5 +1,6 @@
 import {
   getIdToken,
+  onIdTokenChanged,
   signInWithPhoneNumber,
   signOut,
   type ConfirmationResult,
@@ -44,6 +45,29 @@ export async function restoreFirebaseIdToken(): Promise<string | undefined> {
   const auth = getFirebaseAuth();
   await auth.authStateReady();
   return auth.currentUser ? getIdToken(auth.currentUser) : undefined;
+}
+
+export async function resolveFirebaseIdToken(fallback: string) {
+  const auth = getFirebaseAuth();
+  await auth.authStateReady();
+  return auth.currentUser ? getIdToken(auth.currentUser) : fallback;
+}
+
+export function subscribeToFirebaseIdToken(
+  listener: (idToken?: string) => void,
+) {
+  return onIdTokenChanged(getFirebaseAuth(), (user) => {
+    if (!user) {
+      listener(undefined);
+      return;
+    }
+
+    void getIdToken(user)
+      .then(listener)
+      .catch((error) => {
+        console.warn('Unable to refresh the Firebase ID token.', error);
+      });
+  });
 }
 
 export async function logoutMobileUser() {

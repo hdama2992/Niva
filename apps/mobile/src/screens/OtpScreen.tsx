@@ -2,9 +2,11 @@ import { ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +32,7 @@ export function OtpScreen({
   onVerified,
 }: OtpScreenProps) {
   const inputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string>();
   const [resendSeconds, setResendSeconds] = useState(resendDelaySeconds);
@@ -44,6 +47,17 @@ export function OtpScreen({
     );
     return () => clearTimeout(timer);
   }, [resendSeconds]);
+
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(
+        () => scrollRef.current?.scrollTo({ animated: true, y: 48 }),
+        180,
+      );
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const verifyCode = async () => {
     if (code.length !== 6) {
@@ -83,108 +97,115 @@ export function OtpScreen({
       style={styles.screen}
     >
       <DeckTopBar onBack={onBack} />
-      <View style={styles.content}>
-        <Text style={styles.title}>Enter the 6-digit code</Text>
-        <View style={styles.phoneRow}>
-          <Text style={styles.subtitle}>Sent by SMS to {phone}</Text>
-          <Pressable accessibilityRole="button" onPress={onBack}>
-            <Text style={styles.change}>Change</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Enter the 6-digit code</Text>
+          <View style={styles.phoneRow}>
+            <Text style={styles.subtitle}>Sent by SMS to {phone}</Text>
+            <Pressable accessibilityRole="button" onPress={onBack}>
+              <Text style={styles.change}>Change</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            accessibilityLabel="Verification code"
+            accessibilityRole="button"
+            onPress={() => inputRef.current?.focus()}
+            style={styles.codeRow}
+          >
+            {Array.from({ length: 6 }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.codeBox,
+                  index === Math.min(code.length, 5) && styles.codeBoxActive,
+                ]}
+              >
+                <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
+              </View>
+            ))}
+            <TextInput
+              ref={inputRef}
+              autoComplete="sms-otp"
+              autoFocus
+              caretHidden
+              importantForAutofill="yes"
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={(value) => {
+                setCode(value.replace(/\D/g, ''));
+                setError(undefined);
+              }}
+              style={styles.hiddenInput}
+              textContentType="oneTimeCode"
+              value={code}
+            />
+          </Pressable>
+
+          <View style={styles.safetyRow}>
+            <View style={styles.safetyIcon}>
+              <ShieldCheck color={colors.success} size={20} />
+            </View>
+            <Text style={styles.safetyText}>
+              Niva never asks you to share this code with anyone.
+            </Text>
+          </View>
+
+          {error ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              {error}
+            </Text>
+          ) : null}
+
+          <View style={styles.resendRow}>
+            {resendSeconds > 0 ? (
+              <Text style={styles.resendHint}>
+                Resend available in{' '}
+                <Text style={styles.resendStrong}>
+                  {formatTimer(resendSeconds)}
+                </Text>
+              </Text>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                disabled={resending}
+                onPress={() => void resendCode()}
+              >
+                <Text style={styles.resendAction}>
+                  {resending ? 'Sending another code…' : 'Resend code'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <PrimaryButton
+            disabled={code.length !== 6 || submitting}
+            icon={
+              submitting ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <ArrowRight color={colors.surface} size={22} />
+              )
+            }
+            label={submitting ? 'Verifying…' : 'Verify and continue'}
+            onPress={() => void verifyCode()}
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => inputRef.current?.focus()}
+            style={styles.helpButton}
+          >
+            <Text style={styles.helpText}>Having trouble?</Text>
           </Pressable>
         </View>
-
-        <Pressable
-          accessibilityLabel="Verification code"
-          accessibilityRole="button"
-          onPress={() => inputRef.current?.focus()}
-          style={styles.codeRow}
-        >
-          {Array.from({ length: 6 }).map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.codeBox,
-                index === Math.min(code.length, 5) && styles.codeBoxActive,
-              ]}
-            >
-              <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
-            </View>
-          ))}
-          <TextInput
-            ref={inputRef}
-            autoComplete="sms-otp"
-            autoFocus
-            caretHidden
-            importantForAutofill="yes"
-            keyboardType="number-pad"
-            maxLength={6}
-            onChangeText={(value) => {
-              setCode(value.replace(/\D/g, ''));
-              setError(undefined);
-            }}
-            style={styles.hiddenInput}
-            textContentType="oneTimeCode"
-            value={code}
-          />
-        </Pressable>
-
-        <View style={styles.safetyRow}>
-          <View style={styles.safetyIcon}>
-            <ShieldCheck color={colors.success} size={20} />
-          </View>
-          <Text style={styles.safetyText}>
-            Niva never asks you to share this code with anyone.
-          </Text>
-        </View>
-
-        {error ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error}>
-            {error}
-          </Text>
-        ) : null}
-
-        <View style={styles.resendRow}>
-          {resendSeconds > 0 ? (
-            <Text style={styles.resendHint}>
-              Resend available in{' '}
-              <Text style={styles.resendStrong}>
-                {formatTimer(resendSeconds)}
-              </Text>
-            </Text>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              disabled={resending}
-              onPress={() => void resendCode()}
-            >
-              <Text style={styles.resendAction}>
-                {resending ? 'Sending another code…' : 'Resend code'}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <PrimaryButton
-          disabled={code.length !== 6 || submitting}
-          icon={
-            submitting ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <ArrowRight color={colors.surface} size={22} />
-            )
-          }
-          label={submitting ? 'Verifying…' : 'Verify and continue'}
-          onPress={() => void verifyCode()}
-        />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => inputRef.current?.focus()}
-          style={styles.helpButton}
-        >
-          <Text style={styles.helpText}>Having trouble?</Text>
-        </Pressable>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -252,7 +273,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     position: 'relative',
   },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
+  content: { paddingHorizontal: spacing.lg },
   error: {
     color: colors.warning,
     fontSize: typography.small,
@@ -315,6 +336,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   screen: { backgroundColor: colors.background, flex: 1 },
+  scrollContent: { flexGrow: 1 },
   subtitle: { color: colors.muted, fontSize: typography.body },
   title: {
     color: colors.primaryDark,
