@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 
 import { resolveActivityArtwork } from '../constants/activity-artwork';
+import { hostToolsEnabled } from '../constants/features';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import { DiscoveryItem } from '../data/discovery';
 import { IcebreakerMember } from '../services/community';
@@ -238,9 +239,7 @@ export function ActivityDetailScreen({
                   size={16}
                   strokeWidth={2.4}
                 />
-                <Text style={styles.verifiedText}>
-                  Verified member
-                </Text>
+                <Text style={styles.verifiedText}>Verified member</Text>
               </View>
             </View>
           </View>
@@ -278,7 +277,7 @@ export function ActivityDetailScreen({
             </View>
           ) : null}
 
-          {isHost && !cancelled ? (
+          {hostToolsEnabled && isHost && !cancelled ? (
             <View style={styles.hostActions}>
               <Pressable
                 accessibilityRole="button"
@@ -639,7 +638,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
-  hero: { aspectRatio: 3 / 2, backgroundColor: colors.primary, justifyContent: 'flex-start', overflow: 'hidden' },
+  hero: {
+    aspectRatio: 3 / 2,
+    backgroundColor: colors.primary,
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
   heroActions: {
     flexDirection: 'row',
     gap: spacing.sm,

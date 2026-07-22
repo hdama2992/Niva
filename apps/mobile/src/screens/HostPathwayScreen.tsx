@@ -11,6 +11,7 @@ import {
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../constants/theme';
+import { hostToolsEnabled } from '../constants/features';
 import { HostApproval } from '../services/community';
 import { NivaUser } from '../types/niva';
 
@@ -112,7 +113,9 @@ export function HostPathwayScreen({
             <View style={styles.flex}>
               <Text style={styles.statusTitle}>You’re approved to host</Text>
               <Text style={styles.statusText}>
-                Create an event or circle from your Profile.
+                {hostToolsEnabled
+                  ? 'Create an event or circle from your Profile.'
+                  : 'We’ll enable creation tools when hosting opens.'}
               </Text>
             </View>
           </View>

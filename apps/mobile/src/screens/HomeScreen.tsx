@@ -52,6 +52,7 @@ import {
 } from 'react-native';
 
 import { DiscoveryItem, safetyTips } from '../data/discovery';
+import { hostToolsEnabled } from '../constants/features';
 import { colors, radius, spacing, typography } from '../constants/theme';
 import {
   activityArtwork as curatedArtwork,
@@ -1349,13 +1350,17 @@ export function HomeScreen({
                 <Text style={styles.hostPathEyebrow}>HOST WITH NIVA</Text>
                 <Text style={styles.hostPathTitle}>
                   {hostApproval?.status === 'APPROVED'
-                    ? 'Your hosting tools'
+                    ? hostToolsEnabled
+                      ? 'Your hosting tools'
+                      : 'Host access approved'
                     : 'Bring a thoughtful plan to life'}
                 </Text>
                 <Text style={styles.hostPathText}>
                   {hostApproval?.status === 'PENDING'
                     ? 'Your application is under review.'
-                    : 'Learn what hosts do and how approval works.'}
+                    : hostApproval?.status === 'APPROVED' && !hostToolsEnabled
+                      ? 'Creation tools will appear here when hosting opens.'
+                      : 'Learn what hosts do and how approval works.'}
                 </Text>
                 <View style={styles.hostPathAction}>
                   <Text style={styles.hostPathActionText}>View hosting</Text>
@@ -1373,7 +1378,7 @@ export function HomeScreen({
               />
             </Pressable>
 
-            {hostApproval?.status === 'APPROVED' ? (
+            {hostToolsEnabled && hostApproval?.status === 'APPROVED' ? (
               <View style={styles.hostCreateRow}>
                 <Pressable
                   accessibilityRole="button"
@@ -1443,6 +1448,7 @@ export function HomeScreen({
 
           return (
             <Pressable
+              accessibilityLabel={`${tab.label} tab`}
               accessibilityRole="button"
               key={tab.id}
               onPress={() => changeTab(tab.id)}
